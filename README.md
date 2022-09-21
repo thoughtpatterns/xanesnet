@@ -30,8 +30,15 @@ This section is intended to list the frameworks and tools you're using to develo
 ## Getting Started
 
 ### Prerequisites
+The code has been designed to support python 3. The project has the following dependencies and version requirements:
 
-Any tools or versions of languages needed to run code. For example specific Python or Node versions. Minimum hardware requirements also go here.
+- tensorflow>=2.1.0
+- numpy
+- scipy
+- scikit-learn
+- ase
+- tqdm
+
 
 ### Installation
 
@@ -39,7 +46,8 @@ How to build or install the applcation.
 
 ### Running Locally
 
-How to run the application on your local system.
+To run the training :
+'python cli.py learn in.json'
 
 ### Running Tests
 
