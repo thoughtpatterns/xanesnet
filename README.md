@@ -47,7 +47,7 @@ How to build or install the applcation.
 ### Running Locally
 
 To run the training :
-'python cli.py learn in.json'
+`python cli.py learn in.json`
 
 ### Running Tests
 
