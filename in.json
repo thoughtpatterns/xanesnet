@@ -1,0 +1,31 @@
+{
+    "x_path": "/Users/nnn28/xanes/data/datasets/fe/default/xyz_train",
+    "y_path": "/Users/nnn28/xanes/data/datasets/fe/default/xanes_train",
+
+    "descriptor_type": "wacsf",
+    "descriptor_params": {
+        "r_min": 1.0,
+        "r_max": 6.0,
+        "n_g2": 16,
+        "n_g4": 32
+    },
+
+    "hyperparams": {
+        "n_hl": 2,
+        "hl_ini_dim": 256,
+        "hl_shrink": 0.9,
+        "activation": "tanh",
+        "loss": "mse",
+        "lr": 0.0001,
+        "dropout": 0.20,
+        "kernel_init": "he_uniform",
+        "bias_init": "zeros"
+    },
+
+    "seed": 2021,
+
+    "epochs": 1,
+
+    "variance_threshold": 0.0
+
+}
