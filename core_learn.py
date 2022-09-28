@@ -211,20 +211,31 @@ def main(
     x, y = shuffle(x, y, random_state = rng, n_samples = max_samples)
     print('>> ...shuffled and selected!\n')
 
-    net = KerasRegressor(
-        build_fn = build_mlp, 
+    # print(hyperparams)
+    # net = KerasRegressor(
+    #     build_fn = build_mlp, 
+    #     out_dim = y[0].size, 
+    #     **hyperparams,
+    #     callbacks = set_callbacks(**callbacks),
+    #     epochs = epochs,
+    #     random_state = rng,
+    #     verbose = 2
+    # )
+
+    net = build_mlp(
         out_dim = y[0].size, 
         **hyperparams,
-        callbacks = set_callbacks(**callbacks),
-        epochs = epochs,
-        random_state = rng,
-        verbose = 2
-    )
+        # callbacks = set_callbacks(**callbacks),
+        # epochs = epochs,
+        # random_state = rng,
+        # verbose = 2
+        )
+    # print(net.build_mlp.summary()) 
 
     print('>> setting up preprocessing pipeline...')
     pipeline = Pipeline([
-        ('variance_threshold', VarianceThreshold(variance_threshold)),
-        ('scaler', StandardScaler()),
+        # ('variance_threshold', VarianceThreshold(variance_threshold)),
+        # ('scaler', StandardScaler()),
         ('net', net)
     ])
     for i, step in enumerate(pipeline.get_params()['steps']):
@@ -261,16 +272,30 @@ def main(
                 )
 
     else:
-
+        
+        # print(pipeline['net'].build_fn.summary())
         print('>> fitting neural net...')
-        pipeline.fit(x, y)
+        net.fit(
+            x, y, epochs
+            )
+        # print(type(pipeline))
+        # print(pipeline)
+        print(net.summary())
         print('>> ...neural net fit!\n')
 
         if save:
-            save_pipeline(
-                model_dir / f'net.keras', 
-                model_dir / f'pipeline.pickle',
-                pipeline
-            )
+            # save_pipeline(
+            #     model_dir / f'net.keras', 
+            #     model_dir / f'pipeline.pickle',
+            #     pipeline
+            # )
+            # serialize model to JSON
+            model_json = net.to_json()
+            with open(model_dir / f"model.json", "w") as json_file:
+                json_file.write(model_json)
+            # serialize weights to HDF5
+            net.save_weights(model_dir / f"model.h5")
+            print("Saved model to disk")
+
     
     return 0
