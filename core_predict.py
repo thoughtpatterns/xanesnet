@@ -36,6 +36,7 @@ from utils import list_filestems
 from structure.rdc import RDC
 from structure.wacsf import WACSF
 from spectrum.xanes import XANES
+from tensorflow.keras.models import model_from_json
 
 ###############################################################################
 ################################ MAIN FUNCTION ################################
@@ -82,13 +83,22 @@ def main(
         x[i,:] = descriptor.transform(atoms)
     print('>> ...loaded!\n')
 
-    pipeline = load_pipeline(
-        model_dir / 'net.keras',
-        model_dir / 'pipeline.pickle'
-    )
+    # pipeline = load_pipeline(
+    #     model_dir / 'net.keras',
+    #     model_dir / 'pipeline.pickle'
+    # )
+
+    # load json and create model
+    json_file = open(model_dir / 'model.json', 'r')
+    loaded_model_json = json_file.read()
+    json_file.close()
+    loaded_model = model_from_json(loaded_model_json)
+    # load weights into new model
+    loaded_model.load_weights(model_dir / "model.h5")
+    print("Loaded model from disk")
 
     print('>> predicting Y data with neural net...')
-    y_predict = pipeline.predict(x)
+    y_predict = loaded_model(x)
     if y_predict.ndim == 1:
         if len(ids) == 1:
             y_predict = y_predict.reshape(-1, y_predict.size)
