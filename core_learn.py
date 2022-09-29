@@ -22,6 +22,7 @@ this program.  If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 import pickle as pickle
 import tqdm as tqdm
+import time
 
 from pathlib import Path
 from numpy.random import RandomState
@@ -33,6 +34,9 @@ from sklearn.model_selection import RepeatedKFold
 from sklearn.model_selection import cross_validate
 from sklearn.utils import shuffle
 from tensorflow.keras.wrappers.scikit_learn import KerasRegressor
+from sklearn.metrics import mean_squared_error
+from estimator import Estimator
+import tensorflow as tf
 
 from inout import load_xyz
 from inout import save_xyz
@@ -230,12 +234,12 @@ def main(
         # random_state = rng,
         # verbose = 2
         )
-    # print(net.build_mlp.summary()) 
+    # # print(net.build_mlp.summary()) 
 
     print('>> setting up preprocessing pipeline...')
     pipeline = Pipeline([
-        # ('variance_threshold', VarianceThreshold(variance_threshold)),
-        # ('scaler', StandardScaler()),
+        ('variance_threshold', VarianceThreshold(variance_threshold)),
+        ('scaler', StandardScaler()),
         ('net', net)
     ])
     for i, step in enumerate(pipeline.get_params()['steps']):
@@ -247,29 +251,85 @@ def main(
     if kfold_params:
 
         kfold_spooler = RepeatedKFold(**kfold_params, random_state = rng)
+        # print(kfold_spooler)
 
-        print('>> fitting neural net...')
-        kfold_output = cross_validate(
-            pipeline, 
-            x, 
-            y, 
-            cv = kfold_spooler, 
-            return_train_score = True,
-            return_estimator = True, 
-            verbose = kfold_spooler.get_n_splits()
-        )
-        print('...neural net fit!\n')
+        # est_net = Estimator(net, epochs)
 
-        print_cross_validation_scores(kfold_output)
+        # kfold_output = cross_validate(est_net,
+        #     x,
+        #     y,
+        #     cv = kfold_spooler, 
+        #     return_train_score = True
+        #     ,
+        #     return_estimator = True, 
+        #     verbose =
+        #     kfold_spooler.get_n_splits()
+        #     )
 
-        if save:
-            for kfold_pipeline in kfold_output['estimator']:
-                kfold_dir = unique_path(model_dir, 'kfold')
-                save_pipeline(
-                    kfold_dir / 'net.keras', 
-                    kfold_dir / 'pipeline.pickle',
-                    kfold_pipeline
+        # print(kfold_spooler.split(x))
+        
+        fit_time = []
+        train_score = []
+        test_score =[]
+        for train_index, test_index in kfold_spooler.split(x):
+            
+            # clear the session 
+            tf.keras.backend.clear_session()
+            net = build_mlp(
+                out_dim = y[0].size, 
+                **hyperparams,
+                
                 )
+            start = time.time()
+           
+            X_train, X_test = x[train_index], x[test_index]
+            y_train, y_test = y[train_index], y[test_index]
+
+            trainning = net.fit(
+            X_train, y_train, epochs
+            )
+
+            fit_time.append(time.time()- start)
+            train_score.append(trainning.history['loss'][0])
+            
+            result = net.evaluate(X_test, y_test)
+            test_score.append(result)
+        
+        score = {"fit_time": fit_time, "train_score": train_score, "test_score": test_score}
+
+
+
+
+
+
+
+
+        # print('>> fitting neural net...')
+        # kfold_output = cross_validate(
+        #     pipeline, 
+        #     x, 
+        #     y, 
+        #     cv = kfold_spooler, 
+        #     return_train_score = True,
+        #     return_estimator = True, 
+        #     verbose =
+        #     kfold_spooler.get_n_splits()
+        # )
+
+        # # print(kfold_output)
+        # print('...neural net fit!\n')
+
+        # print_cross_validation_scores(kfold_output)
+        print_cross_validation_scores(score)
+
+        # if save:
+        #     for kfold_pipeline in kfold_output['estimator']:
+        #         kfold_dir = unique_path(model_dir, 'kfold')
+        #         save_pipeline(
+        #             kfold_dir / 'net.keras', 
+        #             kfold_dir / 'pipeline.pickle',
+        #             kfold_pipeline
+        #         )
 
     else:
         
@@ -294,7 +354,7 @@ def main(
             with open(model_dir / f"model.json", "w") as json_file:
                 json_file.write(model_json)
             # serialize weights to HDF5
-            net.save_weights(model_dir / f"model.h5")
+            net.save_weights(model_dir / f"model.h")
             print("Saved model to disk")
 
     

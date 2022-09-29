@@ -182,18 +182,18 @@ def build_mlp(
         "bias_regularizer": None        
     }
 
-    print(ini_condition)
+    # print(ini_condition)
     net.add(Dense(hl_ini_dim, **ini_condition))
     net.add(Activation(activation))
     net.add(Dropout_(dropout, always_on = dropout_always_on))
     
     for i in range(n_hl - 1):
         hl_dim = (int(hl_ini_dim * (hl_shrink ** (i + 1))))
-        print(hl_dim)
+        # print(hl_dim)
         net.add(Dense(hl_dim if (hl_dim > 1) else 1, **ini_condition))
         net.add(Activation(activation))
         net.add(Dropout_(dropout, always_on = dropout_always_on))
-    print(out_dim)
+    # print(out_dim)
     net.add(Dense(out_dim))
     net.add(Activation('linear'))
 
