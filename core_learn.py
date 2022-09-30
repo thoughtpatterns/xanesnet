@@ -26,34 +26,24 @@ import time
 
 from pathlib import Path
 from numpy.random import RandomState
-from sklearn.pipeline import Pipeline
-from sklearn.feature_selection import VarianceThreshold
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import KFold
 from sklearn.model_selection import RepeatedKFold
-from sklearn.model_selection import cross_validate
 from sklearn.utils import shuffle
-from tensorflow.keras.wrappers.scikit_learn import KerasRegressor
-from sklearn.metrics import mean_squared_error
-from estimator import Estimator
-import tensorflow as tf
+# import tensorflow as tf
 
 from inout import load_xyz
-from inout import save_xyz
 from inout import load_xanes
-from inout import save_xanes
-from inout import load_pipeline
-from inout import save_pipeline
-from dnn import check_gpu_support
-from dnn import set_callbacks
-from dnn import build_mlp
+# from dnn import check_gpu_support
+# from dnn import build_mlp
 from utils import unique_path
 from utils import linecount
 from utils import list_filestems
 from utils import print_cross_validation_scores
 from structure.rdc import RDC
 from structure.wacsf import WACSF
-from spectrum.xanes import XANES
+
+import torch
+from mlp_pytorch import train_mlp
+from mlp_pytorch import MLP
 
 ###############################################################################
 ################################ MAIN FUNCTION ################################
@@ -215,112 +205,48 @@ def main(
     x, y = shuffle(x, y, random_state = rng, n_samples = max_samples)
     print('>> ...shuffled and selected!\n')
 
-    # print(hyperparams)
-    # net = KerasRegressor(
-    #     build_fn = build_mlp, 
+    # net = build_mlp(
     #     out_dim = y[0].size, 
     #     **hyperparams,
-    #     callbacks = set_callbacks(**callbacks),
-    #     epochs = epochs,
-    #     random_state = rng,
-    #     verbose = 2
-    # )
+    #     )
 
-    net = build_mlp(
-        out_dim = y[0].size, 
-        **hyperparams,
-        # callbacks = set_callbacks(**callbacks),
-        # epochs = epochs,
-        # random_state = rng,
-        # verbose = 2
-        )
-    # # print(net.build_mlp.summary()) 
-
-    print('>> setting up preprocessing pipeline...')
-    pipeline = Pipeline([
-        ('variance_threshold', VarianceThreshold(variance_threshold)),
-        ('scaler', StandardScaler()),
-        ('net', net)
-    ])
-    for i, step in enumerate(pipeline.get_params()['steps']):
-        print(f'  >> {i + 1}. ' + '{} :: {}'.format(*step))
-    print('>> ...set up!\n')
-
-    check_gpu_support()
+    # check_gpu_support()
+    # mlp = MLP(256, 256, hyperparams['dropout'], hyperparams['hl_shrink'], y[0].size)
 
     if kfold_params:
 
         kfold_spooler = RepeatedKFold(**kfold_params, random_state = rng)
-        # print(kfold_spooler)
+        
+        # fit_time = []
+        # train_score = []
+        # test_score =[]
+        # for train_index, test_index in kfold_spooler.split(x):
+            
+        #     # clear the session 
+        #     tf.keras.backend.clear_session()
+        #     net = build_mlp(
+        #         out_dim = y[0].size, 
+        #         **hyperparams,
+                
+        #         )
+        #     start = time.time()
+           
+        #     X_train, X_test = x[train_index], x[test_index]
+        #     y_train, y_test = y[train_index], y[test_index]
 
-        # est_net = Estimator(net, epochs)
-
-        # kfold_output = cross_validate(est_net,
-        #     x,
-        #     y,
-        #     cv = kfold_spooler, 
-        #     return_train_score = True
-        #     ,
-        #     return_estimator = True, 
-        #     verbose =
-        #     kfold_spooler.get_n_splits()
+        #     trainning = net.fit(
+        #     X_train, y_train, epochs
         #     )
 
-        # print(kfold_spooler.split(x))
-        
-        fit_time = []
-        train_score = []
-        test_score =[]
-        for train_index, test_index in kfold_spooler.split(x):
+        #     fit_time.append(time.time()- start)
+        #     train_score.append(trainning.history['loss'][0])
             
-            # clear the session 
-            tf.keras.backend.clear_session()
-            net = build_mlp(
-                out_dim = y[0].size, 
-                **hyperparams,
-                
-                )
-            start = time.time()
-           
-            X_train, X_test = x[train_index], x[test_index]
-            y_train, y_test = y[train_index], y[test_index]
-
-            trainning = net.fit(
-            X_train, y_train, epochs
-            )
-
-            fit_time.append(time.time()- start)
-            train_score.append(trainning.history['loss'][0])
-            
-            result = net.evaluate(X_test, y_test)
-            test_score.append(result)
+        #     result = net.evaluate(X_test, y_test)
+        #     test_score.append(result)
         
-        score = {"fit_time": fit_time, "train_score": train_score, "test_score": test_score}
+        # score = {"fit_time": fit_time, "train_score": train_score, "test_score": test_score}
 
-
-
-
-
-
-
-
-        # print('>> fitting neural net...')
-        # kfold_output = cross_validate(
-        #     pipeline, 
-        #     x, 
-        #     y, 
-        #     cv = kfold_spooler, 
-        #     return_train_score = True,
-        #     return_estimator = True, 
-        #     verbose =
-        #     kfold_spooler.get_n_splits()
-        # )
-
-        # # print(kfold_output)
-        # print('...neural net fit!\n')
-
-        # print_cross_validation_scores(kfold_output)
-        print_cross_validation_scores(score)
+        # print_cross_validation_scores(score)
 
         # if save:
         #     for kfold_pipeline in kfold_output['estimator']:
@@ -333,29 +259,21 @@ def main(
 
     else:
         
-        # print(pipeline['net'].build_fn.summary())
         print('>> fitting neural net...')
-        net.fit(
-            x, y, epochs
-            )
-        # print(type(pipeline))
-        # print(pipeline)
-        print(net.summary())
-        print('>> ...neural net fit!\n')
+        epoch, model, optimizer = train_mlp(x, y, hyperparams, epochs)
+        print(model)
+        # net.fit(
+        #     x, y, epochs
+        #     )
+        # print(net.summary())
+        # print('>> ...neural net fit!\n')
 
-        if save:
-            # save_pipeline(
-            #     model_dir / f'net.keras', 
-            #     model_dir / f'pipeline.pickle',
-            #     pipeline
-            # )
-            # serialize model to JSON
-            model_json = net.to_json()
-            with open(model_dir / f"model.json", "w") as json_file:
-                json_file.write(model_json)
-            # serialize weights to HDF5
-            net.save_weights(model_dir / f"model.h")
-            print("Saved model to disk")
+        # if save:
+        #     model_json = net.to_json()
+        #     with open(model_dir / f"model.json", "w") as json_file:
+        #         json_file.write(model_json)
+        #     net.save_weights(model_dir / f"model.h")
+        #     print("Saved model to disk")
 
     
     return 0

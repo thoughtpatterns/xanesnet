@@ -45,13 +45,13 @@ class MLP(nn.Module):
         )
          
         self.fc2 = nn.Sequential(
-            nn.Linear(self.hidden_size, self.hidden_size*(hl_shrink)),
+            nn.Linear(self.hidden_size, 230),
             nn.ReLU(),
             nn.Dropout(p=self.dropout)
         )
 
         self.fc3 = nn.Sequential(
-            nn.Linear(self.hidden_size*(hl_shrink), out_dim)
+            nn.Linear(230, self.out_dim)
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -62,11 +62,22 @@ class MLP(nn.Module):
 
         return out
 
-def train_mlp (mlp, x, y, hyperparams, verbose, n_epoch):
+def train_mlp (x, y, hyperparams, n_epoch):
 
     device  = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-
-    trainloader = torch.utils.data.DataLoader([ [x[i], y[i]] for i in range(len(y))], shuffle=True, batch_size=100)
+    
+    out_dim = y[0].size
+    n_in = x.shape[1]
+    
+    x = torch.from_numpy(x)
+    y = torch.from_numpy(y)
+    
+    trainset = torch.utils.data.TensorDataset(x, y)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True)
+    # trainloader = torch.utils.data.DataLoader([ [x[i], y[i]] for i in range(len(y))], shuffle=True, batch_size=100)
+    
+    mlp = MLP(n_in, 256, hyperparams['dropout'], hyperparams['hl_shrink'], out_dim)
+    mlp.to(device)
     mlp.train()
     optimizer = optim.Adam(mlp.parameters(), lr=hyperparams['lr'])
     criterion = nn.MSELoss()
@@ -75,6 +86,7 @@ def train_mlp (mlp, x, y, hyperparams, verbose, n_epoch):
         running_loss = 0
         for inputs, labels in trainloader:
             inputs, labels = inputs.to(device), labels.to(device)
+            inputs, labels = inputs.float(), labels.float()
 
             optimizer.zero_grad()
             logps = mlp(inputs)
@@ -85,8 +97,6 @@ def train_mlp (mlp, x, y, hyperparams, verbose, n_epoch):
             running_loss += loss.item()
 
         print(running_loss/len(trainloader))
-
-
 
     return epoch, mlp, optimizer
 
