@@ -41,9 +41,9 @@ from utils import print_cross_validation_scores
 from structure.rdc import RDC
 from structure.wacsf import WACSF
 
-import torch
 from mlp_pytorch import train_mlp
-from mlp_pytorch import MLP
+import torch
+from torchinfo import summary
 
 ###############################################################################
 ################################ MAIN FUNCTION ################################
@@ -261,7 +261,19 @@ def main(
         
         print('>> fitting neural net...')
         epoch, model, optimizer = train_mlp(x, y, hyperparams, epochs)
+        summary(model, (1, 49))
         print(model)
+
+        if save:
+            state = {
+                "epoch": epoch,
+                "state_dict": model.state_dict,
+                "optimizer": optimizer
+            }
+        
+            torch.save(model, model_dir / f"model.cpt")
+            print("Saved model to disk")
+
         # net.fit(
         #     x, y, epochs
         #     )
@@ -276,4 +288,4 @@ def main(
         #     print("Saved model to disk")
 
     
-    return 0
+    return

@@ -68,14 +68,13 @@ def train_mlp (x, y, hyperparams, n_epoch):
     
     out_dim = y[0].size
     n_in = x.shape[1]
-    
+   
     x = torch.from_numpy(x)
     y = torch.from_numpy(y)
     
     trainset = torch.utils.data.TensorDataset(x, y)
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True)
-    # trainloader = torch.utils.data.DataLoader([ [x[i], y[i]] for i in range(len(y))], shuffle=True, batch_size=100)
-    
+   
     mlp = MLP(n_in, 256, hyperparams['dropout'], hyperparams['hl_shrink'], out_dim)
     mlp.to(device)
     mlp.train()
@@ -87,15 +86,16 @@ def train_mlp (x, y, hyperparams, n_epoch):
         for inputs, labels in trainloader:
             inputs, labels = inputs.to(device), labels.to(device)
             inputs, labels = inputs.float(), labels.float()
-
+            
             optimizer.zero_grad()
             logps = mlp(inputs)
-
+            
             loss = criterion(logps, labels)
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
-
+            # print(loss.item())
+            
         print(running_loss/len(trainloader))
 
     return epoch, mlp, optimizer
