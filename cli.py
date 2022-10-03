@@ -81,10 +81,14 @@ def main(args: list):
             inp = json.load(f)
         print_nested_dict(inp, nested_level = 1)
         print('')
+        # print(print_nested_dict)
         learn(**inp, save = args.save)
+        print("done")
 
     if args.mode == 'predict':
-            predict(args.mdl_dir, args.xyz_dir)
+        predict(args.mdl_dir, args.xyz_dir)
+    
+    return
         
     # banner = importlib.resources.read_text(resources, 'banner_close.txt')
     # print(banner)
@@ -95,6 +99,7 @@ def main(args: list):
 
 if __name__ == '__main__':
     main(sys.argv[1:])
+    print("done")
 
 ################################################################################
 ############################### PROGRAM ENDS HERE ##############################
