@@ -33,9 +33,12 @@ from inout import load_pipeline
 from inout import save_pipeline
 from utils import unique_path
 from utils import list_filestems
+from utils import linecount
 from structure.rdc import RDC
 from structure.wacsf import WACSF
 from spectrum.xanes import XANES
+
+from sklearn.metrics import mean_squared_error
 
 ###############################################################################
 ################################ MAIN FUNCTION ################################
@@ -43,7 +46,8 @@ from spectrum.xanes import XANES
  
 def main(
     model_dir: str,
-    x_path: str
+    x_path: str,
+    y_path: str
 ):
     """
     PREDICT. The model state is restored from a model directory containing
@@ -62,17 +66,25 @@ def main(
     model_dir = Path(model_dir)
 
     x_path = Path(x_path)
+    y_path = Path(y_path)
 
-    ids = list_filestems(x_path)
+    ids = list(
+            set(list_filestems(x_path)) & set(list_filestems(y_path))
+        )
+
+    ids.sort()
 
     with open(model_dir / 'descriptor.pickle', 'rb') as f:
         descriptor = pickle.load(f)
 
     n_samples = len(ids)
     n_x_features = descriptor.get_len()
+    n_y_features = linecount(y_path / f'{ids[0]}.txt') - 2
 
     x = np.full((n_samples, n_x_features), np.nan)
     print('>> preallocated {}x{} array for X data...'.format(*x.shape))
+    y = np.full((n_samples, n_y_features), np.nan)
+    print('>> preallocated {}x{} array for Y data...'.format(*y.shape))
     print('>> ...everything preallocated!\n')
 
     print('>> loading data into array(s)...')
@@ -80,6 +92,10 @@ def main(
         with open(x_path / f'{id_}.xyz', 'r') as f:
             atoms = load_xyz(f)
         x[i,:] = descriptor.transform(atoms)
+        with open(y_path / f'{id_}.txt', 'r') as f:
+            xanes = load_xanes(f)
+            # print(xanes.spectrum)
+            e, y[i,:] = xanes.spectrum
     print('>> ...loaded!\n')
 
     pipeline = load_pipeline(
@@ -95,6 +111,8 @@ def main(
         else:
             y_predict = y_predict.reshape(y_predict.size, -1)
     print('>> ...predicted Y data!\n')
+
+    print(mean_squared_error(y, y_predict))
 
     predict_dir = unique_path(Path('.'), 'predictions')
     predict_dir.mkdir()
