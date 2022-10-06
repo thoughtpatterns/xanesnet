@@ -115,8 +115,8 @@ def main(
             y_predict = y_predict.reshape(y_predict.size, -1)
     print('>> ...predicted Y data!\n')
 
-    print(mean_squared_error(y, y_predict))
-    print(emd_samples(y, y_predict))
+    print("MSE:", mean_squared_error(y, y_predict))
+    print("EM distance:", emd_samples(y, y_predict))
 
     predict_dir = unique_path(Path('.'), 'predictions')
     predict_dir.mkdir()
@@ -134,6 +134,7 @@ def main(
         with open(predict_dir / f'{id_}.txt', 'w') as f:
             save_xanes(f, XANES(e, y_predict_))
             plt.savefig(predict_dir / f'{id_}.pdf')
+        plt.close()
     print('...saved!\n')
         
     return 0
