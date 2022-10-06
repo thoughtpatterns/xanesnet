@@ -41,6 +41,7 @@ from spectrum.xanes import XANES
 from sklearn.metrics import mean_squared_error
 import seaborn as sns
 import matplotlib.pyplot as plt
+from pyemd import emd_samples
 
 ###############################################################################
 ################################ MAIN FUNCTION ################################
@@ -115,6 +116,7 @@ def main(
     print('>> ...predicted Y data!\n')
 
     print(mean_squared_error(y, y_predict))
+    print(emd_samples(y, y_predict))
 
     predict_dir = unique_path(Path('.'), 'predictions')
     predict_dir.mkdir()
