@@ -39,6 +39,8 @@ from structure.wacsf import WACSF
 from spectrum.xanes import XANES
 
 from sklearn.metrics import mean_squared_error
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 ###############################################################################
 ################################ MAIN FUNCTION ################################
@@ -121,9 +123,15 @@ def main(
         e = np.load(f)['e']
 
     print('>> saving Y data predictions...')
-    for id_, y_predict_ in tqdm.tqdm(zip(ids, y_predict)):
+    for id_, y_predict_, y_ in tqdm.tqdm(zip(ids, y_predict, y)):
+        sns.set()
+        plt.figure()
+        plt.plot(y_predict_, label="prediction")
+        plt.plot(y_, label="target")
+        plt.legend(loc="upper right")
         with open(predict_dir / f'{id_}.txt', 'w') as f:
             save_xanes(f, XANES(e, y_predict_))
+            plt.savefig(predict_dir / f'{id_}.pdf')
     print('...saved!\n')
         
     return 0
