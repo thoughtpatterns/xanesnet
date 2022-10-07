@@ -27,6 +27,7 @@
 
 import torch
 from torch import nn, optim
+import math
 
 class MLP(nn.Module):
     def __init__(self, input_size, hidden_size, dropout, hl_shrink, out_dim):
@@ -40,18 +41,18 @@ class MLP(nn.Module):
 
         self.fc1 = nn.Sequential(
             nn.Linear(self.input_size, self.hidden_size),
-            nn.ReLU(),
-            nn.Dropout(p=self.dropout)
+            nn.Tanh(),
+            nn.Dropout(p=0.25)
         )
          
         self.fc2 = nn.Sequential(
-            nn.Linear(self.hidden_size, 230),
-            nn.ReLU(),
-            nn.Dropout(p=self.dropout)
+            nn.Linear(self.hidden_size, 512),
+            nn.Tanh(),
+            nn.Dropout(p=0.25)
         )
 
         self.fc3 = nn.Sequential(
-            nn.Linear(230, self.out_dim)
+            nn.Linear(512, self.out_dim)
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -61,6 +62,14 @@ class MLP(nn.Module):
         out = self.fc3(x)
 
         return out
+
+def weight_init(m):
+    if isinstance(m, nn.Linear):
+        nn.init.xavier_uniform_(m.weight)
+        # nn.init.kaiming_uniform_(m.weight, a=math.sqrt(5))
+        nn.init.zeros_(m.bias)
+        # nn.init.constant_(m.bias)
+
 
 def train_mlp (x, y, hyperparams, n_epoch):
 
@@ -73,12 +82,13 @@ def train_mlp (x, y, hyperparams, n_epoch):
     y = torch.from_numpy(y)
     
     trainset = torch.utils.data.TensorDataset(x, y)
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=1, shuffle=True)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=32)
    
-    mlp = MLP(n_in, 256, hyperparams['dropout'], hyperparams['hl_shrink'], out_dim)
+    mlp = MLP(n_in, 512, hyperparams['dropout'], hyperparams['hl_shrink'], out_dim)
     mlp.to(device)
+    mlp.apply(weight_init)
     mlp.train()
-    optimizer = optim.Adam(mlp.parameters(), lr=hyperparams['lr'])
+    optimizer = optim.Adam(mlp.parameters(), lr=0.0001)
     criterion = nn.MSELoss()
 
     for epoch in range(n_epoch):
