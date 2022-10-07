@@ -261,17 +261,18 @@ def main(
         
         print('>> fitting neural net...')
         epoch, model, optimizer = train_mlp(x, y, hyperparams, epochs)
-        summary(model, (1, 49))
+        summary(model, (1, x.shape[1]))
         print(model)
 
         if save:
-            state = {
-                "epoch": epoch,
-                "state_dict": model.state_dict,
-                "optimizer": optimizer
-            }
+            # state = {
+            #     "epoch": epoch,
+            #     "state_dict": model.state_dict,
+            #     "optimizer": optimizer
+            # }
         
-            torch.save(model, model_dir / f"model.cpt")
+            # torch.save(model.state_dict(), model_dir / f"model.cpt")
+            torch.save(model, model_dir / f"model.pt")
             print("Saved model to disk")
 
         # net.fit(
