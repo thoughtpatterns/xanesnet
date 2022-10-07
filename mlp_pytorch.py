@@ -28,6 +28,8 @@
 import torch
 from torch import nn, optim
 import math
+from pyemd import emd_samples
+import numpy as np
 
 class MLP(nn.Module):
     def __init__(self, input_size, hidden_size, dropout, hl_shrink, out_dim):
@@ -40,15 +42,15 @@ class MLP(nn.Module):
         self.out_dim = out_dim
 
         self.fc1 = nn.Sequential(
-            nn.Linear(self.input_size, self.hidden_size),
-            nn.Tanh(),
-            nn.Dropout(p=0.25)
+            nn.Linear(self.input_size, 256),
+            nn.ReLU(),
+            nn.Dropout(p=0.2)
         )
          
         self.fc2 = nn.Sequential(
-            nn.Linear(self.hidden_size, 512),
-            nn.Tanh(),
-            nn.Dropout(p=0.25)
+            nn.Linear(256, 512),
+            nn.ReLU(),
+            nn.Dropout(p=0.2)
         )
 
         self.fc3 = nn.Sequential(
@@ -70,6 +72,12 @@ def weight_init(m):
         nn.init.zeros_(m.bias)
         # nn.init.constant_(m.bias)
 
+# def custom_loss(pred, target):
+#     dist = ((target-pred)**2).sum(1)**0.5
+
+def earth_mover_distance(y_true, y_pred):
+    return torch.mean(torch.square(torch.cumsum(y_true, dim=-1) - torch.cumsum(y_pred, dim=-1)), dim=-1)
+
 
 def train_mlp (x, y, hyperparams, n_epoch):
 
@@ -88,8 +96,8 @@ def train_mlp (x, y, hyperparams, n_epoch):
     mlp.to(device)
     mlp.apply(weight_init)
     mlp.train()
-    optimizer = optim.Adam(mlp.parameters(), lr=0.0001)
-    criterion = nn.MSELoss()
+    optimizer = optim.Adam(mlp.parameters(), lr=0.00001)
+    # criterion = nn.MSELoss()
 
     for epoch in range(n_epoch):
         running_loss = 0
@@ -100,10 +108,15 @@ def train_mlp (x, y, hyperparams, n_epoch):
             optimizer.zero_grad()
             logps = mlp(inputs)
             
-            loss = criterion(logps, labels)
-            loss.backward()
+            # loss = criterion(logps, labels)
+            # loss = custom_loss(logps, labels)
+            loss = earth_mover_distance(labels, logps)
+            # print(loss.shape)
+            # loss.backward()
+            loss.mean().backward()
+
             optimizer.step()
-            running_loss += loss.item()
+            running_loss += loss.mean().item()
             # print(loss.item())
             
         print(running_loss/len(trainloader))

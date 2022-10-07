@@ -260,6 +260,7 @@ def main(
     else:
         
         print('>> fitting neural net...')
+        print(epochs)
         epoch, model, optimizer = train_mlp(x, y, hyperparams, epochs)
         summary(model, (1, x.shape[1]))
         print(model)
