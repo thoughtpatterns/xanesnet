@@ -1,6 +1,6 @@
 {
-    "x_path": "data/datasets/fe/default/xyz_train",
-    "y_path": "data/datasets/fe/default/xanes_train",
+    "x_path": "/data/datasets/fe/default/xyz_train",
+    "y_path": "/data/datasets/fe/default/xanes_train",
 
     "descriptor_type": "wacsf",
     "descriptor_params": {
@@ -12,19 +12,24 @@
 
     "hyperparams": {
         "n_hl": 2,
-        "hl_ini_dim": 256,
-        "hl_shrink": 0.9,
+        "hl_ini_dim": 512,
+        "hl_shrink": 1.0,
         "activation": "tanh",
         "loss": "mse",
         "lr": 0.0001,
-        "dropout": 0.20,
+        "dropout": 0.25,
         "kernel_init": "he_uniform",
         "bias_init": "zeros"
     },
 
+    "kfold_params": {
+        "n_splits": 5,
+        "n_repeats": 5
+    },
+
     "seed": 2021,
 
-    "epochs": 1,
+    "epochs": 512,
 
     "variance_threshold": 0.0
 

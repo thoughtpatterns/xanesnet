@@ -56,6 +56,8 @@ def parse_args(args: list):
         help = 'path to populated model directory')
     predict_p.add_argument('xyz_dir', type = str, 
         help = 'path to .xyz input directory for prediction')
+    predict_p.add_argument('xanes_dir', type = str, 
+        help = 'path to xanes directory for prediction')
     
     args = p.parse_args()
 
@@ -84,7 +86,7 @@ def main(args: list):
         learn(**inp, save = args.save)
 
     if args.mode == 'predict':
-            predict(args.mdl_dir, args.xyz_dir)
+            predict(args.mdl_dir, args.xyz_dir, args.xanes_dir)
         
     # banner = importlib.resources.read_text(resources, 'banner_close.txt')
     # print(banner)
