@@ -1,6 +1,6 @@
 {
-    "x_path": "/data/datasets/fe/preconv/xyz_train",
-    "y_path": "/data/datasets/fe/preconv/xanes_train",
+    "x_path": "/data/datasets/fe/default/xyz_train",
+    "y_path": "/data/datasets/fe/default/xanes_train",
 
     "descriptor_type": "wacsf",
     "descriptor_params": {
