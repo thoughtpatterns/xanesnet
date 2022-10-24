@@ -212,17 +212,9 @@ def main(
     if aemode == 'ae_xyz':
         
         print('>> fitting neural net...')
-        # print(epochs)
-        # print(x.shape)
-        # print(y.shape)
-        # epoch, model, optimizer = train_mlp(x, y, hyperparams, epochs, aemode)
-        # summary(model, (1, x.shape[1]))
-        # print(model)
-        # print(x.shape)
-        # print(np.max(x))
-        # print(np.min(x))
+    
         epoch, model, optimizer = train_ae(x, y, hyperparams, epochs)
-        summary(model, (1, x.shape[1]))
+        summary(model, (1, y.shape[1]))
 
         if save:
             # state = {

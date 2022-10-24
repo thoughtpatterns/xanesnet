@@ -22,34 +22,30 @@ this program.  If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 import pickle as pickle
 import tqdm as tqdm
+import time
 
 from pathlib import Path
+from glob import glob
 from numpy.random import RandomState
-from sklearn.pipeline import Pipeline
-from sklearn.feature_selection import VarianceThreshold
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import KFold
 from sklearn.model_selection import RepeatedKFold
-from sklearn.model_selection import cross_validate
 from sklearn.utils import shuffle
-from tensorflow.keras.wrappers.scikit_learn import KerasRegressor
+# import tensorflow as tf
 
 from inout import load_xyz
-from inout import save_xyz
 from inout import load_xanes
-from inout import save_xanes
-from inout import load_pipeline
-from inout import save_pipeline
-from dnn import check_gpu_support
-from dnn import set_callbacks
-from dnn import build_mlp
+# from dnn import check_gpu_support
+# from dnn import build_mlp
 from utils import unique_path
 from utils import linecount
 from utils import list_filestems
 from utils import print_cross_validation_scores
 from structure.rdc import RDC
 from structure.wacsf import WACSF
-from spectrum.xanes import XANES
+
+from mlp_pytorch import train_mlp
+import torch
+from torchinfo import summary
+from sklearn.metrics import mean_squared_error
 
 ###############################################################################
 ################################ MAIN FUNCTION ################################
@@ -130,8 +126,8 @@ def main(
     rng = RandomState(seed = seed)
 
     x_path = Path(x_path)
-    y_path = Path(y_path)
-    
+    y_path = Path(y_path) 
+
     for path in (x_path, y_path):
         if not path.exists():
             err_str = f'path to X/Y data ({path}) doesn\'t exist'
@@ -185,7 +181,7 @@ def main(
             with open(model_dir / 'dataset.npz', 'wb') as f:
                 np.savez_compressed(f, ids = ids, x = x, y = y, e = e)
 
-    elif x_path.is_file() and y_path.is_file():
+    elif x_path[i].is_file() and y_path[i].is_file():
         print('>> loading data from .npz archive(s)...\n')
         
         with open(x_path, 'rb') as f:
@@ -211,66 +207,53 @@ def main(
     x, y = shuffle(x, y, random_state = rng, n_samples = max_samples)
     print('>> ...shuffled and selected!\n')
 
-    net = KerasRegressor(
-        build_fn = build_mlp, 
-        out_dim = y[0].size, 
-        **hyperparams,
-        callbacks = set_callbacks(**callbacks),
-        epochs = epochs,
-        random_state = rng,
-        verbose = 2
-    )
-
-    print('>> setting up preprocessing pipeline...')
-    pipeline = Pipeline([
-        ('variance_threshold', VarianceThreshold(variance_threshold)),
-        ('scaler', StandardScaler()),
-        ('net', net)
-    ])
-    for i, step in enumerate(pipeline.get_params()['steps']):
-        print(f'  >> {i + 1}. ' + '{} :: {}'.format(*step))
-    print('>> ...set up!\n')
-
-    check_gpu_support()
-
     if kfold_params:
 
         kfold_spooler = RepeatedKFold(**kfold_params, random_state = rng)
+        
+        fit_time = []
+        train_score = []
+        test_score =[]
+        prev_score = 1
 
-        print('>> fitting neural net...')
-        kfold_output = cross_validate(
-            pipeline, 
-            x, 
-            y, 
-            cv = kfold_spooler, 
-            return_train_score = True,
-            return_estimator = True, 
-            verbose = kfold_spooler.get_n_splits()
-        )
-        print('...neural net fit!\n')
+        for train_index, test_index in kfold_spooler.split(x):
 
-        print_cross_validation_scores(kfold_output)
+            start = time.time()
+            model, score = train_mlp(x[train_index], y[train_index], hyperparams, epochs)
+            train_score.append(score)
+            
+            fit_time.append(time.time()- start)
+            
+            model.eval()
+            x_test = torch.from_numpy(x[test_index])
+            x_test = x_test.float()
+            y_predict = model(x_test)
+            y_score = mean_squared_error(y[test_index], y_predict.detach().numpy())
 
+            test_score.append(y_score)
+
+            if y_score < prev_score:
+                best_model = model
+            
+            prev_score = y_score
+
+        result = {"fit_time": fit_time, "train_score": train_score, "test_score": test_score}
+        print_cross_validation_scores(result)
+        
         if save:
-            for kfold_pipeline in kfold_output['estimator']:
-                kfold_dir = unique_path(model_dir, 'kfold')
-                save_pipeline(
-                    kfold_dir / 'net.keras', 
-                    kfold_dir / 'pipeline.pickle',
-                    kfold_pipeline
-                )
+            torch.save(best_model, model_dir / f"model.pt")
+            print("Saved model to disk")
 
     else:
-
+        
         print('>> fitting neural net...')
-        pipeline.fit(x, y)
-        print('>> ...neural net fit!\n')
+        
+        model, score = train_mlp(x, y, hyperparams, epochs)
+        summary(model, (1, x.shape[1]))
+        print(model)
 
         if save:
-            save_pipeline(
-                model_dir / f'net.keras', 
-                model_dir / f'pipeline.pickle',
-                pipeline
-            )
+            torch.save(model, model_dir / f"model.pt")
+            print("Saved model to disk")
     
-    return 0
+    return
