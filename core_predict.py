@@ -44,7 +44,7 @@ from sklearn.metrics import mean_squared_error
 import seaborn as sns
 import matplotlib.pyplot as plt
 from pyemd import emd_samples
-
+from sklearn.preprocessing import minmax_scale
 ###############################################################################
 ################################ MAIN FUNCTION ################################
 ###############################################################################
@@ -111,7 +111,7 @@ def main(
 
     # load the model
     # model = MLP()
-    model_file = open(model_dir / 'model.pt', 'r')
+    # model_file = open(model_dir / 'model.pt', 'r')
     # # loaded_model = torch.load(model_file)
     # model.load_state_dict(torch.load(model_file))
 
@@ -142,16 +142,41 @@ def main(
         e = np.load(f)['e']
 
     print('>> saving Y data predictions...')
+    total_y = []
+    total_y_pred = []
     for id_, y_predict_, y_ in tqdm.tqdm(zip(ids, y_predict, y)):
         sns.set()
         plt.figure()
         plt.plot(y_predict_.detach().numpy(), label="prediction")
         plt.plot(y_, label="target")
         plt.legend(loc="upper right")
+        total_y.append(y_)
+        total_y_pred.append(y_predict_.detach().numpy())
+        
         with open(predict_dir / f'{id_}.txt', 'w') as f:
             save_xanes(f, XANES(e, y_predict_.detach().numpy()))
             plt.savefig(predict_dir / f'{id_}.pdf')
         plt.close()
+    total_y = np.asarray(total_y)
+    total_y_pred = np.asarray(total_y_pred)
+
+    sns.set_style("dark")
+   
+    mean_y = np.mean(total_y, axis=0)
+    stddev_y = np.std(total_y, axis=0)
+    plt.plot(mean_y, label="target")
+    plt.fill_between(np.arange(mean_y.shape[0]), mean_y + stddev_y, mean_y - stddev_y, alpha=0.4, linewidth=0)
+    
+    mean_y_pred = np.mean(total_y_pred, axis=0)
+    stddev_y_pred = np.std(total_y_pred, axis=0)
+    plt.plot(mean_y_pred, label="prediction")
+    plt.fill_between(np.arange(mean_y_pred.shape[0]), mean_y_pred + stddev_y_pred, mean_y_pred - stddev_y_pred, alpha=0.4, linewidth=0)
+
+    plt.legend(loc="best")
+    plt.grid()
+    plt.savefig(predict_dir / 'plot.pdf')
+    
+    plt.show()
     print('...saved!\n')
         
     return 0

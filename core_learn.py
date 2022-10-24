@@ -25,6 +25,7 @@ import tqdm as tqdm
 import time
 
 from pathlib import Path
+from glob import glob
 from numpy.random import RandomState
 from sklearn.model_selection import RepeatedKFold
 from sklearn.utils import shuffle
@@ -44,6 +45,7 @@ from structure.wacsf import WACSF
 from mlp_pytorch import train_mlp
 import torch
 from torchinfo import summary
+from sklearn.metrics import mean_squared_error
 
 ###############################################################################
 ################################ MAIN FUNCTION ################################
@@ -124,8 +126,8 @@ def main(
     rng = RandomState(seed = seed)
 
     x_path = Path(x_path)
-    y_path = Path(y_path)
-    
+    y_path = Path(y_path) 
+
     for path in (x_path, y_path):
         if not path.exists():
             err_str = f'path to X/Y data ({path}) doesn\'t exist'
@@ -179,7 +181,7 @@ def main(
             with open(model_dir / 'dataset.npz', 'wb') as f:
                 np.savez_compressed(f, ids = ids, x = x, y = y, e = e)
 
-    elif x_path.is_file() and y_path.is_file():
+    elif x_path[i].is_file() and y_path[i].is_file():
         print('>> loading data from .npz archive(s)...\n')
         
         with open(x_path, 'rb') as f:
@@ -205,89 +207,53 @@ def main(
     x, y = shuffle(x, y, random_state = rng, n_samples = max_samples)
     print('>> ...shuffled and selected!\n')
 
-    # net = build_mlp(
-    #     out_dim = y[0].size, 
-    #     **hyperparams,
-    #     )
-
-    # check_gpu_support()
-    # mlp = MLP(256, 256, hyperparams['dropout'], hyperparams['hl_shrink'], y[0].size)
-
     if kfold_params:
 
         kfold_spooler = RepeatedKFold(**kfold_params, random_state = rng)
         
-        # fit_time = []
-        # train_score = []
-        # test_score =[]
-        # for train_index, test_index in kfold_spooler.split(x):
-            
-        #     # clear the session 
-        #     tf.keras.backend.clear_session()
-        #     net = build_mlp(
-        #         out_dim = y[0].size, 
-        #         **hyperparams,
-                
-        #         )
-        #     start = time.time()
-           
-        #     X_train, X_test = x[train_index], x[test_index]
-        #     y_train, y_test = y[train_index], y[test_index]
+        fit_time = []
+        train_score = []
+        test_score =[]
+        prev_score = 1
 
-        #     trainning = net.fit(
-        #     X_train, y_train, epochs
-        #     )
+        for train_index, test_index in kfold_spooler.split(x):
 
-        #     fit_time.append(time.time()- start)
-        #     train_score.append(trainning.history['loss'][0])
+            start = time.time()
+            model, score = train_mlp(x[train_index], y[train_index], hyperparams, epochs)
+            train_score.append(score)
             
-        #     result = net.evaluate(X_test, y_test)
-        #     test_score.append(result)
+            fit_time.append(time.time()- start)
+            
+            model.eval()
+            x_test = torch.from_numpy(x[test_index])
+            x_test = x_test.float()
+            y_predict = model(x_test)
+            y_score = mean_squared_error(y[test_index], y_predict.detach().numpy())
+
+            test_score.append(y_score)
+
+            if y_score < prev_score:
+                best_model = model
+            
+            prev_score = y_score
+
+        result = {"fit_time": fit_time, "train_score": train_score, "test_score": test_score}
+        print_cross_validation_scores(result)
         
-        # score = {"fit_time": fit_time, "train_score": train_score, "test_score": test_score}
-
-        # print_cross_validation_scores(score)
-
-        # if save:
-        #     for kfold_pipeline in kfold_output['estimator']:
-        #         kfold_dir = unique_path(model_dir, 'kfold')
-        #         save_pipeline(
-        #             kfold_dir / 'net.keras', 
-        #             kfold_dir / 'pipeline.pickle',
-        #             kfold_pipeline
-        #         )
+        if save:
+            torch.save(best_model, model_dir / f"model.pt")
+            print("Saved model to disk")
 
     else:
         
         print('>> fitting neural net...')
-        print(epochs)
-        epoch, model, optimizer = train_mlp(x, y, hyperparams, epochs)
+        
+        model, score = train_mlp(x, y, hyperparams, epochs)
         summary(model, (1, x.shape[1]))
         print(model)
 
         if save:
-            # state = {
-            #     "epoch": epoch,
-            #     "state_dict": model.state_dict,
-            #     "optimizer": optimizer
-            # }
-        
-            # torch.save(model.state_dict(), model_dir / f"model.cpt")
             torch.save(model, model_dir / f"model.pt")
             print("Saved model to disk")
-
-        # net.fit(
-        #     x, y, epochs
-        #     )
-        # print(net.summary())
-        # print('>> ...neural net fit!\n')
-
-        # if save:
-        #     model_json = net.to_json()
-        #     with open(model_dir / f"model.json", "w") as json_file:
-        #         json_file.write(model_json)
-        #     net.save_weights(model_dir / f"model.h")
-        #     print("Saved model to disk")
-
     
     return
