@@ -70,13 +70,13 @@ def train_ae (x, y, hyperparams, n_epoch):
 
     device  = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     
-    out_dim = y[0].size
-    n_in = x.shape[1]
+    out_dim = x[0].size
+    n_in = y.shape[1]
    
-    x = torch.from_numpy(x)
-    y = torch.from_numpy(y)
+    xyz = torch.from_numpy(x)
+    xanes = torch.from_numpy(y)
     
-    trainset = torch.utils.data.TensorDataset(x, y)
+    trainset = torch.utils.data.TensorDataset(xanes, xyz)
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=32)
    
     model = AE(n_in, 512, hyperparams['dropout'], hyperparams['hl_shrink'], out_dim)
@@ -94,7 +94,7 @@ def train_ae (x, y, hyperparams, n_epoch):
         for inputs, labels in trainloader:
             inputs, labels = inputs.to(device), labels.to(device)
             inputs, labels = inputs.float(), labels.float()
-            # print(inputs.shape)
+
             optimizer.zero_grad()
             recon_input, outputs = model(inputs)
             
@@ -115,8 +115,8 @@ def train_ae (x, y, hyperparams, n_epoch):
             # print(loss.item())
             
         print("total loss:", running_loss/len(trainloader))
-        print("recon loss:", running_recon/len(trainloader))
-        print("pred loss:", running_pred/len(trainloader))
+        # print("recon loss:", running_recon/len(trainloader))
+        # print("pred loss:", running_pred/len(trainloader))
 
 
     return epoch, model, optimizer
