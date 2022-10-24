@@ -1,30 +1,3 @@
-# transforming tensorflow mlp to pytorch
-# the model summary from tensorflow
-# Model: "sequential"
-# _________________________________________________________________
-#  Layer (type)                Output Shape              Param #
-# =================================================================
-#  dense (Dense)               (None, 256)               12800
-
-#  activation (Activation)     (None, 256)               0
-
-#  dropout_ (Dropout_)         (None, 256)               0
-
-#  dense_1 (Dense)             (None, 230)               59110
-
-#  activation_1 (Activation)   (None, 230)               0
-
-#  dropout__1 (Dropout_)       (None, 230)               0
-
-#  dense_2 (Dense)             (None, 376)               86856
-
-#  activation_2 (Activation)   (None, 376)               0
-
-# =================================================================
-# Total params: 158,766
-# Trainable params: 158,766
-# Non-trainable params: 0
-
 import torch
 from torch import nn, optim
 import math
@@ -32,29 +5,29 @@ from pyemd import emd_samples
 import numpy as np
 
 class MLP(nn.Module):
-    def __init__(self, input_size, hidden_size, dropout, hl_shrink, out_dim):
+    def __init__(self, input_size, hidden_size, dropout, hl_size, out_dim):
         super().__init__()
     
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.dropout = dropout
-        self.hl_shrink = hl_shrink
+        self.hl_size = hl_size
         self.out_dim = out_dim
 
         self.fc1 = nn.Sequential(
-            nn.Linear(self.input_size, 256),
-            nn.ReLU(),
-            nn.Dropout(p=0.2)
+            nn.Linear(self.input_size, self.hidden_size),
+            nn.PReLU(),
+            nn.Dropout(p=self.dropout)
         )
          
         self.fc2 = nn.Sequential(
-            nn.Linear(256, 512),
-            nn.ReLU(),
-            nn.Dropout(p=0.2)
+            nn.Linear(self.hidden_size, self.hl_size),
+            nn.PReLU(),
+            nn.Dropout(p=self.dropout)
         )
 
         self.fc3 = nn.Sequential(
-            nn.Linear(512, self.out_dim)
+            nn.Linear(self.hl_size, self.out_dim)
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -68,12 +41,7 @@ class MLP(nn.Module):
 def weight_init(m):
     if isinstance(m, nn.Linear):
         nn.init.xavier_uniform_(m.weight)
-        # nn.init.kaiming_uniform_(m.weight, a=math.sqrt(5))
         nn.init.zeros_(m.bias)
-        # nn.init.constant_(m.bias)
-
-# def custom_loss(pred, target):
-#     dist = ((target-pred)**2).sum(1)**0.5
 
 def earth_mover_distance(y_true, y_pred):
     return torch.mean(torch.square(torch.cumsum(y_true, dim=-1) - torch.cumsum(y_pred, dim=-1)), dim=-1)
@@ -91,13 +59,13 @@ def train_mlp (x, y, hyperparams, n_epoch):
     
     trainset = torch.utils.data.TensorDataset(x, y)
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=32)
-   
-    mlp = MLP(n_in, 512, hyperparams['dropout'], hyperparams['hl_shrink'], out_dim)
+
+    mlp = MLP(n_in, hyperparams['hl_ini_dim'], hyperparams['dropout'], int(hyperparams['hl_ini_dim'] * hyperparams['hl_shrink']), out_dim)
     mlp.to(device)
     mlp.apply(weight_init)
     mlp.train()
-    optimizer = optim.Adam(mlp.parameters(), lr=0.00001)
-    # criterion = nn.MSELoss()
+    optimizer = optim.Adam(mlp.parameters(), lr=hyperparams['lr'])
+    criterion = nn.MSELoss()
 
     for epoch in range(n_epoch):
         running_loss = 0
@@ -108,19 +76,12 @@ def train_mlp (x, y, hyperparams, n_epoch):
             optimizer.zero_grad()
             logps = mlp(inputs)
             
-            # loss = criterion(logps, labels)
-            # loss = custom_loss(logps, labels)
-            loss = earth_mover_distance(labels, logps)
-            # print(loss.shape)
-            # loss.backward()
+            loss = criterion(logps, labels)
             loss.mean().backward()
-
             optimizer.step()
-            running_loss += loss.mean().item()
-            # print(loss.item())
+            running_loss += loss.item()
             
-        print(running_loss/len(trainloader))
+        # print(running_loss/len(trainloader))
 
-    return epoch, mlp, optimizer
-
+    return mlp, running_loss/len(trainloader)
         
