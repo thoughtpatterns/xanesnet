@@ -120,20 +120,20 @@ def main(
     print("Loaded model from disk")
     # print(model)
 
-    x = torch.from_numpy(x)
-    x = x.float()
+    y = torch.from_numpy(y)
+    y = y.float()
 
     print('>> predicting Y data with neural net...')
-    y_predict = model(x)
-    if y_predict.ndim == 1:
+    xyz_predict = model(y)
+    if xyz_predict.ndim == 1:
         if len(ids) == 1:
-            y_predict = y_predict.reshape(-1, y_predict.size)
+            xyz_predict = xyz_predict.reshape(-1, xyz_predict.size)
         else:
-            y_predict = y_predict.reshape(y_predict.size, -1)
+            xyz_predict = xyz_predict.reshape(xyz_predict.size, -1)
     print('>> ...predicted Y data!\n')
 
-    print(mean_squared_error(y, y_predict.detach().numpy()))
-    print(emd_samples(y, y_predict.detach().numpy()))
+    print(mean_squared_error(x, xyz_predict.detach().numpy()))
+    print(emd_samples(x, xyz_predict.detach().numpy()))
 
     predict_dir = unique_path(Path('.'), 'predictions')
     predict_dir.mkdir()
@@ -144,17 +144,17 @@ def main(
     print('>> saving Y data predictions...')
     total_y = []
     total_y_pred = []
-    for id_, y_predict_, y_ in tqdm.tqdm(zip(ids, y_predict, y)):
+    for id_, xyz_predict_, y_ in tqdm.tqdm(zip(ids, xyz_predict, x)):
         sns.set()
         plt.figure()
-        plt.plot(y_predict_.detach().numpy(), label="prediction")
+        plt.plot(xyz_predict_.detach().numpy(), label="prediction")
         plt.plot(y_, label="target")
         plt.legend(loc="upper right")
         total_y.append(y_)
-        total_y_pred.append(y_predict_.detach().numpy())
+        total_y_pred.append(xyz_predict_.detach().numpy())
         
         with open(predict_dir / f'{id_}.txt', 'w') as f:
-            save_xanes(f, XANES(e, y_predict_.detach().numpy()))
+            # save_xanes(f, XANES(e, xyz_predict_.detach().numpy()))
             plt.savefig(predict_dir / f'{id_}.pdf')
         plt.close()
     total_y = np.asarray(total_y)

@@ -12,42 +12,43 @@ class AE (nn.Module):
         self.out_dim = out_dim
 
         self.encoder_hidden_1 = nn.Sequential(
-            nn.Linear(self.input_size, 256),
+            nn.Linear(self.input_size, 512),
             nn.PReLU()
         )
          
         self.encoder_hidden_2 = nn.Sequential(
-            nn.Linear(256, 128),
+            nn.Linear(512, 256),
             nn.PReLU()
         )
 
         self.encoder_output = nn.Sequential(
-            nn.Linear(128, 128),
+            nn.Linear(256, 128),
         )
 
         self.fc1 = nn.Sequential(
             nn.Linear(128, 256),
-            nn.Dropout(p=0.3),
+            nn.Dropout(p=0.4),
             nn.PReLU()
         )
 
         self.fc2 = nn.Sequential(
             nn.Linear(256, self.out_dim),
+            nn.Dropout(p=0.4),
             nn.PReLU(),
         )
 
         self.decoder_hidden_1 = nn.Sequential(
-            nn.Linear(128, 128),
-            nn.PReLU()
-        )
-
-        self.decoder_hidden_2 = nn.Sequential(
             nn.Linear(128, 256),
             nn.PReLU()
         )
 
+        self.decoder_hidden_2 = nn.Sequential(
+            nn.Linear(256, 512),
+            nn.PReLU()
+        )
+
         self.decoder_output = nn.Sequential(
-            nn.Linear(256, self.input_size)
+            nn.Linear(512, self.input_size)
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -83,7 +84,7 @@ def train_ae (x, y, hyperparams, n_epoch):
     model.to(device)
     # mlp.apply(weight_init)
     model.train()
-    optimizer = optim.Adam(model.parameters(), lr=0.00001)
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
     criterion = nn.MSELoss()
     # criterion = nn.L1Loss()
 
@@ -101,7 +102,7 @@ def train_ae (x, y, hyperparams, n_epoch):
 
             loss_recon = criterion(recon_input, inputs) 
             loss_pred = criterion(outputs, labels)
-            loss = loss_recon + (1 * loss_pred)
+            loss = loss_recon + (2 * loss_pred)
             # loss = custom_loss(logps, labels)
             # loss = earth_mover_distance(labels, logps)
             # print(loss.shape)
