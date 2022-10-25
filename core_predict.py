@@ -26,25 +26,20 @@ import tqdm as tqdm
 from pathlib import Path
 
 from inout import load_xyz
-# from inout import save_xyz
 from inout import load_xanes
 from inout import save_xanes
-# from inout import load_pipeline
-# from inout import save_pipeline
 from utils import unique_path
 from utils import list_filestems
 from utils import linecount
 from structure.rdc import RDC
 from structure.wacsf import WACSF
 from spectrum.xanes import XANES
-# from tensorflow.keras.models import model_from_json
-from mlp_pytorch import MLP
+
 import torch
 from sklearn.metrics import mean_squared_error
 import seaborn as sns
 import matplotlib.pyplot as plt
 from pyemd import emd_samples
-from sklearn.preprocessing import minmax_scale
 
 ###############################################################################
 ################################ MAIN FUNCTION ################################
@@ -104,22 +99,9 @@ def main(
             e, y[i,:] = xanes.spectrum
     print('>> ...loaded!\n')
 
-
-    # pipeline = load_pipeline(
-    #     model_dir / 'net.keras',
-    #     model_dir / 'pipeline.pickle'
-    # )
-
-    # load the model
-    # model = MLP()
-    # model_file = open(model_dir / 'model.pt', 'r')
-    # # loaded_model = torch.load(model_file)
-    # model.load_state_dict(torch.load(model_file))
-
     model = torch.load(model_dir / 'model.pt', map_location=torch.device('cpu'))
     model.eval()
     print("Loaded model from disk")
-    # print(model)
 
     x = torch.from_numpy(x)
     x = x.float()
@@ -132,7 +114,6 @@ def main(
         else:
             y_predict = y_predict.reshape(y_predict.size, -1)
     print('>> ...predicted Y data!\n')
-
 
     print(mean_squared_error(y, y_predict.detach().numpy()))
     print(emd_samples(y, y_predict.detach().numpy()))
@@ -163,8 +144,9 @@ def main(
     total_y = np.asarray(total_y)
     total_y_pred = np.asarray(total_y_pred)
 
+    # plotting the average loss
     sns.set_style("dark")
-   
+
     mean_y = np.mean(total_y, axis=0)
     stddev_y = np.std(total_y, axis=0)
     plt.plot(mean_y, label="target")
@@ -180,17 +162,6 @@ def main(
     plt.savefig(predict_dir / 'plot.pdf')
     
     plt.show()
-
-    for id_, y_predict_, y_ in tqdm.tqdm(zip(ids, y_predict, y)):
-        sns.set()
-        plt.figure()
-        plt.plot(y_predict_, label="prediction")
-        plt.plot(y_, label="target")
-        plt.legend(loc="upper right")
-        with open(predict_dir / f'{id_}.txt', 'w') as f:
-            save_xanes(f, XANES(e, y_predict_))
-            plt.savefig(predict_dir / f'{id_}.pdf')
-        plt.close()
 
     print('...saved!\n')
         
