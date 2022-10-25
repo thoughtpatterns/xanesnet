@@ -90,8 +90,6 @@ def main(args: list):
     if args.mode == 'predict':
         predict(args.mdl_dir, args.xyz_dir, args.xanes_dir)
     
-    return
-        
     # banner = importlib.resources.read_text(resources, 'banner_close.txt')
     # print(banner)
 

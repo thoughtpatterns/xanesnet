@@ -45,6 +45,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from pyemd import emd_samples
 from sklearn.preprocessing import minmax_scale
+
 ###############################################################################
 ################################ MAIN FUNCTION ################################
 ###############################################################################
@@ -52,7 +53,7 @@ from sklearn.preprocessing import minmax_scale
 def main(
     model_dir: str,
     x_path: str,
-    y_path:str
+    y_path: str
 ):
     """
     PREDICT. The model state is restored from a model directory containing
@@ -132,6 +133,7 @@ def main(
             y_predict = y_predict.reshape(y_predict.size, -1)
     print('>> ...predicted Y data!\n')
 
+
     print(mean_squared_error(y, y_predict.detach().numpy()))
     print(emd_samples(y, y_predict.detach().numpy()))
 
@@ -142,6 +144,7 @@ def main(
         e = np.load(f)['e']
 
     print('>> saving Y data predictions...')
+
     total_y = []
     total_y_pred = []
     for id_, y_predict_, y_ in tqdm.tqdm(zip(ids, y_predict, y)):
@@ -177,6 +180,18 @@ def main(
     plt.savefig(predict_dir / 'plot.pdf')
     
     plt.show()
+
+    for id_, y_predict_, y_ in tqdm.tqdm(zip(ids, y_predict, y)):
+        sns.set()
+        plt.figure()
+        plt.plot(y_predict_, label="prediction")
+        plt.plot(y_, label="target")
+        plt.legend(loc="upper right")
+        with open(predict_dir / f'{id_}.txt', 'w') as f:
+            save_xanes(f, XANES(e, y_predict_))
+            plt.savefig(predict_dir / f'{id_}.pdf')
+        plt.close()
+
     print('...saved!\n')
         
     return 0
