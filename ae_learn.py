@@ -28,12 +28,10 @@ from pathlib import Path
 from numpy.random import RandomState
 from sklearn.model_selection import RepeatedKFold
 from sklearn.utils import shuffle
-# import tensorflow as tf
 
 from inout import load_xyz
 from inout import load_xanes
-# from dnn import check_gpu_support
-# from dnn import build_mlp
+
 from utils import unique_path
 from utils import linecount
 from utils import list_filestems
@@ -124,20 +122,20 @@ def main(
     """
 
     rng = RandomState(seed = seed)
-
-    x_path = Path(x_path)
-    y_path = Path(y_path)
     
-    for path in (x_path, y_path):
+    xyz_path = Path(x_path)
+    xanes_path = Path(y_path)
+    
+    for path in (xyz_path, xanes_path):
         if not path.exists():
             err_str = f'path to X/Y data ({path}) doesn\'t exist'
             raise FileNotFoundError(err_str)
 
-    if x_path.is_dir() and y_path.is_dir():
+    if xyz_path.is_dir() and xanes_path.is_dir():
         print('>> loading data from directories...\n')
 
         ids = list(
-            set(list_filestems(x_path)) & set(list_filestems(y_path))
+            set(list_filestems(xyz_path)) & set(list_filestems(xanes_path))
         )
 
         ids.sort()
@@ -153,24 +151,22 @@ def main(
 
         n_samples = len(ids)
         n_x_features = descriptor.get_len()
-        n_y_features = linecount(y_path / f'{ids[0]}.txt') - 2
+        n_y_features = linecount(xanes_path / f'{ids[0]}.txt') - 2
 
-        x = np.full((n_samples, n_x_features), np.nan)
-        print('>> preallocated {}x{} array for X data...'.format(*x.shape))
-        y = np.full((n_samples, n_y_features), np.nan)
-        print('>> preallocated {}x{} array for Y data...'.format(*y.shape))
+        xyz_data = np.full((n_samples, n_x_features), np.nan)
+        print('>> preallocated {}x{} array for X data...'.format(*xyz_data.shape))
+        xanes_data = np.full((n_samples, n_y_features), np.nan)
+        print('>> preallocated {}x{} array for Y data...'.format(*xanes_data.shape))
         print('>> ...everything preallocated!\n')
 
         print('>> loading data into array(s)...')
         for i, id_ in enumerate(tqdm.tqdm(ids)):
-            with open(x_path / f'{id_}.xyz', 'r') as f:
+            with open(xyz_path / f'{id_}.xyz', 'r') as f:
                 atoms = load_xyz(f)
-                # print(type(atoms))
-            x[i,:] = descriptor.transform(atoms)
-            with open(y_path / f'{id_}.txt', 'r') as f:
+            xyz_data[i,:] = descriptor.transform(atoms)
+            with open(xanes_path / f'{id_}.txt', 'r') as f:
                 xanes = load_xanes(f)
-                # print(xanes.spectrum)
-            e, y[i,:] = xanes.spectrum
+            e, xanes_data[i,:] = xanes.spectrum
         print('>> ...loaded into array(s)!\n')
 
         if save:
@@ -179,18 +175,18 @@ def main(
             with open(model_dir / 'descriptor.pickle', 'wb') as f:
                 pickle.dump(descriptor, f)
             with open(model_dir / 'dataset.npz', 'wb') as f:
-                np.savez_compressed(f, ids = ids, x = x, y = y, e = e)
+                np.savez_compressed(f, ids = ids, x = xyz_data, y = xanes_data, e = e)
 
     elif x_path.is_file() and y_path.is_file():
         print('>> loading data from .npz archive(s)...\n')
         
         with open(x_path, 'rb') as f:
-            x = np.load(f)['x']
-        print('>> ...loaded {}x{} array of X data'.format(*x.shape))
+            xyz_data = np.load(f)['x']
+        print('>> ...loaded {}x{} array of X data'.format(*xyz_data.shape))
         with open(y_path, 'rb') as f:
-            y = np.load(f)['y']
+            xanes_data = np.load(f)['y']
             e = np.load(f)['e']
-        print('>> ...loaded {}x{} array of Y data'.format(*y.shape))
+        print('>> ...loaded {}x{} array of Y data'.format(*xanes_data.shape))
         print('>> ...everything loaded!\n')
 
         if save:
@@ -204,41 +200,32 @@ def main(
         raise TypeError(err_str)
 
     print('>> shuffling and selecting data...')
-    x, y = shuffle(x, y, random_state = rng, n_samples = max_samples)
+    xyz, xanes = shuffle(xyz_data, xanes_data, random_state = rng, n_samples = max_samples)
     print('>> ...shuffled and selected!\n')
 
     
 
-    if aemode == 'ae_xyz':
+    if aemode == 'train_xyz':
+        print('training xyz structure')
         
         print('>> fitting neural net...')
+
+        epoch, model, optimizer = train_ae(xyz, xanes, hyperparams, epochs)
+        summary(model, (1, xyz.shape[1]))
     
-        epoch, model, optimizer = train_ae(x, y, hyperparams, epochs)
-        summary(model, (1, y.shape[1]))
-
-        if save:
-            # state = {
-            #     "epoch": epoch,
-            #     "state_dict": model.state_dict,
-            #     "optimizer": optimizer
-            # }
+    elif aemode == 'train_xanes':
+        print('training xanes spectrum')
         
-            # torch.save(model.state_dict(), model_dir / f"model.cpt")
-            torch.save(model, model_dir / f"model.pt")
-            print("Saved model to disk")
+        print('>> fitting neural net...')
 
-        # net.fit(
-        #     x, y, epochs
-        #     )
-        # print(net.summary())
-        # print('>> ...neural net fit!\n')
+        epoch, model, optimizer = train_ae(xanes, xyz, hyperparams, epochs)
+        summary(model, (1, xanes.shape[1]))
 
-        # if save:
-        #     model_json = net.to_json()
-        #     with open(model_dir / f"model.json", "w") as json_file:
-        #         json_file.write(model_json)
-        #     net.save_weights(model_dir / f"model.h")
-        #     print("Saved model to disk")
+    if save:
+    
+        torch.save(model, model_dir / f"{aemode}_model.pt")
+        print("Saved model to disk")
+
     else:
         print("none")
     

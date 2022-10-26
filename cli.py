@@ -21,17 +21,11 @@ this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import sys
 import json
-# import importlib.resources
 
 from argparse import ArgumentParser
 
-# import xanesnet
-
-# from xanesnet import resources
 from core_learn import main as learn
 from core_predict import main as predict
-from ae_learn import main as ae_learn
-from ae_predict import main as ae_predict
 from utils import print_nested_dict
 
 ###############################################################################
@@ -41,9 +35,6 @@ from utils import print_nested_dict
 def parse_args(args: list):
 
     p = ArgumentParser()
-
-    # p.add_argument('-v', '--version', action = 'version', 
-    #     version = xanesnet.__version__)
     
     sub_p = p.add_subparsers(dest = 'mode')
 
@@ -60,21 +51,6 @@ def parse_args(args: list):
         help = 'path to .xyz input directory for prediction')
     predict_p.add_argument('xanes_dir', type = str, 
         help = 'path to xanes directory for prediction')
-
-    learn_p = sub_p.add_parser('ae_xyz')
-    learn_p.add_argument('inp_f', type = str, 
-        help = 'path to .json input file w/ variable definitions')
-    learn_p.add_argument('--no-save', dest = 'save', action = 'store_false',
-        help = 'toggles model directory creation and population to <off>')
-
-    predict_p = sub_p.add_parser('ae_predict')
-    predict_p.add_argument('mdl_dir', type = str, 
-        help = 'path to populated model directory')
-    predict_p.add_argument('xyz_dir', type = str, 
-        help = 'path to .xyz input directory for prediction')
-    predict_p.add_argument('xanes_dir', type = str, 
-        help = 'path to xanes directory for prediction')
-
     
     args = p.parse_args()
 
@@ -91,8 +67,6 @@ def main(args: list):
     else:
         args = parse_args(args)
         
-    # banner = importlib.resources.read_text(resources, 'banner_open.txt')
-    # print(banner, '\n')
 
     if args.mode == 'learn':
         print(f'>> loading JSON input @ {args.inp_f}\n')
@@ -101,27 +75,11 @@ def main(args: list):
         print_nested_dict(inp, nested_level = 1)
         print('')
         learn(**inp, save = args.save)
-
-    if args.mode == 'predict':
-            predict(args.mdl_dir, args.xyz_dir, args.xanes_dir)
-    
-    if args.mode == 'ae_xyz':
-        print(f'>> loading JSON input @ {args.inp_f}\n')
-        with open(args.inp_f) as f:
-            inp = json.load(f)
-        print_nested_dict(inp, nested_level = 1)
-        print('')
-        # print(print_nested_dict)
-        print(args.mode)
-        ae_learn(args.mode, **inp, save = args.save)
         print("done")
 
-    if args.mode == 'ae_predict':
-        ae_predict(args.mdl_dir, args.xyz_dir, args.xanes_dir)
-
-        
-    # banner = importlib.resources.read_text(resources, 'banner_close.txt')
-    # print(banner)
+    if args.mode == 'predict':
+        predict(args.mdl_dir, args.xyz_dir, args.xanes_dir)
+    
 
 ################################################################################
 ############################## PROGRAM STARTS HERE #############################
@@ -129,6 +87,7 @@ def main(args: list):
 
 if __name__ == '__main__':
     main(sys.argv[1:])
+    print("done")
 
 ################################################################################
 ############################### PROGRAM ENDS HERE ##############################
