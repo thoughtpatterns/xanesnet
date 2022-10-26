@@ -26,14 +26,13 @@ class AE (nn.Module):
         )
 
         self.fc1 = nn.Sequential(
-            nn.Linear(128, 256),
-            nn.Dropout(p=0.4),
+            nn.Linear(128, 64),
+            nn.Dropout(p=0.2),
             nn.PReLU()
         )
 
         self.fc2 = nn.Sequential(
-            nn.Linear(256, self.out_dim),
-            nn.Dropout(p=0.4),
+            nn.Linear(64, self.out_dim),
             nn.PReLU(),
         )
 
@@ -71,20 +70,20 @@ def train_ae (x, y, hyperparams, n_epoch):
 
     device  = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     
-    out_dim = x[0].size
-    n_in = y.shape[1]
-   
-    xyz = torch.from_numpy(x)
-    xanes = torch.from_numpy(y)
+    out_dim = y[0].size
+    n_in = x.shape[1]
     
-    trainset = torch.utils.data.TensorDataset(xanes, xyz)
+    x = torch.from_numpy(x)
+    y = torch.from_numpy(y)
+    
+    trainset = torch.utils.data.TensorDataset(x, y)
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=32)
    
     model = AE(n_in, 512, hyperparams['dropout'], hyperparams['hl_shrink'], out_dim)
     model.to(device)
     # mlp.apply(weight_init)
     model.train()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.Adam(model.parameters(), lr=0.00001, weight_decay=0.004)
     criterion = nn.MSELoss()
     # criterion = nn.L1Loss()
 
@@ -102,7 +101,7 @@ def train_ae (x, y, hyperparams, n_epoch):
 
             loss_recon = criterion(recon_input, inputs) 
             loss_pred = criterion(outputs, labels)
-            loss = loss_recon + (2 * loss_pred)
+            loss = (1 * loss_recon) + (2 * loss_pred)
             # loss = custom_loss(logps, labels)
             # loss = earth_mover_distance(labels, logps)
             # print(loss.shape)
@@ -116,8 +115,8 @@ def train_ae (x, y, hyperparams, n_epoch):
             # print(loss.item())
             
         print("total loss:", running_loss/len(trainloader))
-        # print("recon loss:", running_recon/len(trainloader))
-        # print("pred loss:", running_pred/len(trainloader))
+        print("recon loss:", running_recon/len(trainloader))
+        print("pred loss:", running_pred/len(trainloader))
 
 
     return epoch, model, optimizer
