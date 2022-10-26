@@ -51,9 +51,7 @@ class AEGANTrainer(nn.Module):
         loss = loss_fn(pred,target)
         return loss
 
-    def forward(self, x_a, x_b):
-        self.eval()
-        
+    def forward(self, x_a, x_b):       
         enc_a = self.gen_a.encode(x_a)
         enc_b = self.gen_b.encode(x_b)
 
@@ -65,7 +63,6 @@ class AEGANTrainer(nn.Module):
 
         x_ba = self.gen_a.decode(shared_dec_b)
         x_ab = self.gen_b.decode(shared_dec_a)
-        self.train()
         return x_ab, x_ba
 
     def gen_update(self, x_a, x_b):
