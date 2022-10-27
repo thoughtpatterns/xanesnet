@@ -32,47 +32,60 @@ from utils import print_nested_dict
 ############################## ARGUMENT PARSING ###############################
 ###############################################################################
 
+
 def parse_args(args: list):
 
     p = ArgumentParser()
-    
-    sub_p = p.add_subparsers(dest = 'mode')
 
-    learn_p = sub_p.add_parser('train_xyz')
-    learn_p.add_argument('inp_f', type = str, 
-        help = 'path to .json input file w/ variable definitions')
-    learn_p.add_argument('--no-save', dest = 'save', action = 'store_false',
-        help = 'toggles model directory creation and population to <off>')
+    sub_p = p.add_subparsers(dest="mode")
 
-    learn_p = sub_p.add_parser('train_xanes')
-    learn_p.add_argument('inp_f', type = str, 
-        help = 'path to .json input file w/ variable definitions')
-    learn_p.add_argument('--no-save', dest = 'save', action = 'store_false',
-        help = 'toggles model directory creation and population to <off>')
+    learn_p = sub_p.add_parser("train_xyz")
+    learn_p.add_argument(
+        "inp_f", type=str, help="path to .json input file w/ variable definitions"
+    )
+    learn_p.add_argument(
+        "--no-save",
+        dest="save",
+        action="store_false",
+        help="toggles model directory creation and population to <off>",
+    )
 
-    predict_p = sub_p.add_parser('predict_xanes')
-    predict_p.add_argument('mdl_dir', type = str, 
-        help = 'path to populated model directory')
-    predict_p.add_argument('xyz_dir', type = str, 
-        help = 'path to .xyz input directory for prediction')
-    predict_p.add_argument('xanes_dir', type = str, 
-        help = 'path to xanes directory for prediction')
+    learn_p = sub_p.add_parser("train_xanes")
+    learn_p.add_argument(
+        "inp_f", type=str, help="path to .json input file w/ variable definitions"
+    )
+    learn_p.add_argument(
+        "--no-save",
+        dest="save",
+        action="store_false",
+        help="toggles model directory creation and population to <off>",
+    )
 
-    predict_p = sub_p.add_parser('predict_xyz')
-    predict_p.add_argument('mdl_dir', type = str, 
-        help = 'path to populated model directory')
-    predict_p.add_argument('xanes_dir', type = str, 
-        help = 'path to .xyz input directory for prediction')
-    predict_p.add_argument('xyz_dir', type = str, 
-        help = 'path to xanes directory for prediction')
+    predict_p = sub_p.add_parser("predict_xanes")
+    predict_p.add_argument(
+        "mdl_dir", type=str, help="path to populated model directory"
+    )
+    predict_p.add_argument(
+        "inp_f", type=str, help="path to .json input file w/ variable definitions"
+    )
+
+    predict_p = sub_p.add_parser("predict_xyz")
+    predict_p.add_argument(
+        "mdl_dir", type=str, help="path to populated model directory"
+    )
+    predict_p.add_argument(
+        "inp_f", type=str, help="path to .json input file w/ variable definitions"
+    )
 
     args = p.parse_args()
 
-    return args  
+    return args
+
 
 ###############################################################################
 ################################ MAIN FUNCTION ################################
 ###############################################################################
+
 
 def main(args: list):
 
@@ -80,39 +93,45 @@ def main(args: list):
         sys.exit()
     else:
         args = parse_args(args)
-    
-    if args.mode == 'train_xyz':
-        print(f'>> loading JSON input @ {args.inp_f}\n')
+
+    if args.mode == "train_xyz":
+        print(f">> loading JSON input @ {args.inp_f}\n")
         with open(args.inp_f) as f:
             inp = json.load(f)
-        print_nested_dict(inp, nested_level = 1)
-        print('')
-        print(args.mode)
-        ae_learn(args.mode, **inp, save = args.save)
-        print("done")
-    
-    if args.mode == 'train_xanes':
-        print(f'>> loading JSON input @ {args.inp_f}\n')
+        print_nested_dict(inp, nested_level=1)
+        print("")
+        ae_learn(args.mode, **inp, save=args.save)
+
+    if args.mode == "train_xanes":
+        print(f">> loading JSON input @ {args.inp_f}\n")
         with open(args.inp_f) as f:
             inp = json.load(f)
-        print_nested_dict(inp, nested_level = 1)
-        print('')
-        print(args.mode)
-        ae_learn(args.mode, **inp, save = args.save)
-        print("done")
+        print_nested_dict(inp, nested_level=1)
+        print("")
+        ae_learn(args.mode, **inp, save=args.save)
 
-    if args.mode == 'predict_xanes':
-        ae_predict(args.mdl_dir, args.xyz_dir, args.xanes_dir)
-   
-    if args.mode == 'predict_xyz':
-        ae_predict(args.mdl_dir, args.xanes_dir, args.xyz_dir)
+    if args.mode == "predict_xanes":
+        print(f">> loading JSON input @ {args.inp_f}\n")
+        with open(args.inp_f) as f:
+            inp = json.load(f)
+        print_nested_dict(inp, nested_level=1)
+        print("")
+        ae_predict(args.mode, args.mdl_dir, **inp)
 
-        
+    if args.mode == "predict_xyz":
+        print(f">> loading JSON input @ {args.inp_f}\n")
+        with open(args.inp_f) as f:
+            inp = json.load(f)
+        print_nested_dict(inp, nested_level=1)
+        print("")
+        ae_predict(args.mode, args.mdl_dir, **inp)
+
+
 ################################################################################
 ############################## PROGRAM STARTS HERE #############################
 ################################################################################
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main(sys.argv[1:])
 
 ################################################################################
