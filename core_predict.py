@@ -44,12 +44,9 @@ from pyemd import emd_samples
 ###############################################################################
 ################################ MAIN FUNCTION ################################
 ###############################################################################
- 
-def main(
-    model_dir: str,
-    x_path: str,
-    y_path: str
-):
+
+
+def main(model_dir: str, x_path: str, y_path: str):
     """
     PREDICT. The model state is restored from a model directory containing
     serialised scaling/pipeline objects and the serialised model, .xyz (X)
@@ -69,62 +66,60 @@ def main(
     x_path = Path(x_path)
     y_path = Path(y_path)
 
-    ids = list(
-            set(list_filestems(x_path)) & set(list_filestems(y_path))
-        )
+    ids = list(set(list_filestems(x_path)) & set(list_filestems(y_path)))
 
     ids.sort()
 
-    with open(model_dir / 'descriptor.pickle', 'rb') as f:
+    with open(model_dir / "descriptor.pickle", "rb") as f:
         descriptor = pickle.load(f)
 
     n_samples = len(ids)
     n_x_features = descriptor.get_len()
-    n_y_features = linecount(y_path / f'{ids[0]}.txt') - 2
+    n_y_features = linecount(y_path / f"{ids[0]}.txt") - 2
 
     x = np.full((n_samples, n_x_features), np.nan)
-    print('>> preallocated {}x{} array for X data...'.format(*x.shape))
+    print(">> preallocated {}x{} array for X data...".format(*x.shape))
     y = np.full((n_samples, n_y_features), np.nan)
-    print('>> preallocated {}x{} array for Y data...'.format(*y.shape))
-    print('>> ...everything preallocated!\n')
+    print(">> preallocated {}x{} array for Y data...".format(*y.shape))
+    print(">> ...everything preallocated!\n")
 
-    print('>> loading data into array(s)...')
+    print(">> loading data into array(s)...")
     for i, id_ in enumerate(tqdm.tqdm(ids)):
-        with open(x_path / f'{id_}.xyz', 'r') as f:
+        with open(x_path / f"{id_}.xyz", "r") as f:
             atoms = load_xyz(f)
-        x[i,:] = descriptor.transform(atoms)
-        with open(y_path / f'{id_}.txt', 'r') as f:
+        x[i, :] = descriptor.transform(atoms)
+        with open(y_path / f"{id_}.txt", "r") as f:
             xanes = load_xanes(f)
             # print(xanes.spectrum)
-            e, y[i,:] = xanes.spectrum
-    print('>> ...loaded!\n')
+            e, y[i, :] = xanes.spectrum
+    print(">> ...loaded!\n")
 
-    model = torch.load(model_dir / 'model.pt', map_location=torch.device('cpu'))
+    model = torch.load(model_dir / "model.pt", map_location=torch.device("cpu"))
     model.eval()
     print("Loaded model from disk")
 
     x = torch.from_numpy(x)
     x = x.float()
 
-    print('>> predicting Y data with neural net...')
+    print(">> predicting Y data with neural net...")
     y_predict = model(x)
     if y_predict.ndim == 1:
         if len(ids) == 1:
             y_predict = y_predict.reshape(-1, y_predict.size)
         else:
             y_predict = y_predict.reshape(y_predict.size, -1)
-    print('>> ...predicted Y data!\n')
+    print(">> ...predicted Y data!\n")
 
     print(mean_squared_error(y, y_predict.detach().numpy()))
     print(emd_samples(y, y_predict.detach().numpy()))
 
-    predict_dir = unique_path(Path('.'), 'predictions')
+    predict_dir = unique_path(Path("."), "predictions")
     predict_dir.mkdir()
 
-    with open(model_dir / 'dataset.npz', 'rb') as f:
-        e = np.load(f)['e']
+    with open(model_dir / "dataset.npz", "rb") as f:
+        e = np.load(f)["e"]
 
-    print('>> saving Y data predictions...')
+    print(">> saving Y data predictions...")
 
     total_y = []
     total_y_pred = []
@@ -136,10 +131,10 @@ def main(
         plt.legend(loc="upper right")
         total_y.append(y_)
         total_y_pred.append(y_predict_.detach().numpy())
-        
-        with open(predict_dir / f'{id_}.txt', 'w') as f:
+
+        with open(predict_dir / f"{id_}.txt", "w") as f:
             save_xanes(f, XANES(e, y_predict_.detach().numpy()))
-            plt.savefig(predict_dir / f'{id_}.pdf')
+            plt.savefig(predict_dir / f"{id_}.pdf")
         plt.close()
     total_y = np.asarray(total_y)
     total_y_pred = np.asarray(total_y_pred)
@@ -150,19 +145,31 @@ def main(
     mean_y = np.mean(total_y, axis=0)
     stddev_y = np.std(total_y, axis=0)
     plt.plot(mean_y, label="target")
-    plt.fill_between(np.arange(mean_y.shape[0]), mean_y + stddev_y, mean_y - stddev_y, alpha=0.4, linewidth=0)
-    
+    plt.fill_between(
+        np.arange(mean_y.shape[0]),
+        mean_y + stddev_y,
+        mean_y - stddev_y,
+        alpha=0.4,
+        linewidth=0,
+    )
+
     mean_y_pred = np.mean(total_y_pred, axis=0)
     stddev_y_pred = np.std(total_y_pred, axis=0)
     plt.plot(mean_y_pred, label="prediction")
-    plt.fill_between(np.arange(mean_y_pred.shape[0]), mean_y_pred + stddev_y_pred, mean_y_pred - stddev_y_pred, alpha=0.4, linewidth=0)
+    plt.fill_between(
+        np.arange(mean_y_pred.shape[0]),
+        mean_y_pred + stddev_y_pred,
+        mean_y_pred - stddev_y_pred,
+        alpha=0.4,
+        linewidth=0,
+    )
 
     plt.legend(loc="best")
     plt.grid()
-    plt.savefig(predict_dir / 'plot.pdf')
-    
+    plt.savefig(predict_dir / "plot.pdf")
+
     plt.show()
 
-    print('...saved!\n')
-        
+    print("...saved!\n")
+
     return 0

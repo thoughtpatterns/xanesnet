@@ -29,10 +29,12 @@ from glob import glob
 from numpy.random import RandomState
 from sklearn.model_selection import RepeatedKFold
 from sklearn.utils import shuffle
+
 # import tensorflow as tf
 
 from inout import load_xyz
 from inout import load_xanes
+
 # from dnn import check_gpu_support
 # from dnn import build_mlp
 from utils import unique_path
@@ -51,6 +53,7 @@ from sklearn.metrics import mean_squared_error
 ################################ MAIN FUNCTION ################################
 ###############################################################################
 
+
 def main(
     x_path: str,
     y_path: str,
@@ -68,8 +71,8 @@ def main(
     """
     LEARN. The .xyz (X) and XANES spectral (Y) data are loaded and transformed;
     a neural network is set up and fit to these data to find an Y <- X mapping.
-    K-fold cross-validation is possible if {kfold_params} are provided. 
-    
+    K-fold cross-validation is possible if {kfold_params} are provided.
+
     Args:
         x_path (str): The path to the .xyz (X) data; expects either a directory
             containing .xyz files or a .npz archive file containing an 'x' key,
@@ -123,107 +126,104 @@ def main(
             Defaults to True.
     """
 
-    rng = RandomState(seed = seed)
+    rng = RandomState(seed=seed)
 
     x_path = Path(x_path)
-    y_path = Path(y_path) 
+    y_path = Path(y_path)
 
     for path in (x_path, y_path):
         if not path.exists():
-            err_str = f'path to X/Y data ({path}) doesn\'t exist'
+            err_str = f"path to X/Y data ({path}) doesn't exist"
             raise FileNotFoundError(err_str)
 
     if x_path.is_dir() and y_path.is_dir():
-        print('>> loading data from directories...\n')
+        print(">> loading data from directories...\n")
 
-        ids = list(
-            set(list_filestems(x_path)) & set(list_filestems(y_path))
-        )
+        ids = list(set(list_filestems(x_path)) & set(list_filestems(y_path)))
 
         ids.sort()
 
-        descriptors = {
-            'rdc': RDC,
-            'wacsf': WACSF
-        }
-        
-        descriptor = (
-            descriptors.get(descriptor_type)(**descriptor_params)
-        )
+        descriptors = {"rdc": RDC, "wacsf": WACSF}
+
+        descriptor = descriptors.get(descriptor_type)(**descriptor_params)
 
         n_samples = len(ids)
         n_x_features = descriptor.get_len()
-        n_y_features = linecount(y_path / f'{ids[0]}.txt') - 2
+        n_y_features = linecount(y_path / f"{ids[0]}.txt") - 2
 
         x = np.full((n_samples, n_x_features), np.nan)
-        print('>> preallocated {}x{} array for X data...'.format(*x.shape))
+        print(">> preallocated {}x{} array for X data...".format(*x.shape))
         y = np.full((n_samples, n_y_features), np.nan)
-        print('>> preallocated {}x{} array for Y data...'.format(*y.shape))
-        print('>> ...everything preallocated!\n')
+        print(">> preallocated {}x{} array for Y data...".format(*y.shape))
+        print(">> ...everything preallocated!\n")
 
-        print('>> loading data into array(s)...')
+        print(">> loading data into array(s)...")
         for i, id_ in enumerate(tqdm.tqdm(ids)):
-            with open(x_path / f'{id_}.xyz', 'r') as f:
+            with open(x_path / f"{id_}.xyz", "r") as f:
                 atoms = load_xyz(f)
                 # print(type(atoms))
-            x[i,:] = descriptor.transform(atoms)
-            with open(y_path / f'{id_}.txt', 'r') as f:
+            x[i, :] = descriptor.transform(atoms)
+            with open(y_path / f"{id_}.txt", "r") as f:
                 xanes = load_xanes(f)
                 # print(xanes.spectrum)
-            e, y[i,:] = xanes.spectrum
-        print('>> ...loaded into array(s)!\n')
+            e, y[i, :] = xanes.spectrum
+        print(">> ...loaded into array(s)!\n")
 
         if save:
-            model_dir = unique_path(Path('.'), 'model')
+            model_dir = unique_path(Path("."), "model")
             model_dir.mkdir()
-            with open(model_dir / 'descriptor.pickle', 'wb') as f:
+            with open(model_dir / "descriptor.pickle", "wb") as f:
                 pickle.dump(descriptor, f)
-            with open(model_dir / 'dataset.npz', 'wb') as f:
-                np.savez_compressed(f, ids = ids, x = x, y = y, e = e)
+            with open(model_dir / "dataset.npz", "wb") as f:
+                np.savez_compressed(f, ids=ids, x=x, y=y, e=e)
 
     elif x_path[i].is_file() and y_path[i].is_file():
-        print('>> loading data from .npz archive(s)...\n')
-        
-        with open(x_path, 'rb') as f:
-            x = np.load(f)['x']
-        print('>> ...loaded {}x{} array of X data'.format(*x.shape))
-        with open(y_path, 'rb') as f:
-            y = np.load(f)['y']
-            e = np.load(f)['e']
-        print('>> ...loaded {}x{} array of Y data'.format(*y.shape))
-        print('>> ...everything loaded!\n')
+        print(">> loading data from .npz archive(s)...\n")
+
+        with open(x_path, "rb") as f:
+            x = np.load(f)["x"]
+        print(">> ...loaded {}x{} array of X data".format(*x.shape))
+        with open(y_path, "rb") as f:
+            y = np.load(f)["y"]
+            e = np.load(f)["e"]
+        print(">> ...loaded {}x{} array of Y data".format(*y.shape))
+        print(">> ...everything loaded!\n")
 
         if save:
-            print('>> overriding save flag (running in `--no-save` mode)\n')
+            print(">> overriding save flag (running in `--no-save` mode)\n")
             save = False
 
     else:
 
-        err_str = 'paths to X/Y data are expected to be either a) both ' \
-            'files (.npz archives), or b) both directories'
+        err_str = (
+            "paths to X/Y data are expected to be either a) both "
+            "files (.npz archives), or b) both directories"
+        )
         raise TypeError(err_str)
 
-    print('>> shuffling and selecting data...')
-    x, y = shuffle(x, y, random_state = rng, n_samples = max_samples)
-    print('>> ...shuffled and selected!\n')
+    print(">> shuffling and selecting data...")
+    x, y = shuffle(x, y, random_state=rng, n_samples=max_samples)
+    print(">> ...shuffled and selected!\n")
 
     if kfold_params:
 
-        kfold_spooler = RepeatedKFold(**kfold_params, random_state = rng)
-        
+        kfold_spooler = RepeatedKFold(**kfold_params, random_state=rng)
+
         fit_time = []
         train_score = []
-        test_score =[]
+        test_score = []
         prev_score = 1
 
         for train_index, test_index in kfold_spooler.split(x):
 
             start = time.time()
-            model, score = train_mlp(x[train_index], y[train_index], hyperparams, epochs)
+            model, score = train_mlp(
+                x[train_index], y[train_index], hyperparams, epochs
+            )
             train_score.append(score)
-            
-            fit_time.append(time.time()- start)
-            
+
+            fit_time.append(time.time() - start)
+
             model.eval()
             x_test = torch.from_numpy(x[test_index])
             x_test = x_test.float()
@@ -234,20 +234,24 @@ def main(
 
             if y_score < prev_score:
                 best_model = model
-            
+
             prev_score = y_score
 
-        result = {"fit_time": fit_time, "train_score": train_score, "test_score": test_score}
+        result = {
+            "fit_time": fit_time,
+            "train_score": train_score,
+            "test_score": test_score,
+        }
         print_cross_validation_scores(result)
-        
+
         if save:
             torch.save(best_model, model_dir / f"model.pt")
             print("Saved model to disk")
 
     else:
-        
-        print('>> fitting neural net...')
-        
+
+        print(">> fitting neural net...")
+
         model, score = train_mlp(x, y, hyperparams, epochs)
         summary(model, (1, x.shape[1]))
         print(model)
@@ -255,5 +259,5 @@ def main(
         if save:
             torch.save(model, model_dir / f"model.pt")
             print("Saved model to disk")
-    
+
     return

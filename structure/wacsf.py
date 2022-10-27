@@ -33,17 +33,18 @@ from structure.descriptors import VectorDescriptor
 ################################## CLASSES ####################################
 ###############################################################################
 
+
 class WACSF(VectorDescriptor):
     """
     A class for transforming a molecular system into a weighted atom-centered
     symmetry function (WACSF) descriptor. WACSFs encode the local geometry
     around an absorption site using parameterised radial and angular
     components. For reference, check out the following publication:
-    
+
     > J. Chem. Phys., 2018, 148, 241709 (10.1063/1.5019667)
-    
+
     ...which builds on the earlier ACSF descriptor introduced in:
-    
+
     > J. Chem. Phys., 2011, 134, 074106 (10.1063/1.3553717)
     """
 
@@ -55,10 +56,10 @@ class WACSF(VectorDescriptor):
         n_g4: int = 0,
         l: list = [1.0, -1.0],
         z: list = [1.0],
-        g2_parameterisation: str = 'shifted',
-        g4_parameterisation: str = 'centred',
-        use_charge = False,
-        use_spin = False
+        g2_parameterisation: str = "shifted",
+        g4_parameterisation: str = "centred",
+        use_charge=False,
+        use_spin=False,
     ):
         """
         Args:
@@ -113,79 +114,81 @@ class WACSF(VectorDescriptor):
         if self.n_g2:
             self.g2_transformer = G2SymmetryFunctionTransformer(
                 self.n_g2,
-                r_min = self.r_min,
-                r_max = self.r_max,
-                parameterisation = self.g2_parameterisation
+                r_min=self.r_min,
+                r_max=self.r_max,
+                parameterisation=self.g2_parameterisation,
             )
 
         if self.n_g4:
             self.g4_transformer = G4SymmetryFunctionTransformer(
                 self.n_g4,
-                r_min = self.r_min,
-                r_max = self.r_max,
-                l = self.l,
-                z = self.z,
-                parameterisation = self.g4_parameterisation
+                r_min=self.r_min,
+                r_max=self.r_max,
+                l=self.l,
+                z=self.z,
+                parameterisation=self.g4_parameterisation,
             )
-        
+
     def transform(self, system: Atoms) -> np.ndarray:
 
         rij_in_range = system.get_distances(0, range(len(system))) < self.r_max
         system = system[rij_in_range]
 
-        ij = np.array([[0,j] for j in range(1, len(system))], dtype = 'uint16')
+        ij = np.array([[0, j] for j in range(1, len(system))], dtype="uint16")
 
         if self.n_g4:
-            jik = np.array([[j,0,k] for j in range(1, len(system))
-                for k in range(1, len(system)) if k > j], dtype = 'uint16')
+            jik = np.array(
+                [
+                    [j, 0, k]
+                    for j in range(1, len(system))
+                    for k in range(1, len(system))
+                    if k > j
+                ],
+                dtype="uint16",
+            )
 
-        rij = system.get_distances(ij[:,0], ij[:,1])
+        rij = system.get_distances(ij[:, 0], ij[:, 1])
         g1 = np.sum(cosine_cutoff(rij, self.r_max))
 
         wacsf = g1
 
         if self.n_g2:
-            #zi = system.get_atomic_numbers()[ij[:,0]] 
-            zj = system.get_atomic_numbers()[ij[:,1]]
-            rij = system.get_distances(ij[:,0], ij[:,1])
+            # zi = system.get_atomic_numbers()[ij[:,0]]
+            zj = system.get_atomic_numbers()[ij[:, 1]]
+            rij = system.get_distances(ij[:, 0], ij[:, 1])
             g2 = self.g2_transformer.transform(zj, rij)
             wacsf = np.append(wacsf, g2)
 
         if self.n_g4:
-            #zi = system.get_atomic_numbers()[jik[:,1]]
-            zj = system.get_atomic_numbers()[jik[:,0]]
-            zk = system.get_atomic_numbers()[jik[:,2]]
-            rij = system.get_distances(jik[:,1], jik[:,0])
-            rik = system.get_distances(jik[:,1], jik[:,2])
-            rjk = system.get_distances(jik[:,0], jik[:,2])
+            # zi = system.get_atomic_numbers()[jik[:,1]]
+            zj = system.get_atomic_numbers()[jik[:, 0]]
+            zk = system.get_atomic_numbers()[jik[:, 2]]
+            rij = system.get_distances(jik[:, 1], jik[:, 0])
+            rik = system.get_distances(jik[:, 1], jik[:, 2])
+            rjk = system.get_distances(jik[:, 0], jik[:, 2])
             ajik = np.radians(system.get_angles(jik))
             g4 = self.g4_transformer.transform(zj, zk, rij, rik, rjk, ajik)
             wacsf = np.append(wacsf, g4)
 
         if self.use_spin:
-            wacsf = np.append(system.info['S'], wacsf)
+            wacsf = np.append(system.info["S"], wacsf)
 
         if self.use_charge:
-            wacsf = np.append(system.info['q'], wacsf)
+            wacsf = np.append(system.info["q"], wacsf)
 
         return wacsf
 
     def get_len(self) -> int:
-        
+
         return 1 + self.n_g2 + self.n_g4 + self.use_charge + self.use_spin
+
 
 class SymmetryFunctionTransformer(ABC):
     """
     An abstract base class for generating symmetry function vectors.
     """
 
-    def __init__(
-        self,
-        n: int,
-        r_min: float,
-        r_max: float,
-        parameterisation: str
-    ):
+    def __init__(self, n: int, r_min: float, r_max: float, parameterisation: str):
         """
         Args:
             n (int): The number of symmetry functions to use for encoding.
@@ -207,18 +210,20 @@ class SymmetryFunctionTransformer(ABC):
         self.r_max = r_max
         self.parameterisation = parameterisation
 
-        if self.parameterisation == 'shifted':
+        if self.parameterisation == "shifted":
             r_aux = np.linspace(self.r_min + 0.5, self.r_max - 0.5, self.n)
             dr = np.diff(r_aux)[0]
             self.h = np.array([1.0 / (2.0 * (dr**2)) for _ in r_aux])
             self.m = np.array([i for i in r_aux])
-        elif self.parameterisation == 'centred':
+        elif self.parameterisation == "centred":
             r_aux = np.linspace(self.r_min + 1.0, self.r_max - 0.5, self.n)
             self.h = np.array([1.0 / (2.0 * (i**2)) for i in r_aux])
             self.m = np.array([0.0 for _ in r_aux])
         else:
-            err_str = 'parameterisation options: \'shifted\' | \'centred\'; ' \
-                'for details, see DOI: 10.1063/1.5019667'
+            err_str = (
+                "parameterisation options: 'shifted' | 'centred'; "
+                "for details, see DOI: 10.1063/1.5019667"
+            )
             raise ValueError(err_str)
 
     @abstractmethod
@@ -232,6 +237,7 @@ class SymmetryFunctionTransformer(ABC):
 
         pass
 
+
 class G2SymmetryFunctionTransformer(SymmetryFunctionTransformer):
     """
     A class for generating G2 symmetry function vectors.
@@ -242,7 +248,7 @@ class G2SymmetryFunctionTransformer(SymmetryFunctionTransformer):
         n: int,
         r_min: float = 0.0,
         r_max: float = 8.0,
-        parameterisation: str = 'shifted'
+        parameterisation: str = "shifted",
     ):
         """
         Args:
@@ -259,19 +265,10 @@ class G2SymmetryFunctionTransformer(SymmetryFunctionTransformer):
                 241709 (DOI: 10.1063/1.5019667).
                 Defaults to 'shifted'.
         """
-        
-        super().__init__(
-            n,
-            r_min = r_min,
-            r_max = r_max,
-            parameterisation = parameterisation
-        )
 
-    def transform(
-        self,
-        zj: np.ndarray,
-        rij: np.ndarray
-    ) -> np.ndarray:
+        super().__init__(n, r_min=r_min, r_max=r_max, parameterisation=parameterisation)
+
+    def transform(self, zj: np.ndarray, rij: np.ndarray) -> np.ndarray:
 
         g2 = np.full(self.n, np.nan)
 
@@ -283,6 +280,7 @@ class G2SymmetryFunctionTransformer(SymmetryFunctionTransformer):
             i += 1
 
         return g2
+
 
 class G4SymmetryFunctionTransformer(SymmetryFunctionTransformer):
     """
@@ -296,7 +294,7 @@ class G4SymmetryFunctionTransformer(SymmetryFunctionTransformer):
         r_max: float = 8.0,
         l: list = [1.0, -1.0],
         z: list = [1.0],
-        parameterisation: str = 'centred'
+        parameterisation: str = "centred",
     ):
         """
         Args:
@@ -321,17 +319,14 @@ class G4SymmetryFunctionTransformer(SymmetryFunctionTransformer):
                 241709 (DOI: 10.1063/1.5019667).
                 Defaults to 'centred'.
         """
-        
-        super().__init__(
-            n,
-            r_min = r_min,
-            r_max = r_max,
-            parameterisation = parameterisation
-        )
+
+        super().__init__(n, r_min=r_min, r_max=r_max, parameterisation=parameterisation)
 
         if self.n % (len(l) * len(z)):
-            err_str = f'can\'t generate {self.n} G4 symmetry functions with ' \
-                f'{len(l)} lambda and {len(z)} zeta value(s)'
+            err_str = (
+                f"can't generate {self.n} G4 symmetry functions with "
+                f"{len(l)} lambda and {len(z)} zeta value(s)"
+            )
             raise ValueError(err_str)
         else:
             n_ = int(self.n / (len(l) * len(z)))
@@ -347,7 +342,7 @@ class G4SymmetryFunctionTransformer(SymmetryFunctionTransformer):
         rij: np.ndarray,
         rik: np.ndarray,
         rjk: np.ndarray,
-        ajik: np.ndarray
+        ajik: np.ndarray,
     ) -> np.ndarray:
 
         g4 = np.full(self.n, np.nan)
@@ -360,24 +355,32 @@ class G4SymmetryFunctionTransformer(SymmetryFunctionTransformer):
         for h, m in zip(self.h, self.m):
             for l in self.l:
                 for z in self.z:
-                    g4[i] = np.sum(zj * zk * (1.0 + (l * np.cos(ajik)))**z
-                        * gaussian(rij, h, m) * cutoff_ij
-                        * gaussian(rik, h, m) * cutoff_ik
-                        * gaussian(rjk, h, m) * cutoff_jk
-                    ) * (2.0**(1.0 - z))
+                    g4[i] = np.sum(
+                        zj
+                        * zk
+                        * (1.0 + (l * np.cos(ajik))) ** z
+                        * gaussian(rij, h, m)
+                        * cutoff_ij
+                        * gaussian(rik, h, m)
+                        * cutoff_ik
+                        * gaussian(rjk, h, m)
+                        * cutoff_jk
+                    ) * (2.0 ** (1.0 - z))
                     i += 1
 
         return g4
 
+
 def cosine_cutoff(r: np.ndarray, r_max: float) -> np.ndarray:
     # returns a cosine cutoff function defined over `r` with `r_max` defining
     # the cutoff radius; see Behler; J. Chem. Phys., 2011, 134, 074106
-    # (DOI: 10.1063/1.3553717) 
+    # (DOI: 10.1063/1.3553717)
 
     return (np.cos((np.pi * r) / r_max) + 1.0) / 2.0
+
 
 def gaussian(r: np.ndarray, h: float, m: float) -> np.ndarray:
     # returns a gaussian-like function defined over `r` with eta (`h`) defining
     # the width and mu (`h`) defining the centrepoint/peak position
 
-    return np.exp(-1.0 * h * (r - m)**2)
+    return np.exp(-1.0 * h * (r - m) ** 2)
