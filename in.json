@@ -1,7 +1,6 @@
 {
     "x_path": "/Users/nnn28/xanes/data/datasets/*/preconv/xyz_train",
     "y_path": "/Users/nnn28/xanes/data/datasets/*/preconv/xanes_train",
-
     "descriptor_type": "wacsf",
     "descriptor_params": {
         "r_min": 1.0,
@@ -9,7 +8,6 @@
         "n_g2": 16,
         "n_g4": 32
     },
-
     "hyperparams": {
         "n_hl": 2,
         "hl_ini_dim": 512,
@@ -21,11 +19,7 @@
         "kernel_init": "he_uniform",
         "bias_init": "zeros"
     },
-
     "seed": 2021,
-
-    "epochs": 50,
-
+    "epochs": 500,
     "variance_threshold": 0.0
-
 }
