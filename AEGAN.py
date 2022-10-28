@@ -31,11 +31,11 @@ class AEGANTrainer(nn.Module):
         enc_a = self.gen_a.encode(x_a)
         enc_b = self.gen_b.encode(x_b)
 
-        shared_enc_a = self.enc_shared.model(enc_a)
-        shared_enc_b = self.enc_shared.model(enc_b)
+        shared_enc_a = self.enc_shared.forward(enc_a)
+        shared_enc_b = self.enc_shared.forward(enc_b)
 
-        shared_dec_a = self.dec_shared.model(shared_enc_a)
-        shared_dec_b = self.dec_shared.model(shared_enc_b)
+        shared_dec_a = self.dec_shared.forward(shared_enc_a)
+        shared_dec_b = self.dec_shared.forward(shared_enc_b)
 
         x_ba = self.gen_a.decode(shared_dec_b)
         x_ab = self.gen_b.decode(shared_dec_a)
@@ -55,11 +55,11 @@ class AEGANTrainer(nn.Module):
         enc_a = self.gen_a.encode(x_a)
         enc_b = self.gen_b.encode(x_b)
 
-        shared_enc_a = self.enc_shared.model(enc_a)
-        shared_enc_b = self.enc_shared.model(enc_b)
+        shared_enc_a = self.enc_shared.forward(enc_a)
+        shared_enc_b = self.enc_shared.forward(enc_b)
 
-        shared_dec_a = self.dec_shared.model(shared_enc_a)
-        shared_dec_b = self.dec_shared.model(shared_enc_b)
+        shared_dec_a = self.dec_shared.forward(shared_enc_a)
+        shared_dec_b = self.dec_shared.forward(shared_enc_b)
 
         x_ba = self.gen_a.decode(shared_dec_b)
         x_ab = self.gen_b.decode(shared_dec_a)
@@ -73,11 +73,11 @@ class AEGANTrainer(nn.Module):
         enc_b = self.gen_b.encode(x_b)
 
         # encode shared layer
-        shared_enc_a = self.enc_shared.model(enc_a)
-        shared_enc_b = self.enc_shared.model(enc_b)
+        shared_enc_a = self.enc_shared.forward(enc_a)
+        shared_enc_b = self.enc_shared.forward(enc_b)
         # decode shared layer
-        shared_dec_a = self.dec_shared.model(shared_enc_a)
-        shared_dec_b = self.dec_shared.model(shared_enc_b)
+        shared_dec_a = self.dec_shared.forward(shared_enc_a)
+        shared_dec_b = self.dec_shared.forward(shared_enc_b)
 
         # decode (within domain)
         x_a_recon = self.gen_a.decode(shared_dec_a)
@@ -87,29 +87,18 @@ class AEGANTrainer(nn.Module):
         x_ba = self.gen_a.decode(shared_dec_b)
         x_ab = self.gen_b.decode(shared_dec_a)
 
-        # encode again
-        y_b_recon = self.gen_a.encode(x_ba)
-        y_a_recon = self.gen_b.encode(x_ab)
-
-        # encode shared layer
-        shared_enc_b_recon = self.enc_shared.model(y_b_recon)
-        shared_enc_a_recon = self.enc_shared.model(y_a_recon)
-        # decode shared layer
-        shared_dec_b_recon = self.dec_shared.model(shared_enc_b_recon)
-        shared_dec_a_recon = self.dec_shared.model(shared_enc_a_recon)
-
-        # decode again
-        x_aba = self.gen_a.decode(shared_dec_a_recon)
-        x_bab = self.gen_b.decode(shared_dec_b_recon)
+        # scale loss by mean-maximum value of input
+        a_max = torch.max(torch.mean(x_a,dim = 1))
+        b_max = torch.max(torch.mean(x_b,dim = 1))
 
         # reconstruction loss
-        self.loss_gen_recon_x_a = self.recon_criterion(x_a_recon, x_a)
-        self.loss_gen_recon_x_b = self.recon_criterion(x_b_recon, x_b)
-        self.loss_gen_cyc_x_a = self.recon_criterion(x_ba, x_a)
-        self.loss_gen_cyc_x_b = self.recon_criterion(x_ab, x_b)
+        self.loss_gen_recon_x_a = self.recon_criterion(x_a_recon, x_a)/a_max
+        self.loss_gen_recon_x_b = self.recon_criterion(x_b_recon, x_b)/b_max
+        self.loss_gen_cyc_x_a = self.recon_criterion(x_ba, x_a)/a_max
+        self.loss_gen_cyc_x_b = self.recon_criterion(x_ab, x_b)/b_max
         # GAN loss
-        self.loss_gen_adv_a = self.dis_a.calc_gen_loss(x_ba)
-        self.loss_gen_adv_b = self.dis_b.calc_gen_loss(x_ab)
+        # self.loss_gen_adv_a = self.dis_a.calc_gen_loss(x_ba)
+        # self.loss_gen_adv_b = self.dis_b.calc_gen_loss(x_ab)
         # total loss
         self.loss_gen_total = self.loss_gen_cyc_x_a + self.loss_gen_cyc_x_b + self.loss_gen_recon_x_a + self.loss_gen_recon_x_b
 
@@ -123,11 +112,11 @@ class AEGANTrainer(nn.Module):
         y_b = self.gen_b.encode(x_b)
 
         # encode shared layer
-        shared_enc_a = self.enc_shared.model(y_a)
-        shared_enc_b = self.enc_shared.model(y_b)
+        shared_enc_a = self.enc_shared.forward(y_a)
+        shared_enc_b = self.enc_shared.forward(y_b)
         # decode shared layer
-        shared_dec_a = self.dec_shared.model(shared_enc_a)
-        shared_dec_b = self.dec_shared.model(shared_enc_b)
+        shared_dec_a = self.dec_shared.forward(shared_enc_a)
+        shared_dec_b = self.dec_shared.forward(shared_enc_b)
 
 
         # decode (cross domain)
@@ -160,7 +149,7 @@ class SharedLayer(nn.Module):
     # Autoencoder architecture
     def __init__(self, **kwargs):
         super().__init__()
-        self.main = nn.Sequential(
+        self.layers = nn.Sequential(
             nn.Linear(128, 128),
             nn.BatchNorm1d(128),
             nn.PReLU(),
@@ -170,21 +159,9 @@ class SharedLayer(nn.Module):
             nn.Linear(128, 128),
             nn.BatchNorm1d(128))
 
-    def model(self,features):
-        z = self.main(features)
+    def forward(self,features):
+        z = self.layers(features)
         return z
-
-# class SharedActivationLayer(nn.Module):
-#     # Autoencoder architecture
-#     def __init__(self, **kwargs):
-#         super().__init__()
-#         self.sig = nn.Sequential(
-#             nn.Linear(128, 1),
-#             nn.Sigmoid())
-
-#     def activate(self,features):
-#         z = self.sig(features)
-#         return z
 
 
 class AEGen(nn.Module):
@@ -215,8 +192,8 @@ class AEGen(nn.Module):
         return hiddens
 
     def decode(self, hiddens):
-        images = self.dec(hiddens)
-        return images
+        hiddens = self.dec(hiddens)
+        return hiddens
 
     def forward(self,features):
         hidden = self.encode(features)
@@ -283,8 +260,7 @@ def train_aegan (x, y, hyperparams, n_epoch):
     model = AEGANTrainer(input_dim_a = n_x_features,input_dim_b = n_y_features)
     model.to(device)
     model.train()
-    optimizer = optim.Adam(model.parameters(), lr=0.00001)
-    criterion = nn.MSELoss()
+    lossfn = nn.MSELoss()
 
     running_loss = [None]*n_epoch
     running_loss_recon_structure = [None]*n_epoch
@@ -308,13 +284,13 @@ def train_aegan (x, y, hyperparams, n_epoch):
             recon_structure, recon_spectrum, pred_structure, pred_spectrum  = model.reconstruct_all_predict_all(inputs_structure,inputs_spectrum)
 
             # xyz-xyz
-            loss_recon_structure += criterion(recon_structure,inputs_structure)
+            loss_recon_structure += lossfn(recon_structure,inputs_structure)
             # xanes-xanes
-            loss_recon_spectrum += criterion(recon_spectrum,inputs_spectrum)
+            loss_recon_spectrum += lossfn(recon_spectrum,inputs_spectrum)
             # xyz-xanes
-            loss_pred_spectrum += criterion(pred_spectrum,inputs_spectrum)
+            loss_pred_spectrum += lossfn(pred_spectrum,inputs_spectrum)
             # xanes-xyz
-            loss_pred_structure += criterion(pred_structure,inputs_structure)
+            loss_pred_structure += lossfn(pred_structure,inputs_structure)
             
 
         running_loss_recon_structure[epoch] = loss_recon_structure.detach().numpy()/len(trainloader)
