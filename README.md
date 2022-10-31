@@ -49,6 +49,14 @@ How to build or install the applcation.
 To run the training :
 `python cli.py learn in.json`
 
+To train xanes in ae-dev 
+run `python cli_ae.py train_xanes in.json`
+Make sure the path is correct in `in.json`
+
+To predict xyz in ae-dev
+run `python cli_ae.py predict_xyz ./model_0xx in_predict.json`
+Make sure the path is correct in `in_predict.json`
+
 ### Running Tests
 
 How to run tests on your local system.
