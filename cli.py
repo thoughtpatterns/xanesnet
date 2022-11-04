@@ -25,9 +25,6 @@ import json
 
 from argparse import ArgumentParser
 
-# import xanesnet
-
-# from xanesnet import resources
 from core_learn import main as learn
 from core_predict import main as predict
 from utils import print_nested_dict
@@ -39,9 +36,6 @@ from utils import print_nested_dict
 def parse_args(args: list):
 
     p = ArgumentParser()
-
-    # p.add_argument('-v', '--version', action = 'version', 
-    #     version = xanesnet.__version__)
     
     sub_p = p.add_subparsers(dest = 'mode')
 
@@ -74,8 +68,6 @@ def main(args: list):
     else:
         args = parse_args(args)
         
-    # banner = importlib.resources.read_text(resources, 'banner_open.txt')
-    # print(banner, '\n')
 
     if args.mode == 'learn':
         print(f'>> loading JSON input @ {args.inp_f}\n')
@@ -84,12 +76,11 @@ def main(args: list):
         print_nested_dict(inp, nested_level = 1)
         print('')
         learn(**inp, save = args.save)
+        print("done")
 
     if args.mode == 'predict':
-            predict(args.mdl_dir, args.xyz_dir, args.xanes_dir)
-        
-    # banner = importlib.resources.read_text(resources, 'banner_close.txt')
-    # print(banner)
+        predict(args.mdl_dir, args.xyz_dir, args.xanes_dir)
+    
 
 ################################################################################
 ############################## PROGRAM STARTS HERE #############################
@@ -97,6 +88,7 @@ def main(args: list):
 
 if __name__ == '__main__':
     main(sys.argv[1:])
+    print("done")
 
 ################################################################################
 ############################### PROGRAM ENDS HERE ##############################

@@ -18,6 +18,7 @@
         "loss": "mse",
         "lr": 0.0001,
         "dropout": 0.25,
+
         "kernel_init": "he_uniform",
         "bias_init": "zeros"
     },
@@ -29,7 +30,7 @@
 
     "seed": 2021,
 
-    "epochs": 512,
+    "epochs": 100,
 
     "variance_threshold": 0.0
 
