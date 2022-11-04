@@ -26,11 +26,8 @@ import tqdm as tqdm
 from pathlib import Path
 
 from inout import load_xyz
-from inout import save_xyz
 from inout import load_xanes
 from inout import save_xanes
-from inout import load_pipeline
-from inout import save_pipeline
 from utils import unique_path
 from utils import list_filestems
 from utils import linecount
@@ -38,6 +35,7 @@ from structure.rdc import RDC
 from structure.wacsf import WACSF
 from spectrum.xanes import XANES
 
+import torch
 from sklearn.metrics import mean_squared_error
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -101,13 +99,15 @@ def main(
             e, y[i,:] = xanes.spectrum
     print('>> ...loaded!\n')
 
-    pipeline = load_pipeline(
-        model_dir / 'net.keras',
-        model_dir / 'pipeline.pickle'
-    )
+    model = torch.load(model_dir / 'model.pt', map_location=torch.device('cpu'))
+    model.eval()
+    print("Loaded model from disk")
+
+    x = torch.from_numpy(x)
+    x = x.float()
 
     print('>> predicting Y data with neural net...')
-    y_predict = pipeline.predict(x)
+    y_predict = model(x)
     if y_predict.ndim == 1:
         if len(ids) == 1:
             y_predict = y_predict.reshape(-1, y_predict.size)
@@ -115,8 +115,8 @@ def main(
             y_predict = y_predict.reshape(y_predict.size, -1)
     print('>> ...predicted Y data!\n')
 
-    print("MSE:", mean_squared_error(y, y_predict))
-    print("EM distance:", emd_samples(y, y_predict))
+    print(mean_squared_error(y, y_predict.detach().numpy()))
+    print(emd_samples(y, y_predict.detach().numpy()))
 
     predict_dir = unique_path(Path('.'), 'predictions')
     predict_dir.mkdir()
@@ -125,16 +125,44 @@ def main(
         e = np.load(f)['e']
 
     print('>> saving Y data predictions...')
+
+    total_y = []
+    total_y_pred = []
     for id_, y_predict_, y_ in tqdm.tqdm(zip(ids, y_predict, y)):
         sns.set()
         plt.figure()
-        plt.plot(y_predict_, label="prediction")
+        plt.plot(y_predict_.detach().numpy(), label="prediction")
         plt.plot(y_, label="target")
         plt.legend(loc="upper right")
+        total_y.append(y_)
+        total_y_pred.append(y_predict_.detach().numpy())
+        
         with open(predict_dir / f'{id_}.txt', 'w') as f:
-            save_xanes(f, XANES(e, y_predict_))
+            save_xanes(f, XANES(e, y_predict_.detach().numpy()))
             plt.savefig(predict_dir / f'{id_}.pdf')
         plt.close()
+    total_y = np.asarray(total_y)
+    total_y_pred = np.asarray(total_y_pred)
+
+    # plotting the average loss
+    sns.set_style("dark")
+
+    mean_y = np.mean(total_y, axis=0)
+    stddev_y = np.std(total_y, axis=0)
+    plt.plot(mean_y, label="target")
+    plt.fill_between(np.arange(mean_y.shape[0]), mean_y + stddev_y, mean_y - stddev_y, alpha=0.4, linewidth=0)
+    
+    mean_y_pred = np.mean(total_y_pred, axis=0)
+    stddev_y_pred = np.std(total_y_pred, axis=0)
+    plt.plot(mean_y_pred, label="prediction")
+    plt.fill_between(np.arange(mean_y_pred.shape[0]), mean_y_pred + stddev_y_pred, mean_y_pred - stddev_y_pred, alpha=0.4, linewidth=0)
+
+    plt.legend(loc="best")
+    plt.grid()
+    plt.savefig(predict_dir / 'plot.pdf')
+    
+    plt.show()
+
     print('...saved!\n')
         
     return 0
