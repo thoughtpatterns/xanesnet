@@ -90,6 +90,7 @@ class AE_cnn(nn.Module):
         self.kernel_size = kernel_size
         self.stride = stride
 
+        # checking the sign for encoder for input_channel for linear
         self.conv1_shape = int(((self.input_size - self.kernel_size) / self.stride) + 1)
         self.conv2_shape = int(
             ((self.conv1_shape - self.kernel_size) / self.stride) + 1
@@ -98,6 +99,7 @@ class AE_cnn(nn.Module):
             ((self.conv2_shape - self.kernel_size) / self.stride) + 1
         )
 
+        # checking the size for decoder to assign padding
         self.convt1_shape = int(((self.conv3_shape - 1) * 2) + self.kernel_size)
         if self.convt1_shape != self.conv2_shape:
             if self.convt1_shape > self.conv2_shape:
@@ -116,17 +118,12 @@ class AE_cnn(nn.Module):
             if self.convt2_shape > self.conv1_shape:
                 self.p2 = self.convt2_shape - self.conv1_shape
                 self.op2 = 0
-                # print(self.op2)
             elif self.convt2_shape < self.conv1_shape:
-                # print("here")
                 self.op2 = self.conv1_shape - self.convt2_shape
                 self.p2 = 0
         else:
             self.p2 = 0
             self.op2 = 0
-            # print(self.op2)
-
-        # print(self.convt2_shape)
 
         self.convt3_shape = int(((self.conv1_shape - 1) * 2) + self.kernel_size)
         if self.convt3_shape != self.input_size:
@@ -140,9 +137,6 @@ class AE_cnn(nn.Module):
             self.p3 = 0
             self.op3 = 0
 
-        # print(self.convt_shape)
-        # print(self.input_size)
-
         self.encoder_layer1 = nn.Sequential(
             nn.Conv1d(
                 in_channels=1,
@@ -150,9 +144,7 @@ class AE_cnn(nn.Module):
                 kernel_size=self.kernel_size,
                 stride=self.stride,
             ),
-            # nn.BatchNorm1d(num_features=16),
             nn.PReLU(),
-            # nn.MaxPool1d(2),
         )
 
         self.encoder_layer2 = nn.Sequential(
@@ -162,9 +154,7 @@ class AE_cnn(nn.Module):
                 kernel_size=self.kernel_size,
                 stride=self.stride,
             ),
-            # nn.BatchNorm1d(num_features=32),
             nn.PReLU(),
-            # nn.MaxPool1d(2),
         )
 
         self.encoder_output = nn.Sequential(
@@ -174,9 +164,7 @@ class AE_cnn(nn.Module):
                 kernel_size=self.kernel_size,
                 stride=self.stride,
             ),
-            # nn.BatchNorm1d(num_features=64),
             nn.PReLU(),
-            # nn.MaxPool1d(2),
         )
         # self.encoder_output = nn.Conv1d(
         #     in_channels=32, out_channels=64, kernel_size=5, stride=2
@@ -187,7 +175,6 @@ class AE_cnn(nn.Module):
                 self.conv3_shape * int(self.out_channel * self.channel_mul * 2),
                 self.hidden_layer,
             ),
-            # nn.Lazylinear(128),
             nn.PReLU(),
             nn.Dropout(self.dropout),
             nn.Linear(self.hidden_layer, self.out_dim),
@@ -202,9 +189,7 @@ class AE_cnn(nn.Module):
                 output_padding=self.op1,
                 padding=self.p1,
             ),
-            # nn.BatchNorm1d(num_features=32),
             nn.PReLU(),
-            # nn.MaxPool1d(2),
         )
 
         self.decoder_layer2 = nn.Sequential(
@@ -216,9 +201,7 @@ class AE_cnn(nn.Module):
                 output_padding=self.op2,
                 padding=self.p2,
             ),
-            # nn.BatchNorm1d(num_features=16),
             nn.PReLU(),
-            # nn.MaxPool1d(2),
         )
 
         self.decoder_output = nn.Sequential(
@@ -230,42 +213,25 @@ class AE_cnn(nn.Module):
                 output_padding=self.op3,
                 padding=self.p3,
             ),
-            # nn.BatchNorm1d(num_features=1),
             nn.PReLU(),
-            # nn.MaxPool1d(2),
         )
 
-    # def encode(self, x):
     def forward(self, x):
 
         x = x.unsqueeze(0)
         x = x.permute(1, 0, 2)
-        # x = nn.flatten(x)
-        # print(x.shape)
 
         self.out = self.encoder_layer1(x)
-        # print(self.out.shape)
         self.out = self.encoder_layer2(self.out)
-        # print(self.out.shape)
         self.out = self.encoder_output(self.out)
-        # print(self.out.shape)
 
         pred = self.out.view(self.out.size(0), -1)
-        # print(pred.shape)
-        self.hl = pred.size(-1)
-        # print(self.hl)
         pred = self.dense_layers(pred)
-        # print(pred.shape)
-        # print(out.shape)
 
         recon = self.decoder_layer1(self.out)
-        # print(recon.shape)
         recon = self.decoder_layer2(recon)
-        # print(recon.shape)
         recon = self.decoder_output(recon)
-        # print(recon.shape)
         recon = recon.squeeze(dim=1)
-        # print(recon.shape)
 
         return recon, pred
 
@@ -327,12 +293,9 @@ def train_ae(x, y, hyperparams, n_epoch):
                 labels.float(),
                 # element_label.long(),
             )
-            # print(inputs.shape)
 
             optimizer.zero_grad()
             recon_input, outputs = model(inputs)
-            # outputs = model(inputs)
-            # print(outputs.shape)
 
             loss_recon = criterion(recon_input, inputs)
             loss_pred = criterion(outputs, labels)
