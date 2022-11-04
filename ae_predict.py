@@ -70,6 +70,8 @@ def main(aemode: str, model_dir: str, x_path: str, y_path: str):
     predict_dir = unique_path(Path("."), "predictions")
     predict_dir.mkdir()
 
+    print(len(xyz_path))
+
     for n_element in range(0, len(xyz_path)):
 
         element_label = []
@@ -107,9 +109,7 @@ def main(aemode: str, model_dir: str, x_path: str, y_path: str):
             e, xanes_data[i, :] = xanes.spectrum
         print(">> ...loaded!\n")
 
-        model = torch.load(
-            model_dir / "train_xanes_model.pt", map_location=torch.device("cpu")
-        )
+        model = torch.load(model_dir / "model.pt", map_location=torch.device("cpu"))
         model.eval()
         print("Loaded model from disk")
 
@@ -117,17 +117,38 @@ def main(aemode: str, model_dir: str, x_path: str, y_path: str):
         element_label = le.fit_transform(element_label)
         element_label = torch.as_tensor(element_label + n_element)
 
-        print("predict xyz structure")
+        if aemode == "predict_xyz":
 
-        n_sample = xanes_data.shape[0]
-        xanes = torch.from_numpy(xanes_data)
-        xanes = xanes.float()
+            print("predict xyz structure")
 
-        print(">> predicting Y data with neural net...")
-        recon_xanes, pred_xyz = model(xanes)
+            n_sample = xanes_data.shape[0]
+            xanes = torch.from_numpy(xanes_data)
+            xanes = xanes.float()
 
-        print(mean_squared_error(xanes, recon_xanes.detach().numpy()))
-        print(mean_squared_error(xyz_data, pred_xyz.detach().numpy()))
+            recon_xanes, pred_xyz = model(xanes)
+
+            x = xanes
+            x_recon = recon_xanes
+            y = xyz_data
+            y_pred = pred_xyz
+
+        elif aemode == "predict_xanes":
+
+            print("predict xyz structure")
+
+            # n_sample = xanes_data.shape[0]
+            xyz = torch.from_numpy(xyz_data)
+            xyz = xyz.float()
+
+            recon_xyz, pred_xanes = model(xyz)
+
+            x = xyz
+            x_recon = recon_xyz
+            y = xanes_data
+            y_pred = pred_xanes
+
+        print("MSE x to x recon : ", mean_squared_error(x, x_recon.detach().numpy()))
+        print("MSE y to y pred : ", mean_squared_error(y, y_pred.detach().numpy()))
 
         os.makedirs(os.path.join(predict_dir, element_name))
 
@@ -137,7 +158,7 @@ def main(aemode: str, model_dir: str, x_path: str, y_path: str):
         total_x_recon = []
 
         for id_, y_predict_, y_, x_recon_, x_ in tqdm.tqdm(
-            zip(ids, pred_xyz, xyz_data, recon_xanes, xanes_data)
+            zip(ids, y_pred, y, x_recon, x)
         ):
             sns.set()
             fig, (ax1, ax2) = plt.subplots(2)
@@ -151,11 +172,11 @@ def main(aemode: str, model_dir: str, x_path: str, y_path: str):
             ax2.set_title("reconstruction")
             ax2.plot(x_, label="target")
             ax2.legend(loc="upper right")
-
+            # print(type(x_))
             total_y.append(y_)
             total_y_pred.append(y_predict_.detach().numpy())
 
-            total_x.append(x_)
+            total_x.append(x_.detach().numpy())
             total_x_recon.append(x_recon_.detach().numpy())
             # with open(predict_dir / f"{id_}.txt", "w") as f:
             np.save(

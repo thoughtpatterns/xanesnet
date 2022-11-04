@@ -18,7 +18,7 @@
         "dropout": 0.25,
         "kernel_init": "he_uniform",
         "bias_init": "zeros",
-        "kernel_size": 5,
+        "kernel_size": 3,
         "stride": 2
     },
     "seed": 2021,

@@ -98,6 +98,51 @@ class AE_cnn(nn.Module):
             ((self.conv2_shape - self.kernel_size) / self.stride) + 1
         )
 
+        self.convt1_shape = int(((self.conv3_shape - 1) * 2) + self.kernel_size)
+        if self.convt1_shape != self.conv2_shape:
+            if self.convt1_shape > self.conv2_shape:
+                self.p1 = self.convt1_shape - self.conv2_shape
+                self.op1 = 0
+            elif self.convt1_shape < self.conv2_shape:
+                self.op1 = self.conv2_shape - self.convt1_shape
+                self.p1 = 0
+        else:
+            self.p1 = 0
+            self.op1 = 0
+
+        self.convt2_shape = int(((self.conv2_shape - 1) * 2) + self.kernel_size)
+        # print(self.conv1_shape)
+        if self.convt2_shape != self.conv1_shape:
+            if self.convt2_shape > self.conv1_shape:
+                self.p2 = self.convt2_shape - self.conv1_shape
+                self.op2 = 0
+                # print(self.op2)
+            elif self.convt2_shape < self.conv1_shape:
+                # print("here")
+                self.op2 = self.conv1_shape - self.convt2_shape
+                self.p2 = 0
+        else:
+            self.p2 = 0
+            self.op2 = 0
+            # print(self.op2)
+
+        # print(self.convt2_shape)
+
+        self.convt3_shape = int(((self.conv1_shape - 1) * 2) + self.kernel_size)
+        if self.convt3_shape != self.input_size:
+            if self.convt3_shape > self.input_size:
+                self.p3 = self.convt3_shape - self.input_size
+                self.op3 = 0
+            elif self.convt3_shape < self.input_size:
+                self.op3 = self.input_size - self.convt3_shape
+                self.p3 = 0
+        else:
+            self.p3 = 0
+            self.op3 = 0
+
+        # print(self.convt_shape)
+        # print(self.input_size)
+
         self.encoder_layer1 = nn.Sequential(
             nn.Conv1d(
                 in_channels=1,
@@ -112,7 +157,7 @@ class AE_cnn(nn.Module):
 
         self.encoder_layer2 = nn.Sequential(
             nn.Conv1d(
-                in_channels=16,
+                in_channels=self.out_channel,
                 out_channels=int(self.out_channel * self.channel_mul),
                 kernel_size=self.kernel_size,
                 stride=self.stride,
@@ -150,11 +195,12 @@ class AE_cnn(nn.Module):
 
         self.decoder_layer1 = nn.Sequential(
             nn.ConvTranspose1d(
-                in_channels=64,
-                out_channels=32,
-                kernel_size=5,
-                stride=2,
-                output_padding=1,
+                in_channels=int(self.out_channel * self.channel_mul * 2),
+                out_channels=int(self.out_channel * self.channel_mul),
+                kernel_size=self.kernel_size,
+                stride=self.stride,
+                output_padding=self.op1,
+                padding=self.p1,
             ),
             # nn.BatchNorm1d(num_features=32),
             nn.PReLU(),
@@ -163,11 +209,12 @@ class AE_cnn(nn.Module):
 
         self.decoder_layer2 = nn.Sequential(
             nn.ConvTranspose1d(
-                in_channels=32,
-                out_channels=16,
-                kernel_size=5,
-                stride=2,
-                output_padding=1,
+                in_channels=int(self.out_channel * self.channel_mul),
+                out_channels=self.out_channel,
+                kernel_size=self.kernel_size,
+                stride=self.stride,
+                output_padding=self.op2,
+                padding=self.p2,
             ),
             # nn.BatchNorm1d(num_features=16),
             nn.PReLU(),
@@ -176,12 +223,12 @@ class AE_cnn(nn.Module):
 
         self.decoder_output = nn.Sequential(
             nn.ConvTranspose1d(
-                in_channels=16,
+                in_channels=self.out_channel,
                 out_channels=1,
-                kernel_size=5,
-                stride=2,
-                output_padding=1,
-                padding=1,
+                kernel_size=self.kernel_size,
+                stride=self.stride,
+                output_padding=self.op3,
+                padding=self.p3,
             ),
             # nn.BatchNorm1d(num_features=1),
             nn.PReLU(),

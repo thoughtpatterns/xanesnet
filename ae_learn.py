@@ -259,7 +259,7 @@ def main(
 
     if save:
 
-        torch.save(model, model_dir / f"{aemode}_model.pt")
+        torch.save(model, model_dir / f"model.pt")
         print("Saved model to disk")
 
     else:
