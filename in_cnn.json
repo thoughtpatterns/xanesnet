@@ -22,6 +22,6 @@
         "stride": 2
     },
     "seed": 2021,
-    "epochs": 50,
+    "epochs": 500,
     "variance_threshold": 0.0
 }
