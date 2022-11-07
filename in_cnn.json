@@ -9,7 +9,7 @@
         "n_g4": 32
     },
     "hyperparams": {
-        "out_channel": 8,
+        "out_channel": 16,
         "channel_mul": 2,
         "hidden_layer": 128,
         "activation": "tanh",
@@ -22,6 +22,6 @@
         "stride": 2
     },
     "seed": 2021,
-    "epochs": 500,
+    "epochs": 5,
     "variance_threshold": 0.0
 }

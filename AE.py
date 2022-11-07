@@ -100,7 +100,9 @@ class AE_cnn(nn.Module):
         )
 
         # checking the size for decoder to assign padding
-        self.convt1_shape = int(((self.conv3_shape - 1) * 2) + self.kernel_size)
+        self.convt1_shape = int(
+            ((self.conv3_shape - 1) * self.stride) + self.kernel_size
+        )
         if self.convt1_shape != self.conv2_shape:
             if self.convt1_shape > self.conv2_shape:
                 self.p1 = self.convt1_shape - self.conv2_shape
@@ -112,7 +114,9 @@ class AE_cnn(nn.Module):
             self.p1 = 0
             self.op1 = 0
 
-        self.convt2_shape = int(((self.conv2_shape - 1) * 2) + self.kernel_size)
+        self.convt2_shape = int(
+            ((self.conv2_shape - 1) * self.stride) + self.kernel_size
+        )
         if self.convt2_shape != self.conv1_shape:
             if self.convt2_shape > self.conv1_shape:
                 self.p2 = self.convt2_shape - self.conv1_shape
@@ -124,7 +128,9 @@ class AE_cnn(nn.Module):
             self.p2 = 0
             self.op2 = 0
 
-        self.convt3_shape = int(((self.conv1_shape - 1) * 2) + self.kernel_size)
+        self.convt3_shape = int(
+            ((self.conv1_shape - 1) * self.stride) + self.kernel_size
+        )
         if self.convt3_shape != self.input_size:
             if self.convt3_shape > self.input_size:
                 self.p3 = self.convt3_shape - self.input_size
@@ -220,14 +226,14 @@ class AE_cnn(nn.Module):
         x = x.unsqueeze(0)
         x = x.permute(1, 0, 2)
 
-        self.out = self.encoder_layer1(x)
-        self.out = self.encoder_layer2(self.out)
-        self.out = self.encoder_output(self.out)
+        out = self.encoder_layer1(x)
+        out = self.encoder_layer2(out)
+        out = self.encoder_output(out)
 
-        pred = self.out.view(self.out.size(0), -1)
+        pred = out.view(out.size(0), -1)
         pred = self.dense_layers(pred)
 
-        recon = self.decoder_layer1(self.out)
+        recon = self.decoder_layer1(out)
         recon = self.decoder_layer2(recon)
         recon = self.decoder_output(recon)
         recon = recon.squeeze(dim=1)
@@ -241,7 +247,6 @@ def train_ae(x, y, hyperparams, n_epoch):
 
     out_dim = y[0].size
     n_in = x.shape[1]
-    # print(x.shape)
 
     le = preprocessing.LabelEncoder()
 
