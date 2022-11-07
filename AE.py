@@ -113,7 +113,6 @@ class AE_cnn(nn.Module):
             self.op1 = 0
 
         self.convt2_shape = int(((self.conv2_shape - 1) * 2) + self.kernel_size)
-        # print(self.conv1_shape)
         if self.convt2_shape != self.conv1_shape:
             if self.convt2_shape > self.conv1_shape:
                 self.p2 = self.convt2_shape - self.conv1_shape

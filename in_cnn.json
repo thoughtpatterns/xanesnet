@@ -1,6 +1,6 @@
 {
-    "x_path": "/Users/nnn28/xanes/data/datasets/fe/preconv/xyz_train",
-    "y_path": "/Users/nnn28/xanes/data/datasets/fe/preconv/xanes_train",
+    "x_path": "/data/datasets/fe/preconv/xyz_train",
+    "y_path": "/data/datasets/fe/preconv/xanes_train",
     "descriptor_type": "wacsf",
     "descriptor_params": {
         "r_min": 1.0,
@@ -9,7 +9,7 @@
         "n_g4": 32
     },
     "hyperparams": {
-        "out_channel": 16,
+        "out_channel": 8,
         "channel_mul": 2,
         "hidden_layer": 128,
         "activation": "tanh",
