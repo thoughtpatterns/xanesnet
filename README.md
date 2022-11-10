@@ -25,9 +25,9 @@ A general layer in the model is MLP consisting of a linear layer, batch norm lay
 
 The trained model can then be used for inference of both structure and spectrum. Three predict methods are provided for the model depending on the input sources. 
 
-```python cli_aegan.py predict_in_xyz xyz_dir```  
-```python cli_aegan.py predict_in_xanes xanes_dir```  
-```python cli_aegan.py predict_all xyz_dir xanes_dir```  
+```python cli_aegan.py predict_in_xyz model_dir xyz_dir```  
+```python cli_aegan.py predict_in_xanes model_dir xanes_dir```  
+```python cli_aegan.py predict_all model_dir xyz_dir xanes_dir```  
 
 Since the model affords reconstruction of the input data as well as prediction the predict method currently performs both. For example, with structure data as the input the predict method returns a reconstruction of the stucture and prediction of the spectrum. 
 
