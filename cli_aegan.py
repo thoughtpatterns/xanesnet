@@ -103,7 +103,7 @@ def main(args: list):
     # if args.mode == 'predict':
     #         predict(args.mdl_dir, args.xyz_dir, args.xanes_dir)
     
-    if args.mode == 'learn':
+    if args.mode == 'learn_aegan':
         print(f'>> loading JSON input @ {args.inp_f}\n')
         with open(args.inp_f) as f:
             inp = json.load(f)
@@ -114,8 +114,14 @@ def main(args: list):
         aegan_learn(**inp, save = args.save)
         print("done")
 
-    if args.mode == 'predict':
-        aegan_predict(args.mdl_dir, args.xyz_dir, args.xanes_dir)
+    if args.mode == 'predict_in_xyz':
+        aegan_predict_in_xyz(args.mdl_dir, args.xyz_dir)
+
+    if args.mode == 'predict_in_xanes':
+        aegan_predict_in_xanes(args.mdl_dir, args.xanes_dir)
+
+    if args.mode == 'predict_all':
+        aegan_predict_all(args.mdl_dir, args.xyz_dir, args.xanes_dir)
 
         
     # banner = importlib.resources.read_text(resources, 'banner_close.txt')
