@@ -18,18 +18,13 @@ this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import sys
 import json
-# import importlib.resources
 
 from argparse import ArgumentParser
 
-# import xanesnet
-
-# from xanesnet import resources
-# from core_learn import main as learn
-# from core_predict import main as predict
 from aegan_learn import main as aegan_learn
-from aegan_predict import main as aegan_predict
-# from aegan_predict import main as aegan_predict
+from aegan_predict import main as aegan_predict_in_xyz
+from aegan_predict import main as aegan_predict_in_xanes
+from aegan_predict import main as aegan_predict_all
 from utils import print_nested_dict
 
 ###############################################################################
