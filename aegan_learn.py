@@ -64,6 +64,7 @@ def main(
 
 ):
     """
+    TODO: MODIFY DOCSTRING FOR AEGAN
     LEARN. The .xyz (X) and XANES spectral (Y) data are loaded and transformed;
     a neural network is set up and fit to these data to find an Y <- X mapping.
     K-fold cross-validation is possible if {kfold_params} are provided. 
@@ -236,35 +237,28 @@ def main(
     #     net.save_weights(model_dir / f"model.h")
     #     print("Saved model to disk")
 
-    print('>> Saving running losses...')
+    print('>> Plotting running losses...')
 
     sns.set()
+    cycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
+
     fig, (ax1,ax2,ax3) = plt.subplots(3,figsize=(10,10))
 
-    ax1.plot(losses['total'], label="Total loss")
+
+    ax1.plot(losses['train_loss'], label="Total training loss",color = cycle[0])
     ax1.legend(loc="upper right")
 
-    ax2.plot(losses['loss_xyz_recon'], label="Structure Reconstruction Error")
-    ax2.plot(losses['loss_xyz_pred'], label="Structure Prediction Error")
+    ax2.plot(losses['loss_x_recon'], label="Training Structure Reconstruction",color = cycle[1])
+    ax2.plot(losses['loss_x_pred'], label="Training Structure Prediction",color = cycle[2])
     ax2.legend(loc="upper right")
 
-    ax3.plot(losses['loss_xanes_recon'], label="Spectrum Reconstruction Error")
-    ax3.plot(losses['loss_xanes_pred'], label="Spectrum Prediction Error")
+    ax3.plot(losses['loss_y_recon'], label="Training Spectrum Reconstruction",color = cycle[3])
+    ax3.plot(losses['loss_y_pred'], label="Training Spectrum Prediction",color = cycle[4])
     ax3.legend(loc="upper right")
-
-    # ax3.plot(y_pred_.detach().numpy(), label="Prediction")
-    # ax3.set_title('Spectrum Prediction')
-    # ax3.plot(y_, label="target")
-    # ax3.legend(loc="upper left")
-        
-    # ax4.plot(x_pred_.detach().numpy(), label="Prediction")
-    # ax4.set_title('Structure Prediction')
-    # ax4.plot(x_, label="target")
-    # ax4.legend(loc="upper left")
 
     # # with open(predict_dir / f'{id_}.txt', 'w') as f:
     #     # save_xanes(f, XANES(e, y_predict_.detach().numpy()))
-    plt.savefig(f"{model_dir}/training-epoch-losses.pdf")
+    plt.savefig(f"{model_dir}/training-mse-loss.pdf")
     fig.clf()
     plt.close(fig)
     print('...saved!\n')
