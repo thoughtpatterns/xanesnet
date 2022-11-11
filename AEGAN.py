@@ -443,8 +443,8 @@ def train_aegan (x, y, hyperparams, n_epoch):
             # Track running losses
             running_loss_recon_x += loss_fn(recon_x,inputs_x)
             running_loss_recon_y += loss_fn(recon_y,inputs_y)
-            running_loss_pred_x += loss_fn(pred_y,inputs_x)
-            running_loss_pred_y += loss_fn(pred_x,inputs_y)
+            running_loss_pred_x += loss_fn(pred_x,inputs_x)
+            running_loss_pred_y += loss_fn(pred_y,inputs_y)
 
             loss_gen_total = running_loss_recon_x + running_loss_recon_y + running_loss_pred_x + running_loss_pred_y
             loss_dis = model.loss_dis_total
