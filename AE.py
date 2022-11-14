@@ -251,9 +251,12 @@ def train_ae(x, y, hyperparams, n_epoch):
     le = preprocessing.LabelEncoder()
 
     x = torch.from_numpy(x)
+    noise = torch.randn_like(x) * 0.1
+    print(noise.shape)
+    # x = noise + x *(1 - noise)
     y = torch.from_numpy(y)
 
-    trainset = torch.utils.data.TensorDataset(x, y)
+    trainset = torch.utils.data.TensorDataset(x, y, noise)
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=32)
 
     # model = AE_mlp(
@@ -286,20 +289,25 @@ def train_ae(x, y, hyperparams, n_epoch):
     for epoch in range(n_epoch):
         running_loss = 0
 
-        for inputs, labels in trainloader:
-            inputs, labels = (
+        for inputs, labels, noise in trainloader:
+            inputs, labels, noise = (
                 inputs.to(device),
                 labels.to(device),
                 # element_label.to(device),
+                noise.to(device)
             )
-            inputs, labels = (
+            inputs, labels, noise = (
                 inputs.float(),
                 labels.float(),
                 # element_label.long(),
+                noise.float()
             )
+            # noise = noise.float()
+            input_noise = noise + inputs *(1 - noise)
 
             optimizer.zero_grad()
-            recon_input, outputs = model(inputs)
+            
+            recon_input, outputs = model(input_noise)
 
             loss_recon = criterion(recon_input, inputs)
             loss_pred = criterion(outputs, labels)
