@@ -89,6 +89,7 @@ def print_cross_validation_scores(scores: dict):
     # with overall k-fold cross validation statistics (mean and std. dev.)
     # using the `scores` dictionary returned from `cross_validate`
 
+    print(scores)
     print('')
     print('>> summarising scores from k-fold cross validation...')
     print('')
