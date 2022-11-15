@@ -1,16 +1,50 @@
 # X-ray Spectroscopy & Machine Learning
-A template repo for the standard RSE project
 
 ## About
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed sollicitudin ante at eleifend eleifend. Sed non vestibulum nisi. Aliquam vel condimentum quam. Donec fringilla et purus at auctor. Praesent euismod vitae metus non consectetur. Sed interdum aliquet nisl at efficitur. Nulla urna quam, gravida eget elementum eget, mattis nec tortor. Fusce ut neque tellus. Integer at magna feugiat lacus porta posuere eget vitae metus.
-
-Curabitur a tempus arcu. Maecenas blandit risus quam, quis convallis justo pretium in. Suspendisse rutrum, elit at venenatis cursus, dolor ligula iaculis dui, ut dignissim enim justo at ligula. Donec interdum dignissim egestas. Nullam nec ultrices enim. Nam quis arcu tincidunt, auctor purus sit amet, aliquam libero. Fusce rhoncus lectus ac imperdiet varius. Sed gravida urna eros, ac luctus justo condimentum nec. Integer ultrices nibh in neque sagittis, at pretium erat pretium. Praesent feugiat purus id iaculis laoreet. Proin in tellus tristique, congue ante in, sodales quam. Sed imperdiet est tortor, eget vestibulum tortor pulvinar volutpat. In et pretium nisl.
+...
 
 ### Project Team
 Tom Penfold, Chemistry, Newcastle University  ([lorem.ipsum@newcastle.ac.uk](mailto:lorem.ipsum@newcastle.ac.uk))  
 Nik Khadijah Nik Aznan, RSE Team, Newcastle University  ([nik.nik-aznan@ncl.ac.uk](mailto:nik.nik-aznan@ncl.ac.uk))  
 Kathryn Garside, RSE Team, Newcastle University ([kathryn.garside@newcastle.ac.uk](mailto:kathryn.garside@newcastle.ac.uk))
+
+## Models
+
+### AEGAN (main branch)
+Trains model via a coupled Autoencoder Generalised adverserial network. The couple autoencoder consists of two generative networks, each built from an encoder and decoder block. A shared layer connects the two networks and enables cross-domain paths through the network, allowing reconstruction and prediction for both of the inputs. A discriminator network aims to check for differences between real inputs and that which have either been reconstructed or predicted, forcing the generative network to perform better.
+
+```python cli_aegan.py learn in_aegan.json```  
+
+Example model parameters can be found in `in_aegan.json`. The user can specify hidden size of linear layers (*hidden_size*), dropout (*dropout*), the number of hidden layers in the encoder-decoder (*n_hl_gen*), shared (*n_hl_shared*) and discriminator (*n_nl_dis*) networks, activation function (*activation*), loss function for the generative (*loss_gen*) and discriminator (*loss_dis*) networks, learning rates (*lr_gen* and *lr_dis*).
+
+A general layer in the model is MLP consisting of a linear layer, batch norm layer, activation. 
+
+(TODO: add dropout layers)
+
+
+The trained model can then be used for inference of both structure and spectrum. Three predict methods are provided for the model depending on the input sources. 
+
+```python cli_aegan.py predict_aegan model_dir xyz_dir xanes_dir``` 
+
+```python cli_aegan.py predict_aegan_spectrum model_dir xyz_dir```  
+```python cli_aegan.py predict_aegan_structure model_dir xanes_dir```  
+ 
+
+Since the model affords reconstruction of the input data as well as prediction the predict method currently performs both. For example, with structure data as the input the predict method returns a reconstruction of the stucture and prediction of the spectrum. 
+
+(TODO: Add generalised CNN option to model.)
+
+### AE (ae-dev branch)
+
+ae_mlp, ae_cnn
+...
+
+### Original XANES PyTorch Implementation
+
+...
+
+####
 
 
 ### RSE Contact
