@@ -23,10 +23,6 @@ class AE_mlp(nn.Module):
             nn.PReLU(),
         )
 
-        # self.encoder_output = nn.Sequential(
-        #     nn.Linear(128, 64),
-        # )
-
         self.fc1 = nn.Sequential(
             nn.Linear(int(self.hidden_size * self.hl_shrink), 64),
             nn.Dropout(self.dropout),
@@ -47,22 +43,16 @@ class AE_mlp(nn.Module):
             nn.PReLU(),
         )
 
-        # self.decoder_output = nn.Sequential(
-        #     nn.Linear(256, self.input_size),
-        # )
-
     def forward(self, x: torch.Tensor) -> torch.Tensor:
 
         x = self.encoder_hidden_1(x)
         latent_space = self.encoder_hidden_2(x)
 
-        # latent_space = self.encoder_output(x)
         in_fc = self.fc1(latent_space)
         pred_y = self.fc2(in_fc)
 
         out = self.decoder_hidden_1(latent_space)
         recon = self.decoder_hidden_2(out)
-        # recon = self.decoder_output(out)
 
         return recon, pred_y
 
@@ -171,9 +161,6 @@ class AE_cnn(nn.Module):
             ),
             nn.PReLU(),
         )
-        # self.encoder_output = nn.Conv1d(
-        #     in_channels=32, out_channels=64, kernel_size=5, stride=2
-        # )
 
         self.dense_layers = nn.Sequential(
             nn.Linear(
@@ -251,12 +238,9 @@ def train_ae(x, y, hyperparams, n_epoch):
     le = preprocessing.LabelEncoder()
 
     x = torch.from_numpy(x)
-    noise = torch.randn_like(x) * 0.1
-    print(noise.shape)
-    # x = noise + x *(1 - noise)
     y = torch.from_numpy(y)
 
-    trainset = torch.utils.data.TensorDataset(x, y, noise)
+    trainset = torch.utils.data.TensorDataset(x, y)
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=32)
 
     # model = AE_mlp(
@@ -289,25 +273,19 @@ def train_ae(x, y, hyperparams, n_epoch):
     for epoch in range(n_epoch):
         running_loss = 0
 
-        for inputs, labels, noise in trainloader:
-            inputs, labels, noise = (
+        for inputs, labels in trainloader:
+            inputs, labels = (
                 inputs.to(device),
                 labels.to(device),
-                # element_label.to(device),
-                noise.to(device)
             )
-            inputs, labels, noise = (
+            inputs, labels = (
                 inputs.float(),
                 labels.float(),
-                # element_label.long(),
-                noise.float()
             )
-            # noise = noise.float()
-            input_noise = noise + inputs *(1 - noise)
 
             optimizer.zero_grad()
             
-            recon_input, outputs = model(input_noise)
+            recon_input, outputs = model(inputs)
 
             loss_recon = criterion(recon_input, inputs)
             loss_pred = criterion(outputs, labels)
