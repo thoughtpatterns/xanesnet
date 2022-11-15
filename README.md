@@ -9,9 +9,9 @@ Tom Penfold, Chemistry, Newcastle University  ([lorem.ipsum@newcastle.ac.uk](mai
 Nik Khadijah Nik Aznan, RSE Team, Newcastle University  ([nik.nik-aznan@ncl.ac.uk](mailto:nik.nik-aznan@ncl.ac.uk))  
 Kathryn Garside, RSE Team, Newcastle University ([kathryn.garside@newcastle.ac.uk](mailto:kathryn.garside@newcastle.ac.uk))
 
-## Development Branches
+## Models
 
-### AEGAN
+### AEGAN (main branch)
 Trains model via a coupled Autoencoder Generalised adverserial network. The couple autoencoder consists of two generative networks, each built from an encoder and decoder block. A shared layer connects the two networks and enables cross-domain paths through the network, allowing reconstruction and prediction for both of the inputs. A discriminator network aims to check for differences between real inputs and that which have either been reconstructed or predicted, forcing the generative network to perform better.
 
 ```python cli_aegan.py learn in_aegan.json```  
@@ -35,6 +35,14 @@ Since the model affords reconstruction of the input data as well as prediction t
 
 (TODO: Add generalised CNN option to model.)
 
+### AE (ae-dev branch)
+
+ae_mlp, ae_cnn
+...
+
+### Original XANES PyTorch Implementation
+
+...
 
 ####
 
