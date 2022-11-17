@@ -8,6 +8,7 @@ class MLP(nn.Module):
     def __init__(self, input_size, hidden_size, dropout, hl_size, out_dim):
         super().__init__()
     
+
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.dropout = dropout
@@ -30,6 +31,7 @@ class MLP(nn.Module):
             nn.Linear(self.hl_size, self.out_dim)
         )
 
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
 
         x = self.fc1(x)
@@ -37,6 +39,7 @@ class MLP(nn.Module):
         out = self.fc3(x)
 
         return out
+
 
 def weight_init(m):
     if isinstance(m, nn.Linear):
@@ -65,6 +68,7 @@ def train_mlp (x, y, hyperparams, n_epoch):
     mlp.apply(weight_init)
     mlp.train()
     optimizer = optim.Adam(mlp.parameters(), lr=hyperparams['lr'])
+
     criterion = nn.MSELoss()
 
     for epoch in range(n_epoch):
@@ -72,6 +76,7 @@ def train_mlp (x, y, hyperparams, n_epoch):
         for inputs, labels in trainloader:
             inputs, labels = inputs.to(device), labels.to(device)
             inputs, labels = inputs.float(), labels.float()
+
             
             optimizer.zero_grad()
             logps = mlp(inputs)
@@ -80,8 +85,9 @@ def train_mlp (x, y, hyperparams, n_epoch):
             loss.mean().backward()
             optimizer.step()
             running_loss += loss.item()
+
             
         # print(running_loss/len(trainloader))
 
     return mlp, running_loss/len(trainloader)
-        
+       

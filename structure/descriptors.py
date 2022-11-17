@@ -30,11 +30,12 @@ from abc import abstractproperty
 ################################## CLASSES ####################################
 ###############################################################################
 
-class Descriptor(ABC):
 
+class Descriptor(ABC):
     def __init__():
 
-            pass
+        pass
+
 
 class VectorDescriptor(Descriptor, ABC):
     """
@@ -42,14 +43,8 @@ class VectorDescriptor(Descriptor, ABC):
     fingerprint feature vector, or 'descriptor', that encodes the local
     environment around an absorption site as a vector.
     """
-    
-    def __init__(
-        self, 
-        r_min: float, 
-        r_max: float,
-        use_charge: bool,
-        use_spin: bool
-    ):
+
+    def __init__(self, r_min: float, r_max: float, use_charge: bool, use_spin: bool):
         """
         Args:
             r_min (float): The minimum radial cutoff distance (in A) around
@@ -67,22 +62,22 @@ class VectorDescriptor(Descriptor, ABC):
         if isinstance(r_min, (int, float)) and r_min >= 0.0:
             self.r_min = float(r_min)
         else:
-            raise ValueError(f'expected r_min: int/float >== 0.0; got {r_min}')
+            raise ValueError(f"expected r_min: int/float >== 0.0; got {r_min}")
 
         if isinstance(r_max, (int, float)) and r_max > r_min:
             self.r_max = float(r_max)
         else:
-            raise ValueError(f'expected r_max: int/float > r_min; got {r_max}')        
+            raise ValueError(f"expected r_max: int/float > r_min; got {r_max}")
 
         if isinstance(use_charge, bool):
             self.use_charge = use_charge
         else:
-            raise ValueError(f'expected use_charge: bool; got {use_charge}')
+            raise ValueError(f"expected use_charge: bool; got {use_charge}")
 
         if isinstance(use_spin, bool):
             self.use_spin = use_spin
         else:
-            raise ValueError(f'expected use_spin: bool; got {use_spin}')
+            raise ValueError(f"expected use_spin: bool; got {use_spin}")
 
     @abstractmethod
     def transform(self, system: Atoms) -> np.ndarray:
@@ -98,8 +93,8 @@ class VectorDescriptor(Descriptor, ABC):
         Returns:
             np.ndarray: A fingerprint feature vector for the molecular system.
         """
-        
-        pass 
+
+        pass
 
     @abstractmethod
     def get_len(self) -> int:

@@ -25,14 +25,10 @@ import numpy as np
 ################################## CLASSES ####################################
 ###############################################################################
 
-class XANES():
 
+class XANES:
     def __init__(
-        self,
-        e: np.ndarray,
-        m: np.ndarray,
-        e0: float = None,
-        info: dict = None
+        self, e: np.ndarray, m: np.ndarray, e0: float = None, info: dict = None
     ):
         """
         Args:
@@ -50,13 +46,15 @@ class XANES():
         Raises:
             ValueError: if the `e` and `m` arrays are not the same length.
         """
-        
+
         if len(e) == len(m):
             self._e = e
             self._m = m
         else:
-            raise ValueError('the energy (`e`) and XANES spectral intensity '\
-                '(`m`) arrays are not the same length')
+            raise ValueError(
+                "the energy (`e`) and XANES spectral intensity "
+                "(`m`) arrays are not the same length"
+            )
 
         if e0 is not None:
             self._e0 = e0
@@ -79,11 +77,7 @@ class XANES():
 
         return self._e[np.argmax(np.gradient(self._m))]
 
-    def scale(
-        self,
-        fit_limits: tuple = (100.0, 400.0),
-        flatten: bool = True
-    ):
+    def scale(self, fit_limits: tuple = (100.0, 400.0), flatten: bool = True):
         """
         Scales the XANES spectrum using the 'edge-step' approach: fitting a
         2nd-order (quadratic) polynomial, `fit`, to the post-edge (where `e`
@@ -109,28 +103,26 @@ class XANES():
         fit_window = (e_rel >= e_rel_min) & (e_rel <= e_rel_max)
 
         fit = np.polynomial.Polynomial.fit(
-            self._e[fit_window],
-            self._m[fit_window],
-            deg = 2
+            self._e[fit_window], self._m[fit_window], deg=2
         )
 
         self._m /= fit(self._e0)
 
         if flatten:
-            self._m[self._e >= self._e0] += (
-                1.0 - (fit(self._e)[self._e >= self._e0] / fit(self._e0))
+            self._m[self._e >= self._e0] += 1.0 - (
+                fit(self._e)[self._e >= self._e0] / fit(self._e0)
             )
 
         return self
 
     def convolve(
         self,
-        conv_type: str = 'fixed_width',
+        conv_type: str = "fixed_width",
         width: float = 2.0,
         ef: float = -5.0,
         ec: float = 30.0,
         el: float = 30.0,
-        width_max: float = 15.0
+        width_max: float = 15.0,
     ):
         """
         Convolves the XANES spectrum with either a fixed-width (`width`; eV)
@@ -141,7 +133,7 @@ class XANES():
         `m` is projected from `e` onto an auxilliary energy scale `e_aux` via
         linear interpolation before convolution; the spacing of the energy
         gridpoints in `e_aux` is equal to the smallest spacing of the energy
-        gridpoints in `e`, and `e_aux` is padded at either end. 
+        gridpoints in `e`, and `e_aux` is padded at either end.
 
         Args:
             conv_type (str, optional): type of convolution; options are
@@ -150,7 +142,7 @@ class XANES():
             width (float, optional): width (in eV) of the Lorentzian function
                 used in the convolution if `conv_type` == 'fixed_width'; if
                 `conv_type` == 'seah_dench_model' or 'arctangent_model', this
-                is the initial width of the (energy-dependent) Lorentzian.            
+                is the initial width of the (energy-dependent) Lorentzian.
                 Defaults to 2.0.
             ef (float, optional): the Fermi energy (in eV, relative to `e0`);
                 cross-sectional contributions from the occupied states below
@@ -178,30 +170,29 @@ class XANES():
         e_aux = np.linspace(
             np.min(self._e) - pad,
             np.max(self._e) + pad,
-            int((np.ptp(self._e) + (2.0 * pad)) / de) + 1
+            int((np.ptp(self._e) + (2.0 * pad)) / de) + 1,
         )
 
-        if conv_type == 'fixed_width':
+        if conv_type == "fixed_width":
             pass
-        elif conv_type == 'seah_dench_model':
+        elif conv_type == "seah_dench_model":
             width = _calc_seah_dench_conv_width(
-                e_rel = e_aux - self._e0,
-                width = width,
-                ef = ef,
-                width_max = width_max
+                e_rel=e_aux - self._e0, width=width, ef=ef, width_max=width_max
             )
-        elif conv_type == 'arctangent_model':
+        elif conv_type == "arctangent_model":
             width = _calc_arctangent_conv_width(
-                e_rel = e_aux - self._e0,
-                width = width,
-                ef = ef,
-                ec = ec,
-                el = el,
-                width_max = width_max
+                e_rel=e_aux - self._e0,
+                width=width,
+                ef=ef,
+                ec=ec,
+                el=el,
+                width_max=width_max,
             )
         else:
-            raise ValueError('the convolution type is not recognised; try'\
-                '`fixed_width` or `arctangent`')
+            raise ValueError(
+                "the convolution type is not recognised; try"
+                "`fixed_width` or `arctangent`"
+            )
 
         # remove cross-sectional contributions to `m` below `ef`
         self._m[self._e < (self._e0 + ef)] = 0.0
@@ -213,7 +204,7 @@ class XANES():
         conv_filter = _lorentzian(e_, e0_, width)
 
         # convolve `m_aux` with the convolution filter `conv_filter`
-        m_aux = np.sum(conv_filter * m_aux, axis = 1)
+        m_aux = np.sum(conv_filter * m_aux, axis=1)
 
         # project `m_aux` onto the original energy scale `e`
         self._m = np.interp(self._e, e_aux, m_aux)
@@ -236,32 +227,33 @@ class XANES():
     def spectrum(self) -> tuple:
         return (self._e, self._m)
 
+
 def _lorentzian(x: np.ndarray, x0: float, width: float):
     # returns the `y` values for a Lorentzian function defined over `x` with a
     # centre `x0` and a width `width`
-    
-    return width * (0.5 / ((x - x0)**2 + (0.5 * width)**2))
+
+    return width * (0.5 / ((x - x0) ** 2 + (0.5 * width) ** 2))
+
 
 def _calc_seah_dench_conv_width(
     e_rel: np.ndarray,
     width: float = 2.0,
     ef: float = -5.0,
     a: float = 1.0,
-    width_max: float = 15.0
+    width_max: float = 15.0,
 ) -> np.ndarray:
     # returns the widths for an energy-dependent Lorentzian under the
     # Seah-Dench convolution model; evaluated over `e_rel` (the energy relative
     # to the X-ray absorption edge `e0` in eV) where `width` is the initial
     # state width in eV, `width_max` is the final state width in eV, `ef` is
-    # the Fermi energy in eV, and `a` is the Seah-Dench (pre-)factor 
+    # the Fermi energy in eV, and `a` is the Seah-Dench (pre-)factor
 
     e_ = e_rel - ef
 
-    g = width + (
-        (a * width_max * e_) / (width_max + (a * e_))
-    )
+    g = width + ((a * width_max * e_) / (width_max + (a * e_)))
 
     return g
+
 
 def _calc_arctangent_conv_width(
     e_rel: np.ndarray,
@@ -269,22 +261,20 @@ def _calc_arctangent_conv_width(
     ef: float = -5.0,
     ec: float = 30.0,
     el: float = 30.0,
-    width_max: float = 15.0
+    width_max: float = 15.0,
 ) -> np.ndarray:
     # returns the widths for an energy-dependent Lorentzian under the
     # arctangent convolution model; evaluated over `e_rel` (the energy relative
     # to the X-ray absorption edge `e0` in eV) where `width` is the initial
     # state width in eV, `width_max` is the final state width in eV, `ef` is
     # the Fermi energy in eV, `ec` is the centre of the arctangent in eV
-    # relative to `e0`, and `el` is the width of the arctangent in eV    
-   
+    # relative to `e0`, and `el` is the width of the arctangent in eV
+
     e_ = (e_rel - ef) / ec
-        
-    with np.errstate(divide = 'ignore'):
+
+    with np.errstate(divide="ignore"):
         arctan = (np.pi / 3.0) * (width_max / el) * (e_ - (1.0 / e_**2))
 
-    g = width + (
-        width_max * ((1.0 / 2.0) + (1.0 / np.pi) * np.arctan(arctan))
-    )
-  
+    g = width + (width_max * ((1.0 / 2.0) + (1.0 / np.pi) * np.arctan(arctan)))
+
     return g

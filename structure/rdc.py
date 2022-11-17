@@ -30,6 +30,7 @@ from structure.descriptors import VectorDescriptor
 ################################## CLASSES ####################################
 ###############################################################################
 
+
 class RDC(VectorDescriptor):
     """
     A class for transforming a molecular system into a radial (or 'pair')
@@ -40,13 +41,13 @@ class RDC(VectorDescriptor):
     """
 
     def __init__(
-        self, 
+        self,
         r_min: float = 0.0,
         r_max: float = 8.0,
         dr: float = 0.01,
         alpha: float = 10.0,
-        use_charge = False,
-        use_spin = False
+        use_charge=False,
+        use_spin=False,
     ):
         """
         Args:
@@ -71,52 +72,56 @@ class RDC(VectorDescriptor):
         """
 
         super().__init__(r_min, r_max, use_charge, use_spin)
-        
+
         if isinstance(dr, (int, float)) and r_max >= dr > 0.0:
             self.dr = float(dr)
         else:
-            raise ValueError(f'expected dr: int/float > 0.0; got {dr}')
+            raise ValueError(f"expected dr: int/float > 0.0; got {dr}")
 
         if isinstance(alpha, (int, float)) and alpha > 0.0:
             self.alpha = float(alpha)
         else:
-            raise ValueError(f'expected alpha: int/float > 0.0; got {alpha}')
+            raise ValueError(f"expected alpha: int/float > 0.0; got {alpha}")
 
         nr_aux = int(np.absolute(self.r_max - self.r_min) / self.dr) + 1
         self.r_aux = np.linspace(self.r_min, self.r_max, nr_aux)
 
     def transform(self, system: Atoms) -> np.ndarray:
-        
+
         if not isinstance(system, Atoms):
-            raise TypeError(f'systems passed as arguments to .transform ',
-                'should be ase.Atoms objects')
+            raise TypeError(
+                f"systems passed as arguments to .transform ",
+                "should be ase.Atoms objects",
+            )
 
         rij_in_range = system.get_distances(0, range(len(system))) < self.r_max
         system = system[rij_in_range]
-        
-        ij = [[0,j] for j in range(1, len(system))]
-        if len(ij) < 1:
-            raise RuntimeError(f'too few atoms within {self.r_max:.2f} A of ',
-                'the absorption site to set up non-zero radial distribution ',
-                'curve (no pairs)')
-        else:
-            ij = np.array(ij, dtype = 'uint16')
 
-        zi = system.get_atomic_numbers()[ij[:,0]]
-        zj = system.get_atomic_numbers()[ij[:,1]]
-        rij = system.get_distances(ij[:,0], ij[:,1])
+        ij = [[0, j] for j in range(1, len(system))]
+        if len(ij) < 1:
+            raise RuntimeError(
+                f"too few atoms within {self.r_max:.2f} A of ",
+                "the absorption site to set up non-zero radial distribution ",
+                "curve (no pairs)",
+            )
+        else:
+            ij = np.array(ij, dtype="uint16")
+
+        zi = system.get_atomic_numbers()[ij[:, 0]]
+        zj = system.get_atomic_numbers()[ij[:, 1]]
+        rij = system.get_distances(ij[:, 0], ij[:, 1])
         rij_r_sq = np.square(rij[:, np.newaxis] - self.r_aux)
         exp = np.exp(-1.0 * self.alpha * rij_r_sq)
-        rdc = np.sum((zi * zj)[:, np.newaxis] * exp, axis = 0)
+        rdc = np.sum((zi * zj)[:, np.newaxis] * exp, axis=0)
 
         if self.use_spin:
-            rdc = np.append(system.info['S'], rdc)
+            rdc = np.append(system.info["S"], rdc)
 
         if self.use_charge:
-            rdc = np.append(system.info['q'], rdc)
+            rdc = np.append(system.info["q"], rdc)
 
         return rdc
 
     def get_len(self) -> int:
-        
+
         return len(self.r_aux) + self.use_charge + self.use_spin
