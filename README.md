@@ -29,16 +29,23 @@ The trained model can then be used for inference of both structure and spectrum.
 
 ```python cli_aegan.py predict_aegan_spectrum model_dir xyz_dir```  
 ```python cli_aegan.py predict_aegan_structure model_dir xanes_dir```  
- 
+
 
 Since the model affords reconstruction of the input data as well as prediction the predict method currently performs both. For example, with structure data as the input the predict method returns a reconstruction of the stucture and prediction of the spectrum. 
 
 (TODO: Add generalised CNN option to model.)
 
-### AE (ae-dev branch)
+### AutoEncoder
 
-ae_mlp, ae_cnn
-...
+To run the basic AutoEncoder to train xanes :
+```python cli_ae.py train_xanes in_cnn.json```
+and run ```python cli_ae.py predict_xyz ./model_0xx in_predict.json``` to run the test.
+
+To run the basic AutoEncoder to train xyz :
+```python cli_ae.py train_xyz in_cnn.json```
+and run ```python cli_ae.py predict_xanes ./model_0xx in_predict.json``` to run the test.
+
+By default the code will run the CNN implementation. To run the mlp implementation, call ```model = AE_mlp(... )``` instead of ```model = AE_cnn(... )```
 
 ### Original XANES PyTorch Implementation
 
@@ -82,6 +89,14 @@ How to build or install the applcation.
 
 To run the training :
 `python cli.py learn in.json`
+
+To train xanes in ae-dev : 
+run `python cli_ae.py train_xanes in.json`.
+Make sure the path is correct in `in.json`
+
+To predict xyz in ae-dev :
+run `python cli_ae.py predict_xyz ./model_0xx in_predict.json`.
+Make sure the path is correct in `in_predict.json`.
 
 ### Running Tests
 
