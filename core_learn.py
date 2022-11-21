@@ -40,7 +40,7 @@ from utils import print_cross_validation_scores
 from structure.rdc import RDC
 from structure.wacsf import WACSF
 
-from mlp_pytorch import train_mlp
+from cnn_pytorch import train_cnn
 import torch
 from torchinfo import summary
 from sklearn.metrics import mean_squared_error
@@ -247,7 +247,7 @@ def main(
         
         print('>> fitting neural net...')
         
-        model, score = train_mlp(x, y, hyperparams, epochs)
+        model, score = train_cnn(x, y, hyperparams, epochs)
         summary(model, (1, x.shape[1]))
         print(model)
 
