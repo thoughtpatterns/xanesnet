@@ -284,7 +284,7 @@ def train_ae(x, y, hyperparams, n_epoch):
             )
 
             optimizer.zero_grad()
-            
+
             recon_input, outputs = model(inputs)
 
             loss_recon = criterion(recon_input, inputs)
