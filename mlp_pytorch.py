@@ -2,7 +2,6 @@ import torch
 from torch import nn, optim
 import math
 
-# from pyemd import emd_samples
 import numpy as np
 from sklearn.model_selection import train_test_split
 from torch.utils.tensorboard import SummaryWriter
