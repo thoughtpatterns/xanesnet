@@ -214,9 +214,12 @@ def main(
         for train_index, test_index in kfold_spooler.split(x):
 
             start = time.time()
-            model, score = train_cnn(
+            model, score = train_mlp(
                 x[train_index], y[train_index], hyperparams, epochs
             )
+            # model, score = train_cnn(
+            #     x[train_index], y[train_index], hyperparams, epochs
+            # )
             train_score.append(score)
 
             fit_time.append(time.time() - start)
@@ -249,7 +252,8 @@ def main(
 
         print(">> fitting neural net...")
 
-        model, score = train_mlp(x, y, hyperparams, epochs)
+        # model, score = train_mlp(x, y, hyperparams, epochs)
+        model, score = train_cnn(x, y, hyperparams, epochs)
         summary(model, (1, x.shape[1]))
         print(model)
 

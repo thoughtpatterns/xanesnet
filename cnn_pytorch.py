@@ -102,8 +102,7 @@ def earth_mover_distance(y_true, y_pred):
         torch.square(torch.cumsum(y_true, dim=-1) - torch.cumsum(y_pred, dim=-1)),
         dim=-1,
     )
-
-
+    
 def train_cnn(x, y, hyperparams, n_epoch):
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
