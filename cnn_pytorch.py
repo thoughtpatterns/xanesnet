@@ -25,6 +25,7 @@ class CNN(nn.Module):
         dropout,
         kernel_size,
         stride,
+        act_fn,
     ):
         super().__init__()
 
@@ -36,6 +37,7 @@ class CNN(nn.Module):
         self.dropout = dropout
         self.kernel_size = kernel_size
         self.stride = stride
+        self.act_fn = act_fn
 
         self.conv1_shape = int(((self.input_size - self.kernel_size) / self.stride) + 1)
         self.conv2_shape = int(
@@ -52,9 +54,8 @@ class CNN(nn.Module):
                 stride=self.stride,
             ),
             nn.BatchNorm1d(num_features=self.out_channel),
-            nn.PReLU(),
-            # nn.MaxPool1d(2),
-            # nn.Dropout(p=self.dropout),
+            self.act_fn,
+            nn.Dropout(p=self.dropout),
         )
 
         self.conv2 = nn.Sequential(
@@ -65,8 +66,7 @@ class CNN(nn.Module):
                 stride=self.stride,
             ),
             nn.BatchNorm1d(num_features=self.out_channel * self.channel_mul),
-            nn.PReLU(),
-            # nn.MaxPool1d(2),
+            self.act_fn,
             nn.Dropout(p=self.dropout),
         )
 
@@ -102,7 +102,20 @@ def earth_mover_distance(y_true, y_pred):
         torch.square(torch.cumsum(y_true, dim=-1) - torch.cumsum(y_pred, dim=-1)),
         dim=-1,
     )
+
+def activation_function(act_param):
     
+    if act_param == 'PReLU' or act_param == 'prelu':
+        act_fn = nn.PReLU()
+    elif act_param == 'ReLU' or act_param == 'relu':
+        act_fn = nn.ReLU(inplace=True)
+    elif act_param == 'LeakyReLU' or act_param=='leakyrelu':
+        act_fn = nn.LeakyReLU(inplace=True)
+    elif act_param == 'Tanh' or act_param == 'tanh':
+        act_fn = nn.Tanh()
+    
+    return act_fn
+
 def train_cnn(x, y, hyperparams, n_epoch):
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -113,13 +126,15 @@ def train_cnn(x, y, hyperparams, n_epoch):
     x = torch.from_numpy(x)
     y = torch.from_numpy(y)
 
+    act_fn = activation_function(hyperparams["activation"])
+
     X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.2)
 
     trainset = torch.utils.data.TensorDataset(X_train, y_train)
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=32)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=hyperparams['batch_size'])
 
     validset = torch.utils.data.TensorDataset(X_test, y_test)
-    validloader = torch.utils.data.DataLoader(validset, batch_size=32)
+    validloader = torch.utils.data.DataLoader(validset, batch_size=hyperparams['batch_size'])
 
     cnn = CNN(
         n_in,
@@ -130,6 +145,7 @@ def train_cnn(x, y, hyperparams, n_epoch):
         hyperparams["dropout"],
         hyperparams["kernel_size"],
         hyperparams["stride"],
+        act_fn,
     )
 
     cnn.to(device)
