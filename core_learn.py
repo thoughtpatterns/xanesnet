@@ -252,8 +252,8 @@ def main(
 
         print(">> fitting neural net...")
 
-        # model, score = train_mlp(x, y, hyperparams, epochs)
-        model, score = train_cnn(x, y, hyperparams, epochs)
+        model, score = train_mlp(x, y, hyperparams, epochs)
+        # model, score = train_cnn(x, y, hyperparams, epochs)
         summary(model, (1, x.shape[1]))
         print(model)
 
