@@ -39,7 +39,6 @@ import torch
 from sklearn.metrics import mean_squared_error
 import seaborn as sns
 import matplotlib.pyplot as plt
-from pyemd import emd_samples
 
 ###############################################################################
 ################################ MAIN FUNCTION ################################
@@ -90,10 +89,8 @@ def main(model_dir: str, x_path: str, y_path: str):
         x[i, :] = descriptor.transform(atoms)
         with open(y_path / f"{id_}.txt", "r") as f:
             xanes = load_xanes(f)
-            # print(xanes.spectrum)
             e, y[i, :] = xanes.spectrum
     print(">> ...loaded!\n")
-
 
     model = torch.load(model_dir / "model.pt", map_location=torch.device("cpu"))
     model.eval()
@@ -101,7 +98,6 @@ def main(model_dir: str, x_path: str, y_path: str):
 
     x = torch.from_numpy(x)
     x = x.float()
-
 
     print(">> predicting Y data with neural net...")
 
@@ -114,7 +110,6 @@ def main(model_dir: str, x_path: str, y_path: str):
     print(">> ...predicted Y data!\n")
 
     print(mean_squared_error(y, y_predict.detach().numpy()))
-    print(emd_samples(y, y_predict.detach().numpy()))
 
     predict_dir = unique_path(Path("."), "predictions")
     predict_dir.mkdir()
@@ -135,17 +130,18 @@ def main(model_dir: str, x_path: str, y_path: str):
         total_y.append(y_)
         total_y_pred.append(y_predict_.detach().numpy())
 
-
         with open(predict_dir / f"{id_}.txt", "w") as f:
             save_xanes(f, XANES(e, y_predict_.detach().numpy()))
             plt.savefig(predict_dir / f"{id_}.pdf")
 
         plt.close()
+
     total_y = np.asarray(total_y)
     total_y_pred = np.asarray(total_y_pred)
 
     # plotting the average loss
     sns.set_style("dark")
+    plt.figure()
 
     mean_y = np.mean(total_y, axis=0)
     stddev_y = np.std(total_y, axis=0)
@@ -177,6 +173,5 @@ def main(model_dir: str, x_path: str, y_path: str):
     plt.show()
 
     print("...saved!\n")
-
 
     return 0
