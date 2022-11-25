@@ -1,8 +1,5 @@
 import torch
 from torch import nn, optim
-import math
-
-import numpy as np
 from sklearn.model_selection import train_test_split
 from torch.utils.tensorboard import SummaryWriter
 import time
@@ -17,36 +14,79 @@ writer = SummaryWriter(f"/tmp/tensorboard/{int(time.time())}")
 writer.add_custom_scalars(layout)
 
 
-class MLP(nn.Module):
-    def __init__(self, input_size, hidden_size, dropout, hl_size, out_dim, act_fn):
+class CNN(nn.Module):
+    def __init__(
+        self,
+        input_size,
+        out_channel,
+        channel_mul,
+        hidden_layer,
+        out_dim,
+        dropout,
+        kernel_size,
+        stride,
+        act_fn,
+    ):
         super().__init__()
 
         self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.dropout = dropout
-        self.hl_size = hl_size
+        self.out_channel = out_channel
+        self.channel_mul = channel_mul
+        self.hidden_layer = hidden_layer
         self.out_dim = out_dim
+        self.dropout = dropout
+        self.kernel_size = kernel_size
+        self.stride = stride
         self.act_fn = act_fn
 
-        self.fc1 = nn.Sequential(
-            nn.Linear(self.input_size, self.hidden_size),
+        self.conv1_shape = int(((self.input_size - self.kernel_size) / self.stride) + 1)
+        self.conv2_shape = int(
+            ((self.conv1_shape - self.kernel_size) / self.stride) + 1
+        )
+        print(self.conv1_shape)
+        print(self.conv2_shape)
+
+        self.conv1 = nn.Sequential(
+            nn.Conv1d(
+                in_channels=1,
+                out_channels=self.out_channel,
+                kernel_size=self.kernel_size,
+                stride=self.stride,
+            ),
+            nn.BatchNorm1d(num_features=self.out_channel),
             self.act_fn,
             nn.Dropout(p=self.dropout),
         )
 
-        self.fc2 = nn.Sequential(
-            nn.Linear(self.hidden_size, self.hl_size),
+        self.conv2 = nn.Sequential(
+            nn.Conv1d(
+                in_channels=self.out_channel,
+                out_channels=self.out_channel * self.channel_mul,
+                kernel_size=self.kernel_size,
+                stride=self.stride,
+            ),
+            nn.BatchNorm1d(num_features=self.out_channel * self.channel_mul),
             self.act_fn,
             nn.Dropout(p=self.dropout),
         )
 
-        self.fc3 = nn.Sequential(nn.Linear(self.hl_size, self.out_dim))
+        self.dense_layer = nn.Sequential(
+            nn.Linear(
+                self.conv2_shape * (self.out_channel * self.channel_mul), self.out_dim
+            )
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
 
-        x = self.fc1(x)
-        x = self.fc2(x)
-        out = self.fc3(x)
+        x = x.unsqueeze(0)
+        x = x.permute(1, 0, 2)
+        x = self.conv1(x)
+        # print(x.shape)
+        x = self.conv2(x)
+        # print(x.shape)
+        x = x.view(x.size(0), -1)
+        # print(x.shape)
+        out = self.dense_layer(x)
 
         return out
 
@@ -92,7 +132,7 @@ class ActivationSwitch:
     def activation_function_selu(self):
         return nn.SELU()
 
-def train_mlp(x, y, hyperparams, n_epoch):
+def train_cnn(x, y, hyperparams, n_epoch):
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -117,18 +157,22 @@ def train_mlp(x, y, hyperparams, n_epoch):
         validset, batch_size=hyperparams["batch_size"]
     )
 
-    mlp = MLP(
+    cnn = CNN(
         n_in,
-        hyperparams["hl_ini_dim"],
-        hyperparams["dropout"],
-        int(hyperparams["hl_ini_dim"] * hyperparams["hl_shrink"]),
+        hyperparams["out_channel"],
+        hyperparams["channel_mul"],
+        hyperparams["hidden_layer"],
         out_dim,
+        hyperparams["dropout"],
+        hyperparams["kernel_size"],
+        hyperparams["stride"],
         act_fn,
     )
-    mlp.to(device)
-    mlp.apply(weight_init)
-    mlp.train()
-    optimizer = optim.Adam(mlp.parameters(), lr=hyperparams["lr"])
+
+    cnn.to(device)
+    cnn.apply(weight_init)
+    cnn.train()
+    optimizer = optim.Adam(cnn.parameters(), lr=hyperparams["lr"])
 
     criterion = nn.MSELoss()
 
@@ -139,7 +183,7 @@ def train_mlp(x, y, hyperparams, n_epoch):
             inputs, labels = inputs.float(), labels.float()
 
             optimizer.zero_grad()
-            logps = mlp(inputs)
+            logps = cnn(inputs)
 
             loss = criterion(logps, labels)
             loss.mean().backward()
@@ -147,12 +191,12 @@ def train_mlp(x, y, hyperparams, n_epoch):
             running_loss += loss.item()
 
         valid_loss = 0
-        mlp.eval()
+        cnn.eval()
         for inputs, labels in validloader:
             inputs, labels = inputs.to(device), labels.to(device)
             inputs, labels = inputs.float(), labels.float()
 
-            target = mlp(inputs)
+            target = cnn(inputs)
 
             loss = criterion(target, labels)
             valid_loss += loss.item()
@@ -164,4 +208,5 @@ def train_mlp(x, y, hyperparams, n_epoch):
         writer.add_scalar("loss/validation", (valid_loss / len(validloader)), epoch)
 
     writer.close()
-    return mlp, running_loss / len(trainloader)
+
+    return cnn, running_loss / len(trainloader)
