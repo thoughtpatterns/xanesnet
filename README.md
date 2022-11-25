@@ -49,7 +49,13 @@ By default the code will run the CNN implementation. To run the mlp implementati
 
 ### Original XANES PyTorch Implementation
 
-...
+To run the mlp version call ```model, score = train_mlp(... )``` in the ```core_learn.py``` and run ```python cli.py learn in.json```.
+
+To run the cnn version call ```model, score = train_cnn(... )``` in the ```core_learn.py``` and run ```python cli.py learn in_cnn.json```.
+
+### Tensorboard
+
+To run tensorboard, run ```tensorboard --logdir=/tmp/tensorboard/ --host 0.0.0.0``` , click on the hyperlink and choose Custom Scalar.
 
 ####
 
