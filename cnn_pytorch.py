@@ -103,18 +103,20 @@ def earth_mover_distance(y_true, y_pred):
         dim=-1,
     )
 
+
 def activation_function(act_param):
-    
-    if act_param == 'PReLU' or act_param == 'prelu':
+
+    if act_param == "PReLU" or act_param == "prelu":
         act_fn = nn.PReLU()
-    elif act_param == 'ReLU' or act_param == 'relu':
+    elif act_param == "ReLU" or act_param == "relu":
         act_fn = nn.ReLU(inplace=True)
-    elif act_param == 'LeakyReLU' or act_param=='leakyrelu':
+    elif act_param == "LeakyReLU" or act_param == "leakyrelu":
         act_fn = nn.LeakyReLU(inplace=True)
-    elif act_param == 'Tanh' or act_param == 'tanh':
+    elif act_param == "Tanh" or act_param == "tanh":
         act_fn = nn.Tanh()
-    
+
     return act_fn
+
 
 def train_cnn(x, y, hyperparams, n_epoch):
 
@@ -131,10 +133,14 @@ def train_cnn(x, y, hyperparams, n_epoch):
     X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.2)
 
     trainset = torch.utils.data.TensorDataset(X_train, y_train)
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=hyperparams['batch_size'])
+    trainloader = torch.utils.data.DataLoader(
+        trainset, batch_size=hyperparams["batch_size"]
+    )
 
     validset = torch.utils.data.TensorDataset(X_test, y_test)
-    validloader = torch.utils.data.DataLoader(validset, batch_size=hyperparams['batch_size'])
+    validloader = torch.utils.data.DataLoader(
+        validset, batch_size=hyperparams["batch_size"]
+    )
 
     cnn = CNN(
         n_in,
@@ -183,8 +189,8 @@ def train_cnn(x, y, hyperparams, n_epoch):
         print("Training loss:", running_loss / len(trainloader))
         print("Validation loss:", valid_loss / len(validloader))
 
-        writer.add_scalar("loss/train", (running_loss/len(trainloader)), epoch)
-        writer.add_scalar("loss/validation", (valid_loss/len(validloader)), epoch)
+        writer.add_scalar("loss/train", (running_loss / len(trainloader)), epoch)
+        writer.add_scalar("loss/validation", (valid_loss / len(validloader)), epoch)
 
     writer.close()
 
