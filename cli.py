@@ -25,12 +25,9 @@ import importlib.resources
 
 from argparse import ArgumentParser
 
-import xanesnet
-
-from xanesnet import resources
-from xanesnet.core_learn import main as learn
-from xanesnet.core_predict import main as predict
-from xanesnet.utils import print_nested_dict
+from core_learn import main as learn
+from core_predict import main as predict
+from utils import print_nested_dict
 
 ###############################################################################
 ############################## ARGUMENT PARSING ###############################
@@ -39,9 +36,6 @@ from xanesnet.utils import print_nested_dict
 def parse_args(args: list):
 
     p = ArgumentParser()
-
-    p.add_argument('-v', '--version', action = 'version', 
-        version = xanesnet.__version__)
     
     sub_p = p.add_subparsers(dest = 'mode')
 
@@ -56,8 +50,9 @@ def parse_args(args: list):
         help = 'path to populated model directory')
     predict_p.add_argument('xyz_dir', type = str, 
         help = 'path to .xyz input directory for prediction')
-    predict_p.add_argument('--shap', dest = 'save', action = 'store_true', 
-        help = 'toggles the use of SHAP analysis for prediction')
+    predict_p.add_argument(
+        "xanes_dir", type=str, help="path to xanes directory for prediction"
+    )
     
     args = p.parse_args()
 
@@ -73,9 +68,6 @@ def main(args: list):
         sys.exit()
     else:
         args = parse_args(args)
-        
-    banner = importlib.resources.read_text(resources, 'banner_open.txt')
-    print(banner, '\n')
 
     if args.mode == 'learn':
         print(f'>> loading JSON input @ {args.inp_f}\n')
@@ -86,11 +78,8 @@ def main(args: list):
         learn(**inp, save = args.save)
 
     if args.mode == 'predict':
-            predict(args.mdl_dir, args.xyz_dir, run_shap = args.save)
+        predict(args.mdl_dir, args.xyz_dir, args.xanes_dir)
         
-    banner = importlib.resources.read_text(resources, 'banner_close.txt')
-    print(banner)
-
 ################################################################################
 ############################## PROGRAM STARTS HERE #############################
 ################################################################################

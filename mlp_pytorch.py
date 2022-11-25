@@ -1,13 +1,23 @@
 import torch
 from torch import nn, optim
 import math
-from pyemd import emd_samples
 import numpy as np
+from sklearn.model_selection import train_test_split
+from torch.utils.tensorboard import SummaryWriter
+import time
+
+# setup tensorboard stuff
+layout = {
+    "Multi": {
+        "loss": ["Multiline", ["loss/train", "loss/validation"]],
+    },
+}
+writer = SummaryWriter(f"/tmp/tensorboard/{int(time.time())}")
+writer.add_custom_scalars(layout)
 
 class MLP(nn.Module):
     def __init__(self, input_size, hidden_size, dropout, hl_size, out_dim):
         super().__init__()
-    
 
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -59,9 +69,15 @@ def train_mlp (x, y, hyperparams, n_epoch):
    
     x = torch.from_numpy(x)
     y = torch.from_numpy(y)
+    noise = torch.randn_like(x) * 0.1
     
-    trainset = torch.utils.data.TensorDataset(x, y)
+    X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.2)
+
+    trainset = torch.utils.data.TensorDataset(X_train, y_train)
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=32)
+
+    validset = torch.utils.data.TensorDataset(X_test, y_test)
+    validloader = torch.utils.data.DataLoader(validset, batch_size=32)
 
     mlp = MLP(n_in, hyperparams['hl_ini_dim'], hyperparams['dropout'], int(hyperparams['hl_ini_dim'] * hyperparams['hl_shrink']), out_dim)
     mlp.to(device)
@@ -85,9 +101,25 @@ def train_mlp (x, y, hyperparams, n_epoch):
             loss.mean().backward()
             optimizer.step()
             running_loss += loss.item()
+        
+        valid_loss = 0
+        mlp.eval()
+        for inputs, labels in validloader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            inputs, labels = inputs.float(), labels.float()
 
-            
-        # print(running_loss/len(trainloader))
+            target = mlp(inputs)
+
+            loss = criterion(target, labels)
+            valid_loss += loss.item()
+
+        print("Training loss:", running_loss / len(trainloader))
+        print("Validation loss:", valid_loss / len(validloader))
+
+        writer.add_scalar("loss/train", (running_loss/len(trainloader)), epoch)
+        writer.add_scalar("loss/validation", (valid_loss/len(validloader)), epoch)
+
+    writer.close()
 
     return mlp, running_loss/len(trainloader)
        
