@@ -13,7 +13,7 @@
         "n_hl": 2,
         "hl_ini_dim": 64,
         "hl_shrink": 0.5,
-        "activation": "tanh",
+        "activation": "prelu",
         "loss": "mse",
         "lr": 0.0001,
         "dropout": 0.1,

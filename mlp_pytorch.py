@@ -63,20 +63,34 @@ def earth_mover_distance(y_true, y_pred):
         dim=-1,
     )
 
+# Select activation function from hyperparams inputs
+class ActivationSwitch:
+    def fn(self, activation):
+        default = nn.PReLU()
+        return getattr(
+            self, f"activation_function_{activation.lower()}", lambda: default
+        )()
 
-def activation_function(act_param):
+    def activation_function_relu(self):
+        return nn.ReLU()
 
-    if act_param == "PReLU" or act_param == "prelu":
-        act_fn = nn.PReLU()
-    elif act_param == "ReLU" or act_param == "relu":
-        act_fn = nn.ReLU(inplace=True)
-    elif act_param == "LeakyReLU" or act_param == "leakyrelu":
-        act_fn = nn.LeakyReLU(inplace=True)
-    elif act_param == "Tanh" or act_param == "tanh":
-        act_fn = nn.Tanh()
+    def activation_function_prelu(self):
+        return nn.PReLU()
 
-    return act_fn
+    def activation_function_tanh(self):
+        return nn.Tanh()
 
+    def activation_function_sigmoid(self):
+        return nn.Sigmoid()
+
+    def activation_function_elu(self):
+        return nn.ELU()
+
+    def activation_function_leakyrelu(self):
+        return nn.LeakyReLU()
+
+    def activation_function_selu(self):
+        return nn.SELU()
 
 def train_mlp(x, y, hyperparams, n_epoch):
 
@@ -88,7 +102,8 @@ def train_mlp(x, y, hyperparams, n_epoch):
     x = torch.from_numpy(x)
     y = torch.from_numpy(y)
 
-    act_fn = activation_function(hyperparams["activation"])
+    activation_switch = ActivationSwitch()
+    act_fn = activation_switch.fn(hyperparams["activation"])
 
     X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.2)
 
