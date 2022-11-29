@@ -11,9 +11,9 @@
     "hyperparams": {
         "batch_size": 32,
         "n_hl": 2,
-        "hl_ini_dim": 16,
+        "hl_ini_dim": 32,
         "hl_shrink": 0.5,
-        "activation": "prelu",
+        "activation": "tanh",
         "loss": "mse",
         "lr": 0.00001,
         "dropout": 0.1,
@@ -24,7 +24,7 @@
     "seed": 2021,
 
 
-    "epochs": 100,
+    "epochs": 500,
 
     "variance_threshold": 0.0
 

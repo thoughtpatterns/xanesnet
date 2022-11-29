@@ -105,6 +105,10 @@ def main(model_dir: str, x_path: str, y_path: str):
     print(">> predicting Y data with neural net...")
 
     y_predict = model(x)
+    # noise
+    # noise = torch.randn_like(x)
+    # y_predict = model(noise)
+    
     if y_predict.ndim == 1:
         if len(ids) == 1:
             y_predict = y_predict.reshape(-1, y_predict.size)
@@ -113,7 +117,6 @@ def main(model_dir: str, x_path: str, y_path: str):
     print(">> ...predicted Y data!\n")
 
     print(mean_squared_error(y, y_predict.detach().numpy()))
-    print(emd_samples(y, y_predict.detach().numpy()))
 
     predict_dir = unique_path(Path("."), "predictions")
     predict_dir.mkdir()
