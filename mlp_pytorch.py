@@ -105,7 +105,7 @@ def train_mlp(x, y, hyperparams, n_epoch):
     activation_switch = ActivationSwitch()
     act_fn = activation_switch.fn(hyperparams["activation"])
 
-    X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.2)
+    X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
 
     trainset = torch.utils.data.TensorDataset(X_train, y_train)
     trainloader = torch.utils.data.DataLoader(
@@ -140,10 +140,10 @@ def train_mlp(x, y, hyperparams, n_epoch):
             inputs, labels = inputs.float(), labels.float()
             
             # print(total_step % n_noise)
-            if total_step % 10 == 0:
+            # if total_step % 10 == 0:
                 # print('add noise')
-                noise = torch.randn_like(inputs) * 0.3
-                inputs = noise + inputs
+            noise = torch.randn_like(inputs) * 0.3
+            inputs = noise + inputs
             # else:
             #     print('no noise')
 
