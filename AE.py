@@ -271,7 +271,7 @@ class ActivationSwitch:
     def activation_function_selu(self):
         return nn.SELU()
 
-def train_ae(x, y, hyperparams, n_epoch):
+def train_ae(x, y, model_mode, hyperparams, n_epoch):
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -298,25 +298,27 @@ def train_ae(x, y, hyperparams, n_epoch):
         validset, batch_size=hyperparams["batch_size"]
     )
 
-    model = AE_mlp(
-        n_in,
-        hyperparams["hl_ini_dim"],
-        hyperparams["dropout"],
-        int(hyperparams["hl_ini_dim"] * hyperparams["hl_shrink"]),
-        out_dim,
-        act_fn,
-    )
+    if model_mode == 'ae_mlp':
+        model = AE_mlp(
+            n_in,
+            hyperparams["hl_ini_dim"],
+            hyperparams["dropout"],
+            int(hyperparams["hl_ini_dim"] * hyperparams["hl_shrink"]),
+            out_dim,
+            act_fn,
+        )
 
-    # model = AE_cnn(
-    #     n_in,
-    #     hyperparams["out_channel"],
-    #     hyperparams["channel_mul"],
-    #     hyperparams["hidden_layer"],
-    #     out_dim,
-    #     hyperparams["dropout"],
-    #     hyperparams["kernel_size"],
-    #     hyperparams["stride"],
-    # )
+    elif model_mode == 'ae_cnn':
+        model = AE_cnn(
+            n_in,
+            hyperparams["out_channel"],
+            hyperparams["channel_mul"],
+            hyperparams["hidden_layer"],
+            out_dim,
+            hyperparams["dropout"],
+            hyperparams["kernel_size"],
+            hyperparams["stride"],
+        )
 
     model.to(device)
 
