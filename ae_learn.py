@@ -51,6 +51,7 @@ from torchinfo import summary
 
 def main(
     aemode: str,
+    model_mode: str,
     x_path: str,
     y_path: str,
     descriptor_type: str,
@@ -213,7 +214,7 @@ def main(
 
         print(">> fitting neural net...")
 
-        model = train_ae(xyz, xanes, hyperparams, epochs)
+        model = train_ae(xyz, xanes, model_mode, hyperparams, epochs)
         summary(model, (1, xyz.shape[1]))
 
     elif aemode == "train_xanes":
@@ -221,7 +222,7 @@ def main(
 
         print(">> fitting neural net...")
 
-        model = train_ae(xanes, xyz, hyperparams, epochs)
+        model = train_ae(xanes, xyz, model_mode, hyperparams, epochs)
         summary(model, (1, xanes.shape[1]))
 
     if save:

@@ -24,7 +24,7 @@
     "seed": 2021,
 
 
-    "epochs": 700,
+    "epochs": 1,
 
     "variance_threshold": 0.0
 
