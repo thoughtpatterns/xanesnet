@@ -2,45 +2,60 @@ import torch
 from torch import nn, optim
 import numpy as np
 from sklearn import preprocessing
+from sklearn.model_selection import train_test_split
+from torch.utils.tensorboard import SummaryWriter
+import time
 
+# setup tensorboard stuff
+layout = {
+    "Multi": {
+        "recon_loss": ["Multiline", ["loss/train", "loss/validation"]],
+        "pred_loss": ["Multiline", ["loss_p/train", "loss_p/validation"]],
+    },
+}
+writer = SummaryWriter(f"/tmp/tensorboard/{int(time.time())}")
+writer.add_custom_scalars(layout)
 
 class AE_mlp(nn.Module):
-    def __init__(self, input_size, hidden_size, dropout, hl_shrink, out_dim):
+    def __init__(self, input_size, hidden_size, dropout, hl_size, out_dim, act_fn):
         super().__init__()
 
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.dropout = dropout
-        self.hl_shrink = hl_shrink
+        self.hl_size = hl_size
         self.out_dim = out_dim
+        self.act_fn = act_fn
+
 
         self.encoder_hidden_1 = nn.Sequential(
-            nn.Linear(self.input_size, self.hidden_size), nn.PReLU()
+            nn.Linear(self.input_size, self.hidden_size), 
+            self.act_fn,
         )
 
         self.encoder_hidden_2 = nn.Sequential(
-            nn.Linear(self.hidden_size, int(self.hidden_size * self.hl_shrink)),
-            nn.PReLU(),
+            nn.Linear(self.hidden_size, self.hl_size),
+            self.act_fn,
         )
 
         self.fc1 = nn.Sequential(
-            nn.Linear(int(self.hidden_size * self.hl_shrink), 64),
+            nn.Linear(self.hl_size, self.hl_size),
+            self.act_fn,
             nn.Dropout(self.dropout),
-            nn.PReLU(),
         )
 
         self.fc2 = nn.Sequential(
-            nn.Linear(64, self.out_dim),
+            nn.Linear(self.hl_size, self.out_dim),
         )
 
         self.decoder_hidden_1 = nn.Sequential(
-            nn.Linear(int(self.hidden_size * self.hl_shrink), self.hidden_size),
-            nn.PReLU(),
+            nn.Linear(self.hl_size, self.hidden_size),
+            self.act_fn,
         )
 
         self.decoder_hidden_2 = nn.Sequential(
             nn.Linear(self.hidden_size, self.input_size),
-            nn.PReLU(),
+            # self.act_fn,
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -227,6 +242,34 @@ class AE_cnn(nn.Module):
 
         return recon, pred
 
+# Select activation function from hyperparams inputs
+class ActivationSwitch:
+    def fn(self, activation):
+        default = nn.PReLU()
+        return getattr(
+            self, f"activation_function_{activation.lower()}", lambda: default
+        )()
+
+    def activation_function_relu(self):
+        return nn.ReLU()
+
+    def activation_function_prelu(self):
+        return nn.PReLU()
+
+    def activation_function_tanh(self):
+        return nn.Tanh()
+
+    def activation_function_sigmoid(self):
+        return nn.Sigmoid()
+
+    def activation_function_elu(self):
+        return nn.ELU()
+
+    def activation_function_leakyrelu(self):
+        return nn.LeakyReLU()
+
+    def activation_function_selu(self):
+        return nn.SELU()
 
 def train_ae(x, y, hyperparams, n_epoch):
 
@@ -240,27 +283,40 @@ def train_ae(x, y, hyperparams, n_epoch):
     x = torch.from_numpy(x)
     y = torch.from_numpy(y)
 
-    trainset = torch.utils.data.TensorDataset(x, y)
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=32)
+    activation_switch = ActivationSwitch()
+    act_fn = activation_switch.fn(hyperparams["activation"])
 
-    # model = AE_mlp(
-    #     n_in,
-    #     hyperparams["hl_ini_dim"],
-    #     hyperparams["dropout"],
-    #     hyperparams["hl_shrink"],
-    #     out_dim,
-    # )
+    X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
 
-    model = AE_cnn(
-        n_in,
-        hyperparams["out_channel"],
-        hyperparams["channel_mul"],
-        hyperparams["hidden_layer"],
-        out_dim,
-        hyperparams["dropout"],
-        hyperparams["kernel_size"],
-        hyperparams["stride"],
+    trainset = torch.utils.data.TensorDataset(X_train, y_train)
+    trainloader = torch.utils.data.DataLoader(
+        trainset, batch_size=hyperparams["batch_size"]
     )
+
+    validset = torch.utils.data.TensorDataset(X_test, y_test)
+    validloader = torch.utils.data.DataLoader(
+        validset, batch_size=hyperparams["batch_size"]
+    )
+
+    model = AE_mlp(
+        n_in,
+        hyperparams["hl_ini_dim"],
+        hyperparams["dropout"],
+        int(hyperparams["hl_ini_dim"] * hyperparams["hl_shrink"]),
+        out_dim,
+        act_fn,
+    )
+
+    # model = AE_cnn(
+    #     n_in,
+    #     hyperparams["out_channel"],
+    #     hyperparams["channel_mul"],
+    #     hyperparams["hidden_layer"],
+    #     out_dim,
+    #     hyperparams["dropout"],
+    #     hyperparams["kernel_size"],
+    #     hyperparams["stride"],
+    # )
 
     model.to(device)
 
@@ -269,9 +325,11 @@ def train_ae(x, y, hyperparams, n_epoch):
         model.parameters(), lr=hyperparams["lr"], weight_decay=0.0000
     )
     criterion = nn.MSELoss()
-
+    print(n_epoch)
     for epoch in range(n_epoch):
         running_loss = 0
+        loss_r = 0
+        loss_p = 0
 
         for inputs, labels in trainloader:
             inputs, labels = (
@@ -295,7 +353,39 @@ def train_ae(x, y, hyperparams, n_epoch):
 
             optimizer.step()
             running_loss += loss.mean().item()
+            loss_r += loss_recon.item()
+            loss_p += loss_pred.item()
 
-        print("total loss:", running_loss / len(trainloader))
+        valid_loss = 0
+        valid_loss_r = 0
+        valid_loss_p = 0
+        model.eval()
+        for inputs, labels in validloader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            inputs, labels = inputs.float(), labels.float()
 
-    return epoch, model, optimizer
+            recon_input, outputs = model(inputs)
+
+            loss_recon = criterion(recon_input, inputs)
+            loss_pred = criterion(outputs, labels)
+
+            loss = loss_recon + loss_pred
+
+            valid_loss = loss.item()
+            valid_loss_r += loss_recon.item()
+            valid_loss_p += loss_pred.item()
+
+        print("Training loss:", running_loss / len(trainloader))
+        print("Validation loss:", valid_loss / len(validloader))
+
+        writer.add_scalar("loss/train", (loss_r / len(trainloader)), epoch)
+        writer.add_scalar("loss/validation", (valid_loss_r / len(validloader)), epoch)
+
+        writer.add_scalar("loss_p/train", (loss_p / len(trainloader)), epoch)
+        writer.add_scalar("loss_p/validation", (valid_loss_p / len(validloader)), epoch)
+
+    # print('total step =', total_step)
+
+    writer.close()
+
+    return model

@@ -48,10 +48,8 @@ def parse_args(args: list):
     predict_p = sub_p.add_parser('predict')
     predict_p.add_argument('mdl_dir', type = str, 
         help = 'path to populated model directory')
-    predict_p.add_argument('xyz_dir', type = str, 
-        help = 'path to .xyz input directory for prediction')
     predict_p.add_argument(
-        "xanes_dir", type=str, help="path to xanes directory for prediction"
+        "inp_f", type=str, help="path to .json input file w/ paths"
     )
     
     args = p.parse_args()
@@ -78,7 +76,12 @@ def main(args: list):
         learn(**inp, save = args.save)
 
     if args.mode == 'predict':
-        predict(args.mdl_dir, args.xyz_dir, args.xanes_dir)
+        print(f">> loading JSON input @ {args.inp_f}\n")
+        with open(args.inp_f) as f:
+            inp = json.load(f)
+        print_nested_dict(inp, nested_level=1)
+        print("")
+        predict(args.mdl_dir, **inp)
         
 ################################################################################
 ############################## PROGRAM STARTS HERE #############################

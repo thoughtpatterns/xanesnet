@@ -213,7 +213,7 @@ def main(
 
         print(">> fitting neural net...")
 
-        epoch, model, optimizer = train_ae(xyz, xanes, hyperparams, epochs)
+        model = train_ae(xyz, xanes, hyperparams, epochs)
         summary(model, (1, xyz.shape[1]))
 
     elif aemode == "train_xanes":
@@ -221,7 +221,7 @@ def main(
 
         print(">> fitting neural net...")
 
-        epoch, model, optimizer = train_ae(xanes, xyz, hyperparams, epochs)
+        model = train_ae(xanes, xyz, hyperparams, epochs)
         summary(model, (1, xanes.shape[1]))
 
     if save:
