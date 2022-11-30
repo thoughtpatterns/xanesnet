@@ -407,7 +407,8 @@ class LossSwitch:
         return nn.MSELoss()
 
     def loss_function_bce(self):
-        return nn.BCELoss()
+        # return nn.BCELoss()
+        return nn.BCEWithLogitsLoss()
 
     def loss_function_emd(self):
         return EMDLoss()
