@@ -63,6 +63,7 @@ def earth_mover_distance(y_true, y_pred):
         dim=-1,
     )
 
+
 # Select activation function from hyperparams inputs
 class ActivationSwitch:
     def fn(self, activation):
@@ -92,6 +93,7 @@ class ActivationSwitch:
     def activation_function_selu(self):
         return nn.SELU()
 
+
 def train_mlp(x, y, hyperparams, n_epoch):
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -105,7 +107,9 @@ def train_mlp(x, y, hyperparams, n_epoch):
     activation_switch = ActivationSwitch()
     act_fn = activation_switch.fn(hyperparams["activation"])
 
-    X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(
+        x, y, test_size=0.2, random_state=42
+    )
 
     trainset = torch.utils.data.TensorDataset(X_train, y_train)
     trainloader = torch.utils.data.DataLoader(
@@ -138,10 +142,10 @@ def train_mlp(x, y, hyperparams, n_epoch):
         for inputs, labels in trainloader:
             inputs, labels = inputs.to(device), labels.to(device)
             inputs, labels = inputs.float(), labels.float()
-            
+
             # print(total_step % n_noise)
             # if total_step % 10 == 0:
-                # print('add noise')
+            # print('add noise')
             noise = torch.randn_like(inputs) * 0.3
             inputs = noise + inputs
             # else:
@@ -173,7 +177,7 @@ def train_mlp(x, y, hyperparams, n_epoch):
 
         writer.add_scalar("loss/train", (running_loss / len(trainloader)), epoch)
         writer.add_scalar("loss/validation", (valid_loss / len(validloader)), epoch)
-    print('total step =', total_step)
+    print("total step =", total_step)
 
     writer.close()
     return mlp, running_loss / len(trainloader)

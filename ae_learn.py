@@ -130,7 +130,6 @@ def main(
 
     print(xyz_path)
 
-
     for path in (xyz_path, xanes_path):
         if not path.exists():
             err_str = f"path to X/Y data ({path}) doesn't exist"
@@ -139,10 +138,7 @@ def main(
     if xyz_path.is_dir() and xanes_path.is_dir():
         print(">> loading data from directories...\n")
 
-        ids = list(
-            set(list_filestems(xyz_path))
-            & set(list_filestems(xanes_path))
-        )
+        ids = list(set(list_filestems(xyz_path)) & set(list_filestems(xanes_path)))
 
         ids.sort()
 
@@ -178,7 +174,6 @@ def main(
             with open(model_dir / "dataset.npz", "wb") as f:
                 np.savez_compressed(f, x=xyz_data, y=xanes_data, e=e)
 
-
     elif x_path.is_file() and y_path.is_file():
         print(">> loading data from .npz archive(s)...\n")
 
@@ -204,9 +199,7 @@ def main(
         raise TypeError(err_str)
 
     print(">> shuffling and selecting data...")
-    xyz, xanes = shuffle(
-        xyz_data, xanes_data, random_state=rng, n_samples=max_samples
-    )
+    xyz, xanes = shuffle(xyz_data, xanes_data, random_state=rng, n_samples=max_samples)
     print(">> ...shuffled and selected!\n")
 
     if aemode == "train_xyz":
