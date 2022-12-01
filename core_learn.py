@@ -258,9 +258,10 @@ def main(
         if model_mode == 'mlp' or model_mode == 'cnn':
             from learn import train
             model, score = train(xyz, xanes, model_mode, hyperparams, epochs)
-        # elif model_mode == 'ae_mlp' or model_mode == 'ae_cnn':
-        #     from ae_learn import train
-        #     model, score = train(xyz, xanes, model_mode, hyperparams, epochs)
+        
+        elif model_mode == 'ae_mlp' or model_mode == 'ae_cnn':
+            from ae_learn import train
+            model, score = train(xyz, xanes, model_mode, hyperparams, epochs)
 
         summary(model, (1, xyz.shape[1]))
 
@@ -272,6 +273,11 @@ def main(
         if model_mode == 'mlp' or model_mode == 'cnn':
             from learn import train
             model, score = train(xanes, xyz, model_mode, hyperparams, epochs)
+        
+        elif model_mode == 'ae_mlp' or model_mode == 'ae_cnn':
+            from ae_learn import train
+            model, score = train(xanes, xyz, model_mode, hyperparams, epochs)
+
         summary(model, (1, xanes.shape[1]))
 
     if save:
