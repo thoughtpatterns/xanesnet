@@ -104,7 +104,7 @@ def main(args: list):
         print("")
         ae_learn(args.mode, args.model_mode, **inp, save=args.save)
 
-    if args.mode == "train_xanes":
+    elif args.mode == "train_xanes":
         print(f">> loading JSON input @ {args.inp_f}\n")
         with open(args.inp_f) as f:
             inp = json.load(f)
@@ -112,7 +112,7 @@ def main(args: list):
         print("")
         ae_learn(args.mode, args.model_mode, **inp, save=args.save)
 
-    if args.mode == "predict_xanes":
+    elif args.mode == "predict_xanes":
         print(f">> loading JSON input @ {args.inp_f}\n")
         with open(args.inp_f) as f:
             inp = json.load(f)
@@ -120,7 +120,7 @@ def main(args: list):
         print("")
         ae_predict(args.mode, args.mdl_dir, **inp)
 
-    if args.mode == "predict_xyz":
+    elif args.mode == "predict_xyz":
         print(f">> loading JSON input @ {args.inp_f}\n")
         with open(args.inp_f) as f:
             inp = json.load(f)
