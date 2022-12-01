@@ -40,8 +40,6 @@ from utils import print_cross_validation_scores
 from structure.rdc import RDC
 from structure.wacsf import WACSF
 
-# from cnn_pytorch import train_cnn
-from mlp_pytorch import train_mlp
 import torch
 from torchinfo import summary
 from sklearn.metrics import mean_squared_error
@@ -52,6 +50,8 @@ from sklearn.metrics import mean_squared_error
 
 
 def main(
+    aemode: str,
+    model_mode: str,
     x_path: str,
     y_path: str,
     descriptor_type: str,
@@ -199,66 +199,87 @@ def main(
         raise TypeError(err_str)
 
     print(">> shuffling and selecting data...")
-    x, y = shuffle(x, y, random_state=rng, n_samples=max_samples)
+    xyz, xanes = shuffle(x, y, random_state=rng, n_samples=max_samples)
     print(">> ...shuffled and selected!\n")
 
-    if kfold_params:
+    # if kfold_params:
 
-        kfold_spooler = RepeatedKFold(**kfold_params, random_state=rng)
+    #     kfold_spooler = RepeatedKFold(**kfold_params, random_state=rng)
 
-        fit_time = []
-        train_score = []
-        test_score = []
-        prev_score = 1
+    #     fit_time = []
+    #     train_score = []
+    #     test_score = []
+    #     prev_score = 1
 
-        for train_index, test_index in kfold_spooler.split(x):
+    #     for train_index, test_index in kfold_spooler.split(x):
 
-            start = time.time()
-            model, score = train_mlp(
-                x[train_index], y[train_index], hyperparams, epochs
-            )
-            # model, score = train_cnn(
-            #     x[train_index], y[train_index], hyperparams, epochs
-            # )
-            train_score.append(score)
+    #         start = time.time()
+    #         model, score = train_mlp(
+    #             x[train_index], y[train_index], hyperparams, epochs
+    #         )
+    #         # model, score = train_cnn(
+    #         #     x[train_index], y[train_index], hyperparams, epochs
+    #         # )
+    #         train_score.append(score)
 
-            fit_time.append(time.time() - start)
+    #         fit_time.append(time.time() - start)
 
-            model.eval()
-            x_test = torch.from_numpy(x[test_index])
-            x_test = x_test.float()
-            y_predict = model(x_test)
-            y_score = mean_squared_error(y[test_index], y_predict.detach().numpy())
+    #         model.eval()
+    #         x_test = torch.from_numpy(x[test_index])
+    #         x_test = x_test.float()
+    #         y_predict = model(x_test)
+    #         y_score = mean_squared_error(y[test_index], y_predict.detach().numpy())
 
-            test_score.append(y_score)
+    #         test_score.append(y_score)
 
-            if y_score < prev_score:
-                best_model = model
+    #         if y_score < prev_score:
+    #             best_model = model
 
-            prev_score = y_score
+    #         prev_score = y_score
 
-        result = {
-            "fit_time": fit_time,
-            "train_score": train_score,
-            "test_score": test_score,
-        }
-        print_cross_validation_scores(result)
+    #     result = {
+    #         "fit_time": fit_time,
+    #         "train_score": train_score,
+    #         "test_score": test_score,
+    #     }
+    #     print_cross_validation_scores(result)
 
-        if save:
-            torch.save(best_model, model_dir / f"model.pt")
-            print("Saved model to disk")
+    #     if save:
+    #         torch.save(best_model, model_dir / f"model.pt")
+    #         print("Saved model to disk")
 
-    else:
+    # else:
+
+    if aemode == "train_xyz":
+        print("training xyz structure")
+
+        print(">> fitting neural net...")
+        
+        if model_mode == 'mlp' or model_mode == 'cnn':
+            from learn import train
+            model, score = train(xyz, xanes, model_mode, hyperparams, epochs)
+        # elif model_mode == 'ae_mlp' or model_mode == 'ae_cnn':
+        #     from ae_learn import train
+        #     model, score = train(xyz, xanes, model_mode, hyperparams, epochs)
+
+        summary(model, (1, xyz.shape[1]))
+
+    elif aemode == "train_xanes":
+        print("training xanes spectrum")
 
         print(">> fitting neural net...")
 
-        model, score = train_mlp(x, y, hyperparams, epochs)
-        # model, score = train_cnn(x, y, hyperparams, epochs)
-        summary(model, (1, x.shape[1]))
-        print(model)
+        if model_mode == 'mlp' or model_mode == 'cnn':
+            from learn import train
+            model, score = train(xanes, xyz, model_mode, hyperparams, epochs)
+        summary(model, (1, xanes.shape[1]))
 
-        if save:
-            torch.save(model, model_dir / f"model.pt")
-            print("Saved model to disk")
+    if save:
+
+        torch.save(model, model_dir / f"model.pt")
+        print("Saved model to disk")
+
+    else:
+        print("none")
 
     return

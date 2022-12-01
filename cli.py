@@ -40,7 +40,20 @@ def parse_args(args: list):
 
     sub_p = p.add_subparsers(dest="mode")
 
-    learn_p = sub_p.add_parser("learn")
+    learn_p = sub_p.add_parser("train_xyz")
+    learn_p.add_argument(
+        "inp_f", type=str, help="path to .json input file w/ variable definitions"
+    )
+    learn_p.add_argument("--model_mode", type=str, help="the model", required=True)
+    learn_p.add_argument(
+        "--no-save",
+        dest="save",
+        action="store_false",
+        help="toggles model directory creation and population to <off>",
+    )
+
+    learn_p = sub_p.add_parser("train_xanes")
+    learn_p.add_argument("--model_mode", type=str, help="the model", required=True)
     learn_p.add_argument(
         "inp_f", type=str, help="path to .json input file w/ variable definitions"
     )
@@ -51,11 +64,21 @@ def parse_args(args: list):
         help="toggles model directory creation and population to <off>",
     )
 
-    predict_p = sub_p.add_parser("predict")
+    predict_p = sub_p.add_parser("predict_xanes")
     predict_p.add_argument(
         "mdl_dir", type=str, help="path to populated model directory"
     )
-    predict_p.add_argument("inp_f", type=str, help="path to .json input file w/ paths")
+    predict_p.add_argument(
+        "inp_f", type=str, help="path to .json input file w/ variable definitions"
+    )
+
+    predict_p = sub_p.add_parser("predict_xyz")
+    predict_p.add_argument(
+        "mdl_dir", type=str, help="path to populated model directory"
+    )
+    predict_p.add_argument(
+        "inp_f", type=str, help="path to .json input file w/ variable definitions"
+    )
 
     args = p.parse_args()
 
@@ -74,21 +97,38 @@ def main(args: list):
     else:
         args = parse_args(args)
 
-    if args.mode == "learn":
+    if args.mode == "train_xyz":
         print(f">> loading JSON input @ {args.inp_f}\n")
         with open(args.inp_f) as f:
             inp = json.load(f)
         print_nested_dict(inp, nested_level=1)
         print("")
-        learn(**inp, save=args.save)
+        learn(args.mode, args.model_mode, **inp, save=args.save)
 
-    if args.mode == "predict":
+    elif args.mode == "train_xanes":
         print(f">> loading JSON input @ {args.inp_f}\n")
         with open(args.inp_f) as f:
             inp = json.load(f)
         print_nested_dict(inp, nested_level=1)
         print("")
-        predict(args.mdl_dir, **inp)
+        learn(args.mode, args.model_mode, **inp, save=args.save)
+
+    elif args.mode == "predict_xanes":
+        print(f">> loading JSON input @ {args.inp_f}\n")
+        with open(args.inp_f) as f:
+            inp = json.load(f)
+        print_nested_dict(inp, nested_level=1)
+        print("")
+        predict(args.mode, args.mdl_dir, **inp)
+
+    elif args.mode == "predict_xyz":
+        print(f">> loading JSON input @ {args.inp_f}\n")
+        with open(args.inp_f) as f:
+            inp = json.load(f)
+        print_nested_dict(inp, nested_level=1)
+        print("")
+        predict(args.mode, args.mdl_dir, **inp)
+
 
 
 ################################################################################

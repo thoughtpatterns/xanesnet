@@ -1,6 +1,109 @@
 import torch
 from torch import nn
 
+class MLP(nn.Module):
+    def __init__(self, input_size, hidden_size, dropout, hl_size, out_dim, act_fn):
+        super().__init__()
+
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.dropout = dropout
+        self.hl_size = hl_size
+        self.out_dim = out_dim
+        self.act_fn = act_fn
+
+        self.fc1 = nn.Sequential(
+            nn.Linear(self.input_size, self.hidden_size),
+            self.act_fn,
+            nn.Dropout(p=self.dropout),
+        )
+
+        self.fc2 = nn.Sequential(
+            nn.Linear(self.hidden_size, self.hl_size),
+            self.act_fn,
+            nn.Dropout(p=self.dropout),
+        )
+
+        self.fc3 = nn.Sequential(nn.Linear(self.hl_size, self.out_dim))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+
+        x = self.fc1(x)
+        x = self.fc2(x)
+        out = self.fc3(x)
+
+        return out
+
+class CNN(nn.Module):
+    def __init__(
+        self,
+        input_size,
+        out_channel,
+        channel_mul,
+        hidden_layer,
+        out_dim,
+        dropout,
+        kernel_size,
+        stride,
+        act_fn,
+    ):
+        super().__init__()
+
+        self.input_size = input_size
+        self.out_channel = out_channel
+        self.channel_mul = channel_mul
+        self.hidden_layer = hidden_layer
+        self.out_dim = out_dim
+        self.dropout = dropout
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.act_fn = act_fn
+
+        self.conv1_shape = int(((self.input_size - self.kernel_size) / self.stride) + 1)
+        self.conv2_shape = int(
+            ((self.conv1_shape - self.kernel_size) / self.stride) + 1
+        )
+
+        self.conv1 = nn.Sequential(
+            nn.Conv1d(
+                in_channels=1,
+                out_channels=self.out_channel,
+                kernel_size=self.kernel_size,
+                stride=self.stride,
+            ),
+            nn.BatchNorm1d(num_features=self.out_channel),
+            self.act_fn,
+            nn.Dropout(p=self.dropout),
+        )
+
+        self.conv2 = nn.Sequential(
+            nn.Conv1d(
+                in_channels=self.out_channel,
+                out_channels=self.out_channel * self.channel_mul,
+                kernel_size=self.kernel_size,
+                stride=self.stride,
+            ),
+            nn.BatchNorm1d(num_features=self.out_channel * self.channel_mul),
+            self.act_fn,
+            nn.Dropout(p=self.dropout),
+        )
+
+        self.dense_layer = nn.Sequential(
+            nn.Linear(
+                self.conv2_shape * (self.out_channel * self.channel_mul), self.out_dim
+            )
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+
+        x = x.unsqueeze(0)
+        x = x.permute(1, 0, 2)
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = x.view(x.size(0), -1)
+        out = self.dense_layer(x)
+
+        return out
 
 class AE_mlp(nn.Module):
     def __init__(self, input_size, hidden_size, dropout, hl_size, out_dim, act_fn):
