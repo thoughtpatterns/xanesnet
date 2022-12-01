@@ -93,7 +93,6 @@ def main(model_dir: str, x_path: str, y_path: str):
             e, y[i, :] = xanes.spectrum
     print(">> ...loaded!\n")
 
-
     model = torch.load(model_dir / "model.pt", map_location=torch.device("cpu"))
     model.eval()
     print("Loaded model from disk")
@@ -101,14 +100,13 @@ def main(model_dir: str, x_path: str, y_path: str):
     x = torch.from_numpy(x)
     x = x.float()
 
-
     print(">> predicting Y data with neural net...")
 
     y_predict = model(x)
     # noise
     # noise = torch.randn_like(x)
     # y_predict = model(noise)
-    
+
     if y_predict.ndim == 1:
         if len(ids) == 1:
             y_predict = y_predict.reshape(-1, y_predict.size)
@@ -136,7 +134,6 @@ def main(model_dir: str, x_path: str, y_path: str):
         plt.legend(loc="upper right")
         total_y.append(y_)
         total_y_pred.append(y_predict_.detach().numpy())
-
 
         with open(predict_dir / f"{id_}.txt", "w") as f:
             save_xanes(f, XANES(e, y_predict_.detach().numpy()))
@@ -179,6 +176,5 @@ def main(model_dir: str, x_path: str, y_path: str):
     plt.show()
 
     print("...saved!\n")
-
 
     return 0

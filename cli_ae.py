@@ -43,9 +43,7 @@ def parse_args(args: list):
     learn_p.add_argument(
         "inp_f", type=str, help="path to .json input file w/ variable definitions"
     )
-    learn_p.add_argument(
-        "--model_mode", type=str, help="the model", required=True
-    )
+    learn_p.add_argument("--model_mode", type=str, help="the model", required=True)
     learn_p.add_argument(
         "--no-save",
         dest="save",
@@ -54,9 +52,7 @@ def parse_args(args: list):
     )
 
     learn_p = sub_p.add_parser("train_xanes")
-    learn_p.add_argument(
-        "--model_mode", type=str, help="the model", required=True
-    )
+    learn_p.add_argument("--model_mode", type=str, help="the model", required=True)
     learn_p.add_argument(
         "inp_f", type=str, help="path to .json input file w/ variable definitions"
     )
