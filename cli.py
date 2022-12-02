@@ -64,6 +64,18 @@ def parse_args(args: list):
         help="toggles model directory creation and population to <off>",
     )
 
+    learn_p = sub_p.add_parser("learn_aegan")
+    learn_p.add_argument("--model_mode", type=str, help="the model", required=True)
+    learn_p.add_argument(
+        "inp_f", type=str, help="path to .json input file w/ variable definitions"
+    )
+    learn_p.add_argument(
+        "--no-save",
+        dest="save",
+        action="store_false",
+        help="toggles model directory creation and population to <off>",
+    )
+
     predict_p = sub_p.add_parser("predict_xanes")
     predict_p.add_argument("--model_mode", type=str, help="the model", required=True)
     predict_p.add_argument(
@@ -79,6 +91,35 @@ def parse_args(args: list):
         "mdl_dir", type=str, help="path to populated model directory"
     )
     predict_p.add_argument(
+        "inp_f", type=str, help="path to .json input file w/ variable definitions"
+    )
+
+    # Parser for structural and spectral inputs
+    predict_p = sub_p.add_parser("predict_aegan")
+    predict_p.add_argument("--model_mode", type=str, help="the model", required=True)
+    predict_p.add_argument(
+        "mdl_dir", type=str, help="path to populated model directory"
+    )
+    predict_p.add_argument(
+        "inp_f", type=str, help="path to .json input file w/ variable definitions"
+    )
+
+    # Parser for structual inputs only
+    predict_p_xyz = sub_p.add_parser("predict_aegan_spectrum")
+    predict_p_xyz.add_argument("--model_mode", type=str, help="the model", required=True)
+    predict_p_xyz.add_argument(
+        "mdl_dir", type=str, help="path to populated model directory"
+    )
+    predict_p_xyz.add_argument(
+        "inp_f", type=str, help="path to .json input file w/ variable definitions"
+    )
+
+    predict_p_xanes = sub_p.add_parser("predict_aegan_structure")
+    predict_p_xanes.add_argument("--model_mode", type=str, help="the model", required=True)
+    predict_p_xanes.add_argument(
+        "mdl_dir", type=str, help="path to populated model directory"
+    )
+    predict_p_xanes.add_argument(
         "inp_f", type=str, help="path to .json input file w/ variable definitions"
     )
 
@@ -114,6 +155,14 @@ def main(args: list):
         print_nested_dict(inp, nested_level=1)
         print("")
         learn(args.mode, args.model_mode, **inp, save=args.save)
+    
+    elif args.mode == "learn_aegan":
+        print(f">> loading JSON input @ {args.inp_f}\n")
+        with open(args.inp_f) as f:
+            inp = json.load(f)
+        print_nested_dict(inp, nested_level=1)
+        print("")
+        learn(args.mode, args.model_mode, **inp, save=args.save)
 
     elif args.mode == "predict_xanes":
         print(f">> loading JSON input @ {args.inp_f}\n")
@@ -132,6 +181,27 @@ def main(args: list):
         print("")
         print(args.mode, args.mdl_dir)
         predict(args.mode, args.model_mode, args.mdl_dir, **inp)
+    
+    elif args.mode == "predict_aegan":
+        print(f">> loading JSON input @ {args.inp_f}\n")
+        with open(args.inp_f) as f:
+            inp = json.load(f)
+        print_nested_dict(inp, nested_level=1)
+        predict(args.mode, args.model_mode, args.mdl_dir, inp["x_path"], inp["y_path"])
+
+    elif args.mode == "predict_aegan_spectrum":
+        print(f">> loading JSON input @ {args.inp_f}\n")
+        with open(args.inp_f) as f:
+            inp = json.load(f)
+        print_nested_dict(inp, nested_level=1)
+        predict(args.mode, args.model_mode, args.mdl_dir, inp["x_path"], None)
+
+    elif args.mode == "predict_aegan_structure":
+        print(f">> loading JSON input @ {args.inp_f}\n")
+        with open(args.inp_f) as f:
+            inp = json.load(f)
+        print_nested_dict(inp, nested_level=1)
+        predict(args.mode, args.model_mode, args.mdl_dir, None, inp["y_path"])
 
 
 

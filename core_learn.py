@@ -50,7 +50,7 @@ from sklearn.metrics import mean_squared_error
 
 
 def main(
-    aemode: str,
+    mode: str,
     model_mode: str,
     x_path: str,
     y_path: str,
@@ -250,35 +250,49 @@ def main(
 
     # else:
 
-    if aemode == "train_xyz":
+    if mode == "train_xyz":
         print("training xyz structure")
 
         print(">> fitting neural net...")
-        
-        if model_mode == 'mlp' or model_mode == 'cnn':
+
+        if model_mode == "mlp" or model_mode == "cnn":
             from learn import train
+
             model, score = train(xyz, xanes, model_mode, hyperparams, epochs)
-        
-        elif model_mode == 'ae_mlp' or model_mode == 'ae_cnn':
+
+        elif model_mode == "ae_mlp" or model_mode == "ae_cnn":
             from ae_learn import train
+
             model, score = train(xyz, xanes, model_mode, hyperparams, epochs)
 
         summary(model, (1, xyz.shape[1]))
 
-    elif aemode == "train_xanes":
+    elif mode == "train_xanes":
         print("training xanes spectrum")
 
         print(">> fitting neural net...")
 
-        if model_mode == 'mlp' or model_mode == 'cnn':
+        if model_mode == "mlp" or model_mode == "cnn":
             from learn import train
+
             model, score = train(xanes, xyz, model_mode, hyperparams, epochs)
-        
-        elif model_mode == 'ae_mlp' or model_mode == 'ae_cnn':
+
+        elif model_mode == "ae_mlp" or model_mode == "ae_cnn":
             from ae_learn import train
+
             model, score = train(xanes, xyz, model_mode, hyperparams, epochs)
 
         summary(model, (1, xanes.shape[1]))
+
+    elif mode == "learn_aegan":
+        from aegan_learn import train_aegan
+
+        losses, model = train_aegan(x, y, hyperparams, epochs)
+        summary(model)
+
+        from plot import plot_running_aegan
+
+        plot_running_aegan(losses, model_dir)
 
     if save:
 

@@ -6,6 +6,8 @@ import numpy as np
 from inout import save_xanes
 from spectrum.xanes import XANES
 
+from sklearn.metrics.pairwise import cosine_similarity
+
 def plot_predict(ids, y, y_predict, e, predict_dir, mode):
     total_y = []
     total_y_pred = []
@@ -18,12 +20,12 @@ def plot_predict(ids, y, y_predict, e, predict_dir, mode):
         total_y.append(y_)
         total_y_pred.append(y_predict_.detach().numpy())
 
-        if mode == 'predict_xanes':
+        if mode == "predict_xanes":
             with open(predict_dir / f"{id_}.txt", "w") as f:
                 save_xanes(f, XANES(e, y_predict_.detach().numpy()))
                 plt.savefig(predict_dir / f"{id_}.pdf")
 
-        elif mode == 'predict_xyz':
+        elif mode == "predict_xyz":
             with open(predict_dir / f"{id_}.txt", "w") as f:
                 f.write("\n".join(map(str, y_predict_.detach().numpy())))
                 plt.savefig(predict_dir / f"{id_}.pdf")
@@ -68,13 +70,16 @@ def plot_predict(ids, y, y_predict, e, predict_dir, mode):
 
     plt.show()
 
+
 def plot_ae_predict(ids, y, y_predict, x, x_recon, e, predict_dir, mode):
     total_y = []
     total_y_pred = []
     total_x = []
     total_x_recon = []
 
-    for id_, y_predict_, y_, x_recon_, x_ in tqdm.tqdm(zip(ids, y_predict, y, x_recon, x)):
+    for id_, y_predict_, y_, x_recon_, x_ in tqdm.tqdm(
+        zip(ids, y_predict, y, x_recon, x)
+    ):
         sns.set()
         fig, (ax1, ax2) = plt.subplots(2)
 
@@ -93,19 +98,19 @@ def plot_ae_predict(ids, y, y_predict, x, x_recon, e, predict_dir, mode):
 
         total_x.append(x_.detach().numpy())
         total_x_recon.append(x_recon_.detach().numpy())
-        if mode == 'predict_xanes':
+        if mode == "predict_xanes":
             with open(predict_dir / f"{id_}.txt", "w") as f:
                 save_xanes(f, XANES(e, y_predict_.detach().numpy()))
                 plt.savefig(predict_dir / f"{id_}.pdf")
 
-        elif mode == 'predict_xyz':
+        elif mode == "predict_xyz":
             with open(predict_dir / f"{id_}.txt", "w") as f:
                 f.write("\n".join(map(str, y_predict_.detach().numpy())))
                 plt.savefig(predict_dir / f"{id_}.pdf")
 
         fig.clf()
         plt.close(fig)
-        
+
     print(">> saving Y data predictions...")
 
     total_y = np.asarray(total_y)
@@ -174,5 +179,141 @@ def plot_ae_predict(ids, y, y_predict, x, x_recon, e, predict_dir, mode):
     plt.savefig(predict_dir / "avg_plot.pdf")
 
     plt.show()
+    fig.clf()
+    plt.close(fig)
+
+
+def plot_running_aegan(losses, model_dir):
+
+    print(">> Plotting running losses...")
+
+    sns.set()
+    cycle = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+
+    fig, (ax1, ax2, ax3) = plt.subplots(3, figsize=(10, 10))
+
+    ax1.plot(losses["train_loss"], label="Total training loss", color=cycle[0])
+    ax1.legend(loc="upper right")
+
+    ax2.plot(
+        losses["loss_x_recon"],
+        label="Training Structure Reconstruction",
+        color=cycle[1],
+    )
+    ax2.plot(
+        losses["loss_x_pred"], label="Training Structure Prediction", color=cycle[2]
+    )
+    ax2.legend(loc="upper right")
+
+    ax3.plot(
+        losses["loss_y_recon"], label="Training Spectrum Reconstruction", color=cycle[3]
+    )
+    ax3.plot(
+        losses["loss_y_pred"], label="Training Spectrum Prediction", color=cycle[4]
+    )
+    ax3.legend(loc="upper right")
+
+    # # with open(predict_dir / f'{id_}.txt', 'w') as f:
+    #     # save_xanes(f, XANES(e, y_predict_.detach().numpy()))
+    plt.savefig(f"{model_dir}/training-mse-loss.pdf")
+    fig.clf()
+    plt.close(fig)
+
+
+def plot_aegan_predict(ids, x, y, x_recon, y_recon, x_pred, y_pred, plots_dir):
+
+    for id_, x_, y_, x_recon_, y_recon_, x_pred_, y_pred_ in tqdm.tqdm(
+        zip(ids, x, y, x_recon, y_recon, x_pred, y_pred)
+    ):
+        sns.set()
+        fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, figsize=(20, 20))
+
+        ax1.plot(x_recon_, label="Reconstruction")
+        ax1.set_title(f"Structure Reconstruction")
+        ax1.plot(x_, label="target")
+        ax1.legend(loc="upper left")
+
+        ax2.plot(y_recon_, label="Reconstruction")
+        ax2.set_title(f"Spectrum Reconstruction")
+        ax2.plot(y_, label="target")
+        ax2.legend(loc="upper left")
+
+        ax3.plot(y_pred_, label="Prediction")
+        ax3.set_title(f"Spectrum Prediction")
+        ax3.plot(y_, label="target")
+        ax3.legend(loc="upper left")
+
+        ax4.plot(x_pred_, label="Prediction")
+        ax4.set_title(f"Structure Prediction")
+        ax4.plot(x_, label="target")
+        ax4.legend(loc="upper left")
+
+        plt.savefig(plots_dir / f"{id_}.pdf")
+        fig.clf()
+        plt.close(fig)
+
+
+def plot_aegan_spectrum(ids, x, x_recon, y_pred, plots_dir):
+
+    for id_, x_, x_recon_, y_pred_ in tqdm.tqdm(zip(ids, x, x_recon, y_pred)):
+        sns.set()
+        fig, (ax1, ax2) = plt.subplots(2, figsize=(20, 20))
+
+        ax1.plot(x_recon_, label="Reconstruction")
+        ax1.set_title(f"Structure Reconstruction")
+        ax1.plot(x_, label="target")
+        ax1.legend(loc="upper left")
+
+        ax2.plot(y_pred_, label="Prediction")
+        ax2.set_title(f"Spectrum Prediction")
+        ax2.legend(loc="upper left")
+
+        plt.savefig(plots_dir / f"{id_}.pdf")
+        fig.clf()
+        plt.close(fig)
+
+
+def plot_aegan_structure(ids, y, y_recon, x_pred, plots_dir):
+
+    for id_, y_, y_recon_, x_pred_ in tqdm.tqdm(zip(ids, y, y_recon, x_pred)):
+        sns.set()
+        fig, (ax1, ax2) = plt.subplots(2, figsize=(20, 20))
+
+        ax1.plot(y_recon_, label="Reconstruction")
+        ax1.set_title(f"Sprectum Reconstruction")
+        ax1.plot(y_, label="target")
+        ax1.legend(loc="upper left")
+
+        ax2.plot(x_pred_, label="Prediction")
+        ax2.set_title(f"Structure Prediction")
+        ax2.legend(loc="upper left")
+
+        plt.savefig(plots_dir / f"{id_}.pdf")
+        fig.clf()
+        plt.close(fig)
+
+
+def plot_cosine_similarity(x, y, x_recon, y_recon, x_pred, y_pred, analysis_dir):
+
+    cosine_x_x_pred = np.diagonal(cosine_similarity(x, x_pred))
+    cosine_y_y_pred = np.diagonal(cosine_similarity(y, y_pred))
+    cosine_x_x_recon = np.diagonal(cosine_similarity(x, x_recon))
+    cosine_y_y_recon = np.diagonal(cosine_similarity(y, y_recon))
+
+    sns.set()
+    cycle = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    fig, (ax1, ax2, ax3) = plt.subplots(3, figsize=(10, 15))
+    ax1.plot(cosine_x_x_recon, cosine_y_y_pred, "o", color=cycle[0])
+    ax1.set(xlabel="Reconstructed Structure", ylabel="Predicted Spectrum")
+    ax2.plot(cosine_y_y_recon, cosine_x_x_pred, "o", color=cycle[1])
+    ax2.set(xlabel="Reconstructed Spectrum", ylabel="Predicted Structure")
+    ax3.plot(
+        cosine_x_x_recon + cosine_y_y_recon,
+        cosine_x_x_pred + cosine_y_y_pred,
+        "o",
+        color=cycle[2],
+    )
+    ax3.set(xlabel="Reconstruction", ylabel="Prediction")
+    plt.savefig(f"{analysis_dir}/cosine_similarity.pdf")
     fig.clf()
     plt.close(fig)

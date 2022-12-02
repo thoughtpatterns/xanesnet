@@ -17,6 +17,7 @@ layout = {
 writer = SummaryWriter(f"/tmp/tensorboard/{int(time.time())}")
 writer.add_custom_scalars(layout)
 
+
 def train(x, y, model_mode, hyperparams, n_epoch):
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -44,8 +45,9 @@ def train(x, y, model_mode, hyperparams, n_epoch):
         validset, batch_size=hyperparams["batch_size"]
     )
 
-    if model_mode == 'mlp':
+    if model_mode == "mlp":
         from model import MLP
+
         model = MLP(
             n_in,
             hyperparams["hl_ini_dim"],
@@ -55,8 +57,9 @@ def train(x, y, model_mode, hyperparams, n_epoch):
             act_fn,
         )
 
-    elif model_mode == 'cnn':
+    elif model_mode == "cnn":
         from model import CNN
+
         model = CNN(
             n_in,
             hyperparams["out_channel"],
