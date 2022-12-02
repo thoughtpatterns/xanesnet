@@ -29,6 +29,36 @@ class ActivationSwitch:
     def activation_function_selu(self):
         return nn.SELU()
 
+
+# Select loss function from hyperparams inputs
+class LossSwitch:
+    def fn(self, loss_fn):
+        default = nn.MSELoss()
+        return getattr(self, f"loss_function_{loss_fn.lower()}", lambda: default)()
+
+    def loss_function_mse(self):
+        return nn.MSELoss()
+
+    def loss_function_bce(self):
+        return nn.BCELoss()
+
+    def loss_function_emd(self):
+        return EMDLoss()
+
+
+# Earth mover distance as loss function
+class EMDLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, y_true, y_pred):
+        loss = torch.mean(
+            torch.square(torch.cumsum(y_true, dim=-1) - torch.cumsum(y_pred, dim=-1)),
+            dim=-1,
+        ).sum()
+        return loss
+
+
 def weight_init(m):
     if isinstance(m, nn.Linear):
         nn.init.xavier_uniform_(m.weight)
