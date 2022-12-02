@@ -65,6 +65,7 @@ def parse_args(args: list):
     )
 
     predict_p = sub_p.add_parser("predict_xanes")
+    predict_p.add_argument("--model_mode", type=str, help="the model", required=True)
     predict_p.add_argument(
         "mdl_dir", type=str, help="path to populated model directory"
     )
@@ -73,6 +74,7 @@ def parse_args(args: list):
     )
 
     predict_p = sub_p.add_parser("predict_xyz")
+    predict_p.add_argument("--model_mode", type=str, help="the model", required=True)
     predict_p.add_argument(
         "mdl_dir", type=str, help="path to populated model directory"
     )
@@ -119,7 +121,8 @@ def main(args: list):
             inp = json.load(f)
         print_nested_dict(inp, nested_level=1)
         print("")
-        predict(args.mode, args.mdl_dir, **inp)
+        print(args.mode, args.mdl_dir)
+        predict(args.mode, args.model_mode, args.mdl_dir, **inp)
 
     elif args.mode == "predict_xyz":
         print(f">> loading JSON input @ {args.inp_f}\n")
@@ -127,7 +130,8 @@ def main(args: list):
             inp = json.load(f)
         print_nested_dict(inp, nested_level=1)
         print("")
-        predict(args.mode, args.mdl_dir, **inp)
+        print(args.mode, args.mdl_dir)
+        predict(args.mode, args.model_mode, args.mdl_dir, **inp)
 
 
 
