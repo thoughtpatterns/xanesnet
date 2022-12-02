@@ -37,15 +37,27 @@ from spectrum.xanes import XANES
 
 import torch
 from sklearn.metrics import mean_squared_error
-import seaborn as sns
-import matplotlib.pyplot as plt
+
+
+def y_predict_dim(y_predict, ids, model_dir):
+    if y_predict.ndim == 1:
+        if len(ids) == 1:
+            y_predict = y_predict.reshape(-1, y_predict.size)
+        else:
+            y_predict = y_predict.reshape(y_predict.size, -1)
+    print(">> ...predicted Y data!\n")
+
+    with open(model_dir / "dataset.npz", "rb") as f:
+        e = np.load(f)["e"]
+
+    return y_predict, e
 
 ###############################################################################
 ################################ MAIN FUNCTION ################################
 ###############################################################################
 
 
-def main(model_dir: str, x_path: str, y_path: str):
+def main(mode: str, model_mode: str, model_dir: str, x_path: str, y_path: str):
     """
     PREDICT. The model state is restored from a model directory containing
     serialised scaling/pipeline objects and the serialised model, .xyz (X)
@@ -62,10 +74,13 @@ def main(model_dir: str, x_path: str, y_path: str):
 
     model_dir = Path(model_dir)
 
-    x_path = Path(x_path)
-    y_path = Path(y_path)
+    xyz_path = Path(x_path)
+    xanes_path = Path(y_path)
 
-    ids = list(set(list_filestems(x_path)) & set(list_filestems(y_path)))
+    predict_dir = unique_path(Path("."), "predictions")
+    predict_dir.mkdir()
+
+    ids = list(set(list_filestems(xyz_path)) & set(list_filestems(xanes_path)))
 
     ids.sort()
 
@@ -74,106 +89,98 @@ def main(model_dir: str, x_path: str, y_path: str):
 
     n_samples = len(ids)
     n_x_features = descriptor.get_len()
-    n_y_features = linecount(y_path / f"{ids[0]}.txt") - 2
+    n_y_features = linecount(xanes_path / f"{ids[0]}.txt") - 2
 
-    x = np.full((n_samples, n_x_features), np.nan)
-    print(">> preallocated {}x{} array for X data...".format(*x.shape))
-    y = np.full((n_samples, n_y_features), np.nan)
-    print(">> preallocated {}x{} array for Y data...".format(*y.shape))
+    xyz_data = np.full((n_samples, n_x_features), np.nan)
+    print(">> preallocated {}x{} array for X data...".format(*xyz_data.shape))
+    xanes_data = np.full((n_samples, n_y_features), np.nan)
+    print(">> preallocated {}x{} array for Y data...".format(*xanes_data.shape))
     print(">> ...everything preallocated!\n")
 
     print(">> loading data into array(s)...")
     for i, id_ in enumerate(tqdm.tqdm(ids)):
-        with open(x_path / f"{id_}.xyz", "r") as f:
+
+        with open(xyz_path / f"{id_}.xyz", "r") as f:
             atoms = load_xyz(f)
-        x[i, :] = descriptor.transform(atoms)
-        with open(y_path / f"{id_}.txt", "r") as f:
+        xyz_data[i, :] = descriptor.transform(atoms)
+        with open(xanes_path / f"{id_}.txt", "r") as f:
             xanes = load_xanes(f)
-            # print(xanes.spectrum)
-            e, y[i, :] = xanes.spectrum
+        e, xanes_data[i, :] = xanes.spectrum
     print(">> ...loaded!\n")
 
     model = torch.load(model_dir / "model.pt", map_location=torch.device("cpu"))
     model.eval()
     print("Loaded model from disk")
 
-    x = torch.from_numpy(x)
-    x = x.float()
+    if model_mode == 'mlp' or model_mode == 'cnn':
+        
+        if mode == "predict_xyz":
 
-    print(">> predicting Y data with neural net...")
+            print("predict xyz structure")
 
-    y_predict = model(x)
-    # noise
-    # noise = torch.randn_like(x)
-    # y_predict = model(noise)
+            xanes = torch.from_numpy(xanes_data)
+            xanes = xanes.float()
 
-    if y_predict.ndim == 1:
-        if len(ids) == 1:
-            y_predict = y_predict.reshape(-1, y_predict.size)
-        else:
-            y_predict = y_predict.reshape(y_predict.size, -1)
-    print(">> ...predicted Y data!\n")
+            pred_xyz = model(xanes)
 
-    print(mean_squared_error(y, y_predict.detach().numpy()))
+            y = xyz_data
+            y_predict = pred_xyz
 
-    predict_dir = unique_path(Path("."), "predictions")
-    predict_dir.mkdir()
+        elif mode == "predict_xanes":
 
-    with open(model_dir / "dataset.npz", "rb") as f:
-        e = np.load(f)["e"]
+            print("predict xanes structure")
 
-    print(">> saving Y data predictions...")
+            xyz = torch.from_numpy(xyz_data)
+            xyz = xyz.float()
 
-    total_y = []
-    total_y_pred = []
-    for id_, y_predict_, y_ in tqdm.tqdm(zip(ids, y_predict, y)):
-        sns.set()
-        plt.figure()
-        plt.plot(y_predict_.detach().numpy(), label="prediction")
-        plt.plot(y_, label="target")
-        plt.legend(loc="upper right")
-        total_y.append(y_)
-        total_y_pred.append(y_predict_.detach().numpy())
+            pred_xanes = model(xyz)
 
-        with open(predict_dir / f"{id_}.txt", "w") as f:
-            save_xanes(f, XANES(e, y_predict_.detach().numpy()))
-            plt.savefig(predict_dir / f"{id_}.pdf")
+            y = xanes_data
+            y_predict = pred_xanes
 
-        plt.close()
-    total_y = np.asarray(total_y)
-    total_y_pred = np.asarray(total_y_pred)
+        print("MSE y to y pred : ", mean_squared_error(y, y_predict.detach().numpy()))
+        
+        y_predict, e = y_predict_dim(y_predict, ids, model_dir)
+        from plot import plot_predict
+        plot_predict(ids, y, y_predict, e, predict_dir, mode)
 
-    # plotting the average loss
-    sns.set_style("dark")
+    
+    elif model_mode == 'ae_mlp' or model_mode == 'ae_cnn':
 
-    mean_y = np.mean(total_y, axis=0)
-    stddev_y = np.std(total_y, axis=0)
-    plt.plot(mean_y, label="target")
+        if mode == "predict_xyz":
 
-    plt.fill_between(
-        np.arange(mean_y.shape[0]),
-        mean_y + stddev_y,
-        mean_y - stddev_y,
-        alpha=0.4,
-        linewidth=0,
-    )
+            print("predict xyz structure")
 
-    mean_y_pred = np.mean(total_y_pred, axis=0)
-    stddev_y_pred = np.std(total_y_pred, axis=0)
-    plt.plot(mean_y_pred, label="prediction")
-    plt.fill_between(
-        np.arange(mean_y_pred.shape[0]),
-        mean_y_pred + stddev_y_pred,
-        mean_y_pred - stddev_y_pred,
-        alpha=0.4,
-        linewidth=0,
-    )
+            xanes = torch.from_numpy(xanes_data)
+            xanes = xanes.float()
 
-    plt.legend(loc="best")
-    plt.grid()
-    plt.savefig(predict_dir / "plot.pdf")
+            recon_xanes, pred_xyz = model(xanes)
 
-    plt.show()
+            x = xanes
+            x_recon = recon_xanes
+            y = xyz_data
+            y_predict = pred_xyz
+
+        elif mode == "predict_xanes":
+
+            print("predict xyz structure")
+
+            xyz = torch.from_numpy(xyz_data)
+            xyz = xyz.float()
+
+            recon_xyz, pred_xanes = model(xyz)
+
+            x = xyz
+            x_recon = recon_xyz
+            y = xanes_data
+            y_predict = pred_xanes
+
+        print("MSE x to x recon : ", mean_squared_error(x, x_recon.detach().numpy()))
+        print("MSE y to y pred : ", mean_squared_error(y, y_predict.detach().numpy()))
+
+        y_predict, e = y_predict_dim(y_predict, ids, model_dir)
+        from plot import plot_ae_predict
+        plot_ae_predict(ids, y, y_predict, x, x_recon, e, predict_dir, mode)
 
     print("...saved!\n")
 
