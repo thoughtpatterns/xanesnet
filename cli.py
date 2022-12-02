@@ -106,7 +106,9 @@ def parse_args(args: list):
 
     # Parser for structual inputs only
     predict_p_xyz = sub_p.add_parser("predict_aegan_spectrum")
-    predict_p_xyz.add_argument("--model_mode", type=str, help="the model", required=True)
+    predict_p_xyz.add_argument(
+        "--model_mode", type=str, help="the model", required=True
+    )
     predict_p_xyz.add_argument(
         "mdl_dir", type=str, help="path to populated model directory"
     )
@@ -115,7 +117,9 @@ def parse_args(args: list):
     )
 
     predict_p_xanes = sub_p.add_parser("predict_aegan_structure")
-    predict_p_xanes.add_argument("--model_mode", type=str, help="the model", required=True)
+    predict_p_xanes.add_argument(
+        "--model_mode", type=str, help="the model", required=True
+    )
     predict_p_xanes.add_argument(
         "mdl_dir", type=str, help="path to populated model directory"
     )
@@ -155,7 +159,7 @@ def main(args: list):
         print_nested_dict(inp, nested_level=1)
         print("")
         learn(args.mode, args.model_mode, **inp, save=args.save)
-    
+
     elif args.mode == "learn_aegan":
         print(f">> loading JSON input @ {args.inp_f}\n")
         with open(args.inp_f) as f:
@@ -181,7 +185,7 @@ def main(args: list):
         print("")
         print(args.mode, args.mdl_dir)
         predict(args.mode, args.model_mode, args.mdl_dir, **inp)
-    
+
     elif args.mode == "predict_aegan":
         print(f">> loading JSON input @ {args.inp_f}\n")
         with open(args.inp_f) as f:
@@ -202,8 +206,6 @@ def main(args: list):
             inp = json.load(f)
         print_nested_dict(inp, nested_level=1)
         predict(args.mode, args.model_mode, args.mdl_dir, None, inp["y_path"])
-
-
 
 ################################################################################
 ############################## PROGRAM STARTS HERE #############################
