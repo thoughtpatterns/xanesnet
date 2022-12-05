@@ -71,6 +71,7 @@ def train(x, y, model_mode, hyperparams, n_epoch):
             hyperparams["dropout"],
             hyperparams["kernel_size"],
             hyperparams["stride"],
+            act_fn,
         )
 
     model.to(device)
@@ -80,12 +81,14 @@ def train(x, y, model_mode, hyperparams, n_epoch):
         model.parameters(), lr=hyperparams["lr"], weight_decay=0.0000
     )
     criterion = nn.MSELoss()
-    print(n_epoch)
+
+    total_step = 0
     for epoch in range(n_epoch):
         running_loss = 0
         loss_r = 0
         loss_p = 0
 
+        total_step_train = 0
         for inputs, labels in trainloader:
             inputs, labels = (
                 inputs.to(device),
@@ -95,6 +98,10 @@ def train(x, y, model_mode, hyperparams, n_epoch):
                 inputs.float(),
                 labels.float(),
             )
+
+            # if total_step % 20 == 0:
+            #     noise = torch.randn_like(inputs) * 0.3
+            #     inputs = noise + inputs
 
             optimizer.zero_grad()
 
@@ -111,10 +118,15 @@ def train(x, y, model_mode, hyperparams, n_epoch):
             loss_r += loss_recon.item()
             loss_p += loss_pred.item()
 
+            # print("train:", loss_recon.item(), loss_pred.item(), loss.item())
+
+            total_step_train += 1
+
         valid_loss = 0
         valid_loss_r = 0
         valid_loss_p = 0
         model.eval()
+        total_step_valid = 0
         for inputs, labels in validloader:
             inputs, labels = inputs.to(device), labels.to(device)
             inputs, labels = inputs.float(), labels.float()
@@ -129,6 +141,13 @@ def train(x, y, model_mode, hyperparams, n_epoch):
             valid_loss = loss.item()
             valid_loss_r += loss_recon.item()
             valid_loss_p += loss_pred.item()
+
+            # print("valid:", loss_recon.item(), loss_pred.item(), loss.item())
+        
+            total_step_valid += 1
+        
+        # print(total_step_train, total_step_valid)
+        # print(len(trainloader),len(validloader) )
 
         print("Training loss:", running_loss / len(trainloader))
         print("Validation loss:", valid_loss / len(validloader))
