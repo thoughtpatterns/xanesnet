@@ -92,9 +92,16 @@ class CNN(nn.Module):
             nn.Dropout(p=self.dropout),
         )
 
-        self.dense_layer = nn.Sequential(
+        self.dense_layer1 = nn.Sequential(
             nn.Linear(
-                self.conv2_shape * (self.out_channel * self.channel_mul), self.out_dim
+                self.conv2_shape * (self.out_channel * self.channel_mul), self.hidden_layer
+            ),
+            self.act_fn,
+        )
+
+        self.dense_layer2 = nn.Sequential(
+            nn.Linear(
+                self.hidden_layer, self.out_dim
             )
         )
 
@@ -105,7 +112,8 @@ class CNN(nn.Module):
         x = self.conv1(x)
         x = self.conv2(x)
         x = x.view(x.size(0), -1)
-        out = self.dense_layer(x)
+        x = self.dense_layer1(x)
+        out = self.dense_layer2(x)
 
         return out
 
@@ -176,6 +184,7 @@ class AE_cnn(nn.Module):
         dropout,
         kernel_size,
         stride,
+        act_fn,
     ):
         super().__init__()
 
@@ -187,6 +196,7 @@ class AE_cnn(nn.Module):
         self.dropout = dropout
         self.kernel_size = kernel_size
         self.stride = stride
+        self.act_fn = act_fn
 
         # checking the sign for encoder for input_channel for linear
         self.conv1_shape = int(((self.input_size - self.kernel_size) / self.stride) + 1)
@@ -247,7 +257,7 @@ class AE_cnn(nn.Module):
                 kernel_size=self.kernel_size,
                 stride=self.stride,
             ),
-            nn.PReLU(),
+            self.act_fn,
         )
 
         self.encoder_layer2 = nn.Sequential(
@@ -257,7 +267,7 @@ class AE_cnn(nn.Module):
                 kernel_size=self.kernel_size,
                 stride=self.stride,
             ),
-            nn.PReLU(),
+            self.act_fn,
         )
 
         self.encoder_output = nn.Sequential(
@@ -267,7 +277,7 @@ class AE_cnn(nn.Module):
                 kernel_size=self.kernel_size,
                 stride=self.stride,
             ),
-            nn.PReLU(),
+            self.act_fn,
         )
 
         self.dense_layers = nn.Sequential(
@@ -275,7 +285,7 @@ class AE_cnn(nn.Module):
                 self.conv3_shape * int(self.out_channel * self.channel_mul * 2),
                 self.hidden_layer,
             ),
-            nn.PReLU(),
+            self.act_fn,
             nn.Dropout(self.dropout),
             nn.Linear(self.hidden_layer, self.out_dim),
         )
@@ -289,7 +299,7 @@ class AE_cnn(nn.Module):
                 output_padding=self.op1,
                 padding=self.p1,
             ),
-            nn.PReLU(),
+            self.act_fn,
         )
 
         self.decoder_layer2 = nn.Sequential(
@@ -301,7 +311,7 @@ class AE_cnn(nn.Module):
                 output_padding=self.op2,
                 padding=self.p2,
             ),
-            nn.PReLU(),
+            self.act_fn,
         )
 
         self.decoder_output = nn.Sequential(
@@ -313,7 +323,7 @@ class AE_cnn(nn.Module):
                 output_padding=self.op3,
                 padding=self.p3,
             ),
-            nn.PReLU(),
+            self.act_fn,
         )
 
     def forward(self, x):

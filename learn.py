@@ -87,12 +87,9 @@ def train(x, y, model_mode, hyperparams, n_epoch):
             inputs, labels = inputs.float(), labels.float()
 
             # print(total_step % n_noise)
-            # if total_step % 10 == 0:
-            # print('add noise')
-            noise = torch.randn_like(inputs) * 0.3
-            inputs = noise + inputs
-            # else:
-            #     print('no noise')
+            if total_step % 20 == 0:
+                noise = torch.randn_like(inputs) * 0.3
+                inputs = noise + inputs
 
             optimizer.zero_grad()
             logps = model(inputs)
