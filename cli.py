@@ -64,7 +64,7 @@ def parse_args(args: list):
         help="toggles model directory creation and population to <off>",
     )
 
-    learn_p = sub_p.add_parser("learn_aegan")
+    learn_p = sub_p.add_parser("train_aegan")
     learn_p.add_argument("--model_mode", type=str, help="the model", required=True)
     learn_p.add_argument(
         "inp_f", type=str, help="path to .json input file w/ variable definitions"
@@ -105,7 +105,7 @@ def parse_args(args: list):
     )
 
     # Parser for structual inputs only
-    predict_p_xyz = sub_p.add_parser("predict_aegan_spectrum")
+    predict_p_xyz = sub_p.add_parser("predict_aegan_xanes")
     predict_p_xyz.add_argument(
         "--model_mode", type=str, help="the model", required=True
     )
@@ -116,7 +116,7 @@ def parse_args(args: list):
         "inp_f", type=str, help="path to .json input file w/ variable definitions"
     )
 
-    predict_p_xanes = sub_p.add_parser("predict_aegan_structure")
+    predict_p_xanes = sub_p.add_parser("predict_aegan_xyz")
     predict_p_xanes.add_argument(
         "--model_mode", type=str, help="the model", required=True
     )
@@ -160,7 +160,7 @@ def main(args: list):
         print("")
         learn(args.mode, args.model_mode, **inp, save=args.save)
 
-    elif args.mode == "learn_aegan":
+    elif args.mode == "train_aegan":
         print(f">> loading JSON input @ {args.inp_f}\n")
         with open(args.inp_f) as f:
             inp = json.load(f)
@@ -193,14 +193,14 @@ def main(args: list):
         print_nested_dict(inp, nested_level=1)
         predict(args.mode, args.model_mode, args.mdl_dir, inp["x_path"], inp["y_path"])
 
-    elif args.mode == "predict_aegan_spectrum":
+    elif args.mode == "predict_aegan_xanes":
         print(f">> loading JSON input @ {args.inp_f}\n")
         with open(args.inp_f) as f:
             inp = json.load(f)
         print_nested_dict(inp, nested_level=1)
         predict(args.mode, args.model_mode, args.mdl_dir, inp["x_path"], None)
 
-    elif args.mode == "predict_aegan_structure":
+    elif args.mode == "predict_aegan_xyz":
         print(f">> loading JSON input @ {args.inp_f}\n")
         with open(args.inp_f) as f:
             inp = json.load(f)

@@ -390,7 +390,7 @@ def main(
 
         summary(model, (1, xanes.shape[1]))
 
-    elif mode == "learn_aegan":
+    elif mode == "train_aegan":
         from aegan_learn import train_aegan
 
         losses, model = train_aegan(x, y, hyperparams, epochs)
