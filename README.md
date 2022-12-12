@@ -47,7 +47,7 @@ Select MODEL_MODE from the following:
 Input for training and prediction should be given in JSON format. The prediction input file gives the path to the input data. Example input files for training and hyper parameter options can be found in the [resources](https://github.com/NewcastleRSE/xray-spectroscopy-ml/tree/main/resources) folder.
 
 #### Example of training and inference. 
-```python cli.py train_xanes --model_mode mlp in.json```. 
+```python cli.py train_xanes --model_mode mlp in.json```  
 ```python cli.py predict_xanes --model_mode mlp model_dir in_predict.json```
 
 
