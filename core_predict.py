@@ -119,6 +119,7 @@ def main(mode: str, model_mode: str, model_dir: str, x_path: str, y_path: str):
             with open(xanes_path / f"{id_}.txt", "r") as f:
                 xanes = load_xanes(f)
                 e, xanes_data[i, :] = xanes.spectrum
+
     print(">> ...loaded!\n")
 
     model = torch.load(model_dir / "model.pt", map_location=torch.device("cpu"))
@@ -130,6 +131,7 @@ def main(mode: str, model_mode: str, model_dir: str, x_path: str, y_path: str):
         if mode == "predict_xyz":
 
             print("predict xyz structure")
+
 
             xanes = torch.from_numpy(xanes_data)
             xanes = xanes.float()
@@ -279,5 +281,4 @@ def main(mode: str, model_mode: str, model_dir: str, x_path: str, y_path: str):
             plot_cosine_similarity(x, y, x_recon, y_recon, x_pred, y_pred, analysis_dir)
 
             print("...saved!\n")
-
     return 0

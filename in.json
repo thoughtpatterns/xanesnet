@@ -17,7 +17,6 @@
         "loss": "mse",
         "lr": 0.00001,
         "dropout": 0.2,
-
         "kernel_init": "he_uniform",
         "bias_init": "zeros"
     },

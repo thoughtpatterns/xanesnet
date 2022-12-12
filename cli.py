@@ -78,6 +78,7 @@ def parse_args(args: list):
 
     predict_p = sub_p.add_parser("predict_xanes")
     predict_p.add_argument("--model_mode", type=str, help="the model", required=True)
+
     predict_p.add_argument(
         "mdl_dir", type=str, help="path to populated model directory"
     )
@@ -125,6 +126,7 @@ def parse_args(args: list):
     )
     predict_p_xanes.add_argument(
         "inp_f", type=str, help="path to .json input file w/ variable definitions"
+
     )
 
     args = p.parse_args()
@@ -201,6 +203,7 @@ def main(args: list):
         predict(args.mode, args.model_mode, args.mdl_dir, inp["x_path"], None)
 
     elif args.mode == "predict_aegan_xyz":
+
         print(f">> loading JSON input @ {args.inp_f}\n")
         with open(args.inp_f) as f:
             inp = json.load(f)
