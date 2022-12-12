@@ -63,6 +63,7 @@ def earth_mover_distance(y_true, y_pred):
         dim=-1,
     )
 
+
 # Select activation function from hyperparams inputs
 class ActivationSwitch:
     def fn(self, activation):
@@ -105,7 +106,10 @@ def train_mlp(x, y, hyperparams, n_epoch):
     activation_switch = ActivationSwitch()
     act_fn = activation_switch.fn(hyperparams["activation"])
 
-    X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.2)
+    X_train, X_test, y_train, y_test = train_test_split(
+        x, y, test_size=0.2, random_state=42
+    )
+
 
     trainset = torch.utils.data.TensorDataset(X_train, y_train)
     trainloader = torch.utils.data.DataLoader(
@@ -132,11 +136,21 @@ def train_mlp(x, y, hyperparams, n_epoch):
 
     criterion = nn.MSELoss()
 
+    total_step = 0
     for epoch in range(n_epoch):
         running_loss = 0
         for inputs, labels in trainloader:
             inputs, labels = inputs.to(device), labels.to(device)
             inputs, labels = inputs.float(), labels.float()
+
+            # print(total_step % n_noise)
+            # if total_step % 10 == 0:
+            # print('add noise')
+            noise = torch.randn_like(inputs) * 0.3
+            inputs = noise + inputs
+            # else:
+            #     print('no noise')
+
 
             optimizer.zero_grad()
             logps = mlp(inputs)
@@ -144,6 +158,8 @@ def train_mlp(x, y, hyperparams, n_epoch):
             loss = criterion(logps, labels)
             loss.mean().backward()
             optimizer.step()
+            total_step += 1
+
             running_loss += loss.item()
 
         valid_loss = 0
@@ -162,6 +178,8 @@ def train_mlp(x, y, hyperparams, n_epoch):
 
         writer.add_scalar("loss/train", (running_loss / len(trainloader)), epoch)
         writer.add_scalar("loss/validation", (valid_loss / len(validloader)), epoch)
+    print("total step =", total_step)
+
 
     writer.close()
     return mlp, running_loss / len(trainloader)
