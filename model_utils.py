@@ -40,10 +40,16 @@ class LossSwitch:
         return nn.MSELoss()
 
     def loss_function_bce(self):
-        return nn.BCELoss()
+        return nn.BCEWithLogitsLoss()
 
     def loss_function_emd(self):
         return EMDLoss()
+
+    def loss_function_cosine(self):
+        return nn.CosineEmbeddingLoss()
+
+    def loss_function_l1(self):
+        return nn.L1Loss()
 
 
 # Earth mover distance as loss function
