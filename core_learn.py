@@ -316,7 +316,7 @@ def main(
     elif mode == "train_aegan":
         from aegan_learn import train_aegan
 
-        losses, model = train_aegan(x, y, hyperparams, epochs)
+        losses, model = train_aegan(xyz, xanes, hyperparams, epochs)
         summary(model)
 
         from plot import plot_running_aegan
