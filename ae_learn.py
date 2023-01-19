@@ -5,7 +5,7 @@ from sklearn import preprocessing
 from sklearn.model_selection import train_test_split
 from torch.utils.tensorboard import SummaryWriter
 import time
-from model_utils import ActivationSwitch
+import model_utils
 
 # setup tensorboard stuff
 layout = {
@@ -30,7 +30,7 @@ def train(x, y, model_mode, hyperparams, n_epoch):
     x = torch.from_numpy(x)
     y = torch.from_numpy(y)
 
-    activation_switch = ActivationSwitch()
+    activation_switch = model_utils.ActivationSwitch()
     act_fn = activation_switch.fn(hyperparams["activation"])
 
     X_train, X_test, y_train, y_test = train_test_split(
@@ -75,6 +75,20 @@ def train(x, y, model_mode, hyperparams, n_epoch):
         )
 
     model.to(device)
+
+    # Model weight & bias initialisation
+    weight_seed = hyperparams["weight_init_seed"]
+    kernel_init = model_utils.WeightInitSwitch().fn(hyperparams["kernel_init"])
+    bias_init = model_utils.WeightInitSwitch().fn(hyperparams["bias_init"])
+    # set seed
+    torch.cuda.manual_seed(
+        weight_seed
+    ) if torch.cuda.is_available() else torch.manual_seed(weight_seed)
+    model.apply(
+        lambda m: model_utils.weight_bias_init(
+            m=m, kernel_init_fn=kernel_init, bias_init_fn=bias_init
+        )
+    )
 
     model.train()
     optimizer = optim.Adam(
