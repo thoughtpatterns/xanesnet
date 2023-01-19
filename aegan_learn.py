@@ -2,7 +2,7 @@ import torch
 from torch import nn
 
 from model import AEGANTrainer
-from model_utils import weight_init
+import model_utils
 
 
 def train_aegan(x, y, hyperparams, n_epoch):
@@ -40,8 +40,19 @@ def train_aegan(x, y, hyperparams, n_epoch):
 
     model.to(device)
 
-    # Initialise weights
-    model.apply(weight_init)
+    # Model weight & bias initialisation
+    weight_seed = hyperparams["weight_init_seed"]
+    kernel_init = model_utils.WeightInitSwitch().fn(hyperparams["kernel_init"])
+    bias_init = model_utils.WeightInitSwitch().fn(hyperparams["bias_init"])
+    # set seed
+    torch.cuda.manual_seed(
+        weight_seed
+    ) if torch.cuda.is_available() else torch.manual_seed(weight_seed)
+    model.apply(
+        lambda m: model_utils.weight_bias_init(
+            m=m, kernel_init_fn=kernel_init, bias_init_fn=bias_init
+        )
+    )
 
     model.train()
     loss_fn = nn.MSELoss()
