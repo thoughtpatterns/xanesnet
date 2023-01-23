@@ -10,6 +10,7 @@
         "n_g4": 32
     },
     "hyperparams": {
+        "batch_size": 64,
         "n_hl_gen": 2,
         "n_hl_shared": 2,
         "n_hl_dis": 2,
@@ -23,10 +24,6 @@
         "weight_init_seed":2023,
         "kernel_init": "xavier_uniform",
         "bias_init": "zeros"
-    },
-    "kfold_params": {
-        "n_splits": 5,
-        "n_repeats": 5
     },
     "seed": 2021,
     "epochs": 10,

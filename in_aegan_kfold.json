@@ -10,6 +10,7 @@
         "n_g4": 32
     },
     "hyperparams": {
+        "batch_size": 64,
         "n_hl_gen": 2,
         "n_hl_shared": 2,
         "n_hl_dis": 2,
