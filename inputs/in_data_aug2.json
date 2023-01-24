@@ -11,7 +11,8 @@
     "data_params":{
         "augment" : true,
         "augment_type" : "random_combination",
-        "augment_params" : {"augment_mult" : 2}
+        "augment_mult" : 2,
+        "augment_params" : {}
     },
     "hyperparams": {
         "batch_size": 64,
