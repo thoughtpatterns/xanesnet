@@ -225,7 +225,7 @@ def main(
         if data_params['augment']:
             data_aug_params = data_params["augment_params"]
             n_aug_samples = (
-                np.multiply(n_samples, data_aug_params["augment_mult"]) - n_samples
+                np.multiply(n_samples, data_params["augment_mult"]) - n_samples
             )
             print(">> ...AUGMENTING DATA...\n")
             if data_params["augment_type"].lower() == "random_noise":
