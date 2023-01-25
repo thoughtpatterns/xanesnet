@@ -43,22 +43,22 @@ class LossSwitch:
         default = nn.MSELoss()
         return getattr(self, f"loss_function_{loss_fn.lower()}", lambda: default)(*args)
 
-    def loss_function_mse(self,*args):
+    def loss_function_mse(self, *args):
         return nn.MSELoss(*args)
 
-    def loss_function_bce(self,*args):
+    def loss_function_bce(self, *args):
         return nn.BCEWithLogitsLoss(*args)
 
-    def loss_function_emd(self,*args):
+    def loss_function_emd(self, *args):
         return EMDLoss(*args)
 
-    def loss_function_cosine(self,*args):
+    def loss_function_cosine(self, *args):
         return nn.CosineEmbeddingLoss(*args)
 
-    def loss_function_l1(self,*args):
+    def loss_function_l1(self, *args):
         return nn.L1Loss(*args)
 
-    def loss_function_wcc(self,*args):
+    def loss_function_wcc(self, *args):
         return WCCLoss(*args)
 
 
@@ -126,13 +126,13 @@ class EMDLoss(nn.Module):
 
 class WCCLoss(nn.Module):
     """
-    Computes the weighted cross-correlation loss between y_pred and y_true based on the 
+    Computes the weighted cross-correlation loss between y_pred and y_true based on the
     method proposed in [1].
     Args:
         gaussianHWHM: Scalar value for full-width-at-half-maximum of Gaussian weight function.
     Reference:
-    [1] Källman, E., Delcey, M.G., Guo, M., Lindh, R. and Lundberg, M., 2020. 
-        "Quantifying similarity for spectra with a large number of overlapping transitions: Examples 
+    [1] Källman, E., Delcey, M.G., Guo, M., Lindh, R. and Lundberg, M., 2020.
+        "Quantifying similarity for spectra with a large number of overlapping transitions: Examples
         from soft X-ray spectroscopy." Chemical Physics, 535, p.110786.
     """
 
@@ -172,3 +172,70 @@ class WCCLoss(nn.Module):
 
         loss = 1 - torch.mean(similarity)
         return loss
+
+
+def model_mode_error(model, mode, model_mode, xyz_shape, xanes_shape):
+
+    from utils import unique_path
+    from pathlib import Path
+
+    for child in model.modules():
+        if type(child).__name__ == "Linear":
+            output_size = child.weight.shape[0]
+            print(output_size)
+
+    if mode == "predict_xyz":
+        input_data = xanes_shape
+        output_data = xyz_shape
+    elif mode == "predict_xanes":
+        input_data = xyz_shape
+        output_data = xanes_shape
+
+    if model_mode == "mlp" or model_mode == "cnn" or model_mode == "ae_cnn":
+        assert (
+            output_size == output_data
+        ), "the model was not train for this, please swap your predict mode"
+    if model_mode == "ae_mlp":
+        assert (
+            output_size == input_data
+        ), "the model was not train for this, please swap your predict mode"
+
+    predict_dir = unique_path(Path("."), "predictions")
+    predict_dir.mkdir()
+
+    return predict_dir
+
+
+def json_check(inp):
+
+    # assert isinstance(
+    #     inp["hyperparams"]["loss"], str
+    # ), "wrong type for loss param in json"
+    assert isinstance(
+        inp["hyperparams"]["activation"], str
+    ), "wrong type for activation param in json"
+
+
+# def json_cnn_check(inp, model):
+#     assert isinstance(
+#         inp["hyperparams"]["loss"], str
+#     ), "wrong type for loss param in json"
+#     assert isinstance(
+#         inp["hyperparams"]["activation"], str
+#     ), "wrong type for activation param in json"
+
+
+def montecarlo_dropout(model, input_data, output_shape):
+
+    model.train()
+    T = 10
+
+    prob_output = np.zeros(output_shape)
+    print(prob_output.shape)
+    for t in range(T):
+        output = model(input_data)
+        prob_output = prob_output + output.cpu().detach().numpy()
+
+    prob_pred = prob_output / T
+
+    return prob_pred
