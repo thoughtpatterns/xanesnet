@@ -53,7 +53,7 @@ class LossSwitch:
         return EMDLoss()
 
     def loss_function_cosine(self, *args):
-        return nn.CosineSimilarity()
+        return CosineSimilarityLoss()
 
     def loss_function_l1(self, *args):
         return nn.L1Loss(*args)
@@ -121,6 +121,18 @@ class EMDLoss(nn.Module):
             torch.square(torch.cumsum(y_true, dim=-1) - torch.cumsum(y_pred, dim=-1)),
             dim=-1,
         ).sum()
+        return loss
+    
+class CosineSimilarityLoss(nn.Module):
+    """
+    Implements Cosine Similarity as loss function
+    """
+
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, y_true, y_pred):
+        loss = torch.mean( nn.CosineSimilarity()(y_pred, y_true) )
         return loss
 
 
