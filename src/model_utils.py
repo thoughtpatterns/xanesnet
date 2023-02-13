@@ -47,13 +47,13 @@ class LossSwitch:
         return nn.MSELoss(*args)
 
     def loss_function_bce(self, *args):
-        return nn.BCEWithLogitsLoss(*args)
+        return nn.BCEWithLogitsLoss()
 
     def loss_function_emd(self, *args):
-        return EMDLoss(*args)
+        return EMDLoss()
 
     def loss_function_cosine(self, *args):
-        return nn.CosineEmbeddingLoss(*args)
+        return nn.CosineSimilarity()
 
     def loss_function_l1(self, *args):
         return nn.L1Loss(*args)
