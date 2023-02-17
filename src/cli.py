@@ -80,7 +80,9 @@ def parse_args(args: list):
 
     predict_p = sub_p.add_parser("predict_xanes")
     predict_p.add_argument("--model_mode", type=str, help="the model", required=True)
-
+    # shap arguments
+    predict_p.add_argument("--run_shap", type=bool, help="SHAP analysis", required=False, default = False)
+    predict_p.add_argument("--shap_nsamples", type=int, help="Number of background samples for SHAP analysis", required=False, default = 50)
     predict_p.add_argument(
         "mdl_dir", type=str, help="path to populated model directory"
     )
@@ -90,6 +92,9 @@ def parse_args(args: list):
 
     predict_p = sub_p.add_parser("predict_xyz")
     predict_p.add_argument("--model_mode", type=str, help="the model", required=True)
+    # shap arguments
+    predict_p.add_argument("--run_shap", type=bool, help="SHAP analysis", required=False, default = False)
+    predict_p.add_argument("--shap_nsamples", type=int, help="Number of background samples for SHAP analysis", required=False, default = 50)
     predict_p.add_argument(
         "mdl_dir", type=str, help="path to populated model directory"
     )
@@ -100,6 +105,9 @@ def parse_args(args: list):
     # Parser for structural and spectral inputs
     predict_p = sub_p.add_parser("predict_aegan")
     predict_p.add_argument("--model_mode", type=str, help="the model", required=True)
+        # shap arguments
+    predict_p.add_argument("--run_shap", type=bool, help="SHAP analysis", required=False, default = False)
+    predict_p.add_argument("--shap_nsamples", type=int, help="Number of background samples for SHAP analysis", required=False, default = 50)
     predict_p.add_argument(
         "mdl_dir", type=str, help="path to populated model directory"
     )
@@ -112,6 +120,9 @@ def parse_args(args: list):
     predict_p_xyz.add_argument(
         "--model_mode", type=str, help="the model", required=True
     )
+    # shap arguments
+    predict_p_xyz.add_argument("--run_shap", type=bool, help="SHAP analysis", required=False, default = False)
+    predict_p_xyz.add_argument("--shap_nsamples", type=int, help="Number of background samples for SHAP analysis", required=False, default = 50)
     predict_p_xyz.add_argument(
         "mdl_dir", type=str, help="path to populated model directory"
     )
@@ -123,6 +134,9 @@ def parse_args(args: list):
     predict_p_xanes.add_argument(
         "--model_mode", type=str, help="the model", required=True
     )
+    # shap arguments
+    predict_p_xanes.add_argument("--run_shap", type=bool, help="SHAP analysis", required=False, default = False)
+    predict_p_xanes.add_argument("--shap_nsamples", type=int, help="Number of background samples for SHAP analysis", required=False, default = 50)
     predict_p_xanes.add_argument(
         "mdl_dir", type=str, help="path to populated model directory"
     )
@@ -209,16 +223,16 @@ def main(args: list):
         learn(args.mode, args.model_mode, **inp, save=args.save)
 
     elif args.mode == "predict_xanes":
-        predict(args.mode, args.model_mode, args.mdl_dir, **inp)
+        predict(args.mode, args.model_mode, args.run_shap, args.shap_nsamples, args.mdl_dir, **inp)
 
     elif args.mode == "predict_xyz":
-        predict(args.mode, args.model_mode, args.mdl_dir, **inp)
+        predict(args.mode, args.model_mode, args.run_shap, args.shap_nsamples, args.mdl_dir, **inp)
 
     elif args.mode == "predict_aegan":
-        predict(args.mode, args.model_mode, args.mdl_dir, inp["x_path"], inp["y_path"])
+        predict(args.mode, args.model_mode, args.run_shap, args.shap_nsamples, args.mdl_dir, inp["x_path"], inp["y_path"])
 
     elif args.mode == "predict_aegan_xanes":
-        predict(args.mode, args.model_mode, args.mdl_dir, inp["x_path"], None)
+        predict(args.mode, args.model_mode, args.run_shap, args.shap_nsamples, args.mdl_dir, inp["x_path"], None)
 
     elif args.mode == "predict_aegan_xyz":
 
@@ -226,7 +240,7 @@ def main(args: list):
         with open(args.inp_f) as f:
             inp = json.load(f)
         print_nested_dict(inp, nested_level=1)
-        predict(args.mode, args.model_mode, args.mdl_dir, None, inp["y_path"])
+        predict(args.mode, args.model_mode, args.run_shap, args.shap_nsamples, args.mdl_dir, None, inp["y_path"])
 
     if "eval" in args.mode:
         print(f">> loading JSON input @ {args.inp_f}\n")
@@ -234,7 +248,7 @@ def main(args: list):
             inp = json.load(f)
         print_nested_dict(inp, nested_level=1)
         print("")
-        eval_model(args.mode, args.mdl_dir, args.model_mode, **inp)
+        eval_model(args.mode, args.mdl_dir, args.run_shap, args.shap_nsamples, args.model_mode, **inp)
 
 
 ################################################################################
