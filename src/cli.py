@@ -25,8 +25,11 @@ import importlib.resources
 
 from argparse import ArgumentParser
 
-from core_learn import main as learn
+from core_data import train_data
+
+# from core_learn import main as learn
 from core_predict import main as predict
+
 from core_eval import main as eval_model
 from utils import print_nested_dict
 from model_utils import json_check
@@ -37,7 +40,6 @@ from model_utils import json_check
 
 
 def parse_args(args: list):
-
     p = ArgumentParser()
 
     sub_p = p.add_subparsers(dest="mode")
@@ -199,7 +201,6 @@ def parse_args(args: list):
 
 
 def main(args: list):
-
     if len(args) == 0:
         sys.exit()
     else:
@@ -213,14 +214,14 @@ def main(args: list):
 
     if args.mode == "train_xyz":
         json_check(inp)
-        learn(args.mode, args.model_mode, **inp, save=args.save)
+        train_data(args.mode, args.model_mode, **inp, save=args.save)
 
     elif args.mode == "train_xanes":
         json_check(inp)
-        learn(args.mode, args.model_mode, **inp, save=args.save)
+        train_data(args.mode, args.model_mode, **inp, save=args.save)
 
     elif args.mode == "train_aegan":
-        learn(args.mode, args.model_mode, **inp, save=args.save)
+        train_data(args.mode, args.model_mode, **inp, save=args.save)
 
     elif args.mode == "predict_xanes":
         predict(args.mode, args.model_mode, args.run_shap, args.shap_nsamples, args.mdl_dir, **inp)
@@ -235,7 +236,6 @@ def main(args: list):
         predict(args.mode, args.model_mode, args.run_shap, args.shap_nsamples, args.mdl_dir, inp["x_path"], None)
 
     elif args.mode == "predict_aegan_xyz":
-
         print(f">> loading JSON input @ {args.inp_f}\n")
         with open(args.inp_f) as f:
             inp = json.load(f)

@@ -30,7 +30,6 @@ class MLP(nn.Module):
         self.fc3 = nn.Sequential(nn.Linear(self.hl_size, self.out_dim))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-
         x = self.fc1(x)
         x = self.fc2(x)
         out = self.fc3(x)
@@ -103,7 +102,6 @@ class CNN(nn.Module):
         self.dense_layer2 = nn.Sequential(nn.Linear(self.hidden_layer, self.out_dim))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-
         x = x.unsqueeze(0)
         x = x.permute(1, 0, 2)
         x = self.conv1(x)
@@ -157,7 +155,6 @@ class AE_mlp(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-
         x = self.encoder_hidden_1(x)
         latent_space = self.encoder_hidden_2(x)
 
@@ -170,7 +167,6 @@ class AE_mlp(nn.Module):
         return recon, pred_y
 
     def predict(self, x: torch.Tensor) -> torch.Tensor:
-
         x = self.encoder_hidden_1(x)
         latent_space = self.encoder_hidden_2(x)
 
@@ -180,7 +176,6 @@ class AE_mlp(nn.Module):
         return pred_y
 
     def reconstruct(self, x: torch.Tensor) -> torch.Tensor:
-
         x = self.encoder_hidden_1(x)
         latent_space = self.encoder_hidden_2(x)
 
@@ -344,7 +339,6 @@ class AE_cnn(nn.Module):
         )
 
     def forward(self, x):
-
         x = x.unsqueeze(0)
         x = x.permute(1, 0, 2)
 
@@ -362,9 +356,7 @@ class AE_cnn(nn.Module):
 
         return recon, pred
 
-
     def predict(self, x):
-
         x = x.unsqueeze(0)
         x = x.permute(1, 0, 2)
 
@@ -378,7 +370,6 @@ class AE_cnn(nn.Module):
         return pred
 
     def reconstruct(self, x):
-
         x = x.unsqueeze(0)
         x = x.permute(1, 0, 2)
 
@@ -516,7 +507,6 @@ class AEGANTrainer(nn.Module):
 
     # Reconstruct and predict spectrum and structure from inputs
     def reconstruct_all_predict_all(self, x_a, x_b):
-
         enc_a = self.gen_a.encode(x_a)
         enc_b = self.gen_b.encode(x_b)
 
@@ -751,3 +741,35 @@ class Dis(nn.Module):
         ones = torch.ones((input_fake.size(0), 1))
         loss = self.loss_fn(out0, ones)
         return loss
+
+
+class EnsembleModel(nn.Module):
+    def __init__(self, models):
+        super(EnsembleModel, self).__init__()
+        self.models = nn.ModuleList(models)
+
+    def forward(self, x):
+        outs = [model(x) for model in self.models]
+        out = torch.stack(outs).mean(dim=0)
+        return out
+
+
+class AutoencoderEnsemble(nn.Module):
+    def __init__(self, models):
+        super(AutoencoderEnsemble, self).__init__()
+        self.models = nn.ModuleList(models)
+
+    def forward(self, x):
+        reconstructions = []
+        predictions = []
+        for model in self.models:
+            # Compute the reconstruction and prediction outputs for each sub-model
+            reconstruction, prediction = model(x)
+            reconstructions.append(reconstruction)
+            predictions.append(prediction)
+
+        # Stack the reconstruction and prediction outputs along a new dimension
+        reconstructions = torch.stack(reconstructions).mean(dim=0)
+        predictions = torch.stack(predictions).mean(dim=0)
+
+        return reconstructions, predictions
