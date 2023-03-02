@@ -125,7 +125,8 @@ class EMDLoss(nn.Module):
             dim=-1,
         ).sum()
         return loss
-    
+
+
 class CosineSimilarityLoss(nn.Module):
     """
     Implements Cosine Similarity as loss function
@@ -135,9 +136,10 @@ class CosineSimilarityLoss(nn.Module):
         super().__init__()
 
     def forward(self, y_true, y_pred):
-        loss = torch.mean( nn.CosineSimilarity()(y_pred, y_true) )
+        loss = torch.mean(nn.CosineSimilarity()(y_pred, y_true))
         return loss
 
+
 class CosineSimilarityLoss(nn.Module):
     """
     Implements Cosine Similarity as loss function
@@ -147,7 +149,7 @@ class CosineSimilarityLoss(nn.Module):
         super().__init__()
 
     def forward(self, y_true, y_pred):
-        loss = torch.mean( nn.CosineSimilarity()(y_pred, y_true) )
+        loss = torch.mean(nn.CosineSimilarity()(y_pred, y_true))
         return loss
 
 
@@ -168,7 +170,6 @@ class WCCLoss(nn.Module):
         self.gaussianHWHM = gaussianHWHM
 
     def forward(self, y_true, y_pred):
-
         n_features = y_true.shape[1]
         n_samples = y_true.shape[0]
 
@@ -202,7 +203,6 @@ class WCCLoss(nn.Module):
 
 
 def model_mode_error(model, mode, model_mode, xyz_shape, xanes_shape):
-
     for child in model.modules():
         if type(child).__name__ == "Linear":
             output_size = child.weight.shape[0]
@@ -243,7 +243,6 @@ def make_dir():
 
 
 def json_check(inp):
-
     # assert isinstance(
     #     inp["hyperparams"]["loss"], str
     # ), "wrong type for loss param in json"
@@ -261,23 +260,50 @@ def json_check(inp):
 #     ), "wrong type for activation param in json"
 
 
-def montecarlo_dropout(model, input_data, output_shape):
-
+def montecarlo_dropout(model, input_data, n_mc):
     model.train()
-    T = 10
 
-    prob_output = np.zeros(output_shape)
-    print(prob_output.shape)
-    for t in range(T):
+    prob_output = []
+
+    input_data = torch.from_numpy(input_data)
+    input_data = input_data.float()
+
+    for t in range(n_mc):
         output = model(input_data)
-        prob_output = prob_output + output.cpu().detach().numpy()
+        prob_output.append(output)
 
-    prob_pred = prob_output / T
+    prob_mean = torch.mean(torch.stack(prob_output), dim=0)
+    prob_var = torch.std(torch.stack(prob_output), dim=0)
 
-    return prob_pred
+    return prob_mean, prob_var
 
 
-def run_shap_analysis(model, predict_dir, data, ids, n_samples = 100, shap_mode = 'predict'):
+def montecarlo_dropout_ae(model, input_data, n_mc):
+    model.train()
+
+    prob_output = []
+    prob_recon = []
+
+    input_data = torch.from_numpy(input_data)
+    input_data = input_data.float()
+
+    for t in range(n_mc):
+        recon, output = model(input_data)
+        prob_output.append(output)
+        prob_recon.append(recon)
+
+    mean_output = torch.mean(torch.stack(prob_output), dim=0)
+    var_output = torch.std(torch.stack(prob_output), dim=0)
+
+    mean_recon = torch.mean(torch.stack(prob_recon), dim=0)
+    var_recon = torch.std(torch.stack(prob_recon), dim=0)
+
+    return mean_output, var_output, mean_recon, var_recon
+
+
+def run_shap_analysis(
+    model, predict_dir, data, ids, n_samples=100, shap_mode="predict"
+):
     """
     Get SHAP values for predictions using random sample of data
     as background samples
@@ -287,7 +313,7 @@ def run_shap_analysis(model, predict_dir, data, ids, n_samples = 100, shap_mode 
 
     n_features = data.shape[1]
 
-    background = data[random.sample(range(data.shape[0]),n_samples )]
+    background = data[random.sample(range(data.shape[0]), n_samples)]
 
     # SHAP analysis
     explainer = shap.DeepExplainer(model, background)
@@ -295,29 +321,32 @@ def run_shap_analysis(model, predict_dir, data, ids, n_samples = 100, shap_mode 
     shap_values = np.reshape(shap_values, (len(shap_values), data.shape[0], n_features))
 
     # Print SHAP as a function of features and molecules
-    importances = np.mean(np.abs(shap_values), axis = 0)
-    importances_nonabs = np.mean(shap_values, axis = 0)
+    importances = np.mean(np.abs(shap_values), axis=0)
+    importances_nonabs = np.mean(shap_values, axis=0)
 
-    overall_imp = np.mean(importances, axis = 0)
-    energy_imp = np.mean(shap_values,axis = 1)
-
+    overall_imp = np.mean(importances, axis=0)
+    energy_imp = np.mean(shap_values, axis=1)
 
     # SHAP as a function of features and molecules
-    for i,id_ in enumerate(ids):
-        with open(shaps_dir / f'{id_}.shap', 'w') as f:
-            f.writelines(map("{} {} {}\n".format, np.arange(n_features), importances[i,:], importances_nonabs[i,:]))
-
+    for i, id_ in enumerate(ids):
+        with open(shaps_dir / f"{id_}.shap", "w") as f:
+            f.writelines(
+                map(
+                    "{} {} {}\n".format,
+                    np.arange(n_features),
+                    importances[i, :],
+                    importances_nonabs[i, :],
+                )
+            )
 
     # SHAP as a function of features, averaged over all molecules
-    with open(shaps_dir / f'overall.shap', 'w') as f:
+    with open(shaps_dir / f"overall.shap", "w") as f:
         f.writelines(map("{} {}\n".format, np.arange(n_features), overall_imp))
 
-
     # SHAP as a function of features and energy grid points
-    energ_dir = shaps_dir / 'energy'
-    energ_dir.mkdir(exist_ok = True)
+    energ_dir = shaps_dir / "energy"
+    energ_dir.mkdir(exist_ok=True)
 
     for i in range(shap_values.shape[0]):
-        with open(energ_dir / f'energy{i}.shap', 'w') as f:
-            f.writelines(map("{} {}\n".format, np.arange(n_features), energy_imp[i,:]))
-
+        with open(energ_dir / f"energy{i}.shap", "w") as f:
+            f.writelines(map("{} {}\n".format, np.arange(n_features), energy_imp[i, :]))

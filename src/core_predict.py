@@ -19,6 +19,7 @@ this program.  If not, see <https://www.gnu.org/licenses/>.
 ############################### LIBRARY IMPORTS ###############################
 ###############################################################################
 
+import os
 import numpy as np
 import pickle as pickle
 import tqdm as tqdm
@@ -31,45 +32,33 @@ from inout import save_xanes
 from utils import unique_path
 from utils import list_filestems
 from utils import linecount
-from structure.rdc import RDC
-from structure.wacsf import WACSF
 from spectrum.xanes import XANES
 
 import torch
 from sklearn.metrics import mean_squared_error
 
-from model_utils import run_shap_analysis
-
-
-def average(lst):
-    for lstNum in range(len(lst)):
-        print(lstNum)
-        for sublistItem in range(len(lst[lstNum])):
-            lst[lstNum] / lst[sublistItem]  # <-- ??
-    print(type(lst))
-    return lst
-
-
-def y_predict_dim(y_predict, ids, model_dir):
-    if y_predict.ndim == 1:
-        if len(ids) == 1:
-            y_predict = y_predict.reshape(-1, y_predict.size)
-        else:
-            y_predict = y_predict.reshape(y_predict.size, -1)
-    print(">> ...predicted Y data!\n")
-
-    with open(model_dir / "dataset.npz", "rb") as f:
-        e = np.load(f)["e"]
-
-    return y_predict, e.flatten()
-
+from predict import average
+from predict import y_predict_dim
+from predict import predict_xanes
+from predict import predict_xyz
 
 ###############################################################################
 ################################ MAIN FUNCTION ################################
 ###############################################################################
 
 
-def main(mode: str, model_mode: str, run_shap: bool, shap_nsamples: int, model_dir: str, x_path: str, y_path: str):
+def main(
+    mode: str,
+    model_mode: str,
+    run_shap: bool,
+    shap_nsamples: int,
+    model_dir: str,
+    x_path: str,
+    y_path: str,
+    monte_carlo: dict = {},
+    bootstrap: dict = {},
+    ensemble: dict = {},
+):
     """
     PREDICT. The model state is restored from a model directory containing
     serialised scaling/pipeline objects and the serialised model, .xyz (X)
@@ -130,272 +119,210 @@ def main(mode: str, model_mode: str, run_shap: bool, shap_nsamples: int, model_d
 
     print(">> ...loaded!\n")
 
-    model = torch.load(model_dir / "model.pt", map_location=torch.device("cpu"))
-    model.eval()
+    if bootstrap["fn"] == "True":
+        from bootstrap_fn import bootstrap_predict
 
-    print("Loaded model from disk")
+        bootstrap_predict(model_dir, mode, model_mode, xyz_data, xanes_data, ids)
 
-    if xyz_path is not None and xanes_path is not None:
-        from model_utils import model_mode_error
+    elif ensemble["fn"] == "True":
+        from ensemble_fn import ensemble_predict
 
-        parent_model_dir, predict_dir = model_mode_error(
-            model, mode, model_mode, xyz_data.shape[1], xanes_data.shape[1]
-        )
+        ensemble_predict(ensemble, model_dir, mode, model_mode, xyz_data, xanes_data)
+
     else:
-        from model_utils import make_dir
-
-        parent_model_dir, predict_dir = make_dir()
-
-    if model_mode == "mlp" or model_mode == "cnn":
-
-        if mode == "predict_xyz":
-
-            print("predict xyz structure")
-
-            xanes = torch.from_numpy(xanes_data)
-            xanes = xanes.float()
-
-            pred_xyz = model(xanes)
-
-            y = xyz_data
-            y_predict = pred_xyz
-
-            # from model_utils import montecarlo_dropout
-
-            # prob_pred = montecarlo_dropout(
-            #     model, xanes, pred_xyz.detach().numpy().shape
-            # )
-
-        elif mode == "predict_xanes":
-
-            print("predict xanes spectrum")
-
-            xyz = torch.from_numpy(xyz_data)
-            xyz = xyz.float()
-
-            pred_xanes = model(xyz)
-
-            y = xanes_data
-            y_predict = pred_xanes
-
-        print("MSE y to y pred : ", mean_squared_error(y, y_predict.detach().numpy()))
-
-        y_predict, e = y_predict_dim(y_predict, ids, model_dir)
-
-        from plot import plot_predict
-
-        plot_predict(ids, y, y_predict, e, predict_dir, mode)
-        # plot_predict(ids, y, prob_pred, e, predict_dir, mode)
-
-    elif model_mode == "ae_mlp" or model_mode == "ae_cnn":
-
-        if mode == "predict_xyz":
-
-            print("predict xyz structure")
-
-            print(model)
-            print(xanes_data.shape)
-            xanes = torch.from_numpy(xanes_data)
-            xanes = xanes.float()
-
-            recon_xanes, pred_xyz = model(xanes)
-
-            x = xanes
-            x_recon = recon_xanes
-            y = xyz_data
-            y_predict = pred_xyz
-
-        elif mode == "predict_xanes":
-
-            print("predict xanes spectrum")
-            print(model)
-            print(xyz_data.shape)
-
-            xyz = torch.from_numpy(xyz_data)
-            xyz = xyz.float()
-
-            recon_xyz, pred_xanes = model(xyz)
-
-            x = xyz
-            x_recon = recon_xyz
-            y = xanes_data
-            y_predict = pred_xanes
-
-        print("MSE x to x recon : ", mean_squared_error(x, x_recon.detach().numpy()))
-        print("MSE y to y pred : ", mean_squared_error(y, y_predict.detach().numpy()))
-
-        y_predict, e = y_predict_dim(y_predict, ids, model_dir)
-        from plot import plot_ae_predict
-
-        plot_ae_predict(ids, y, y_predict, x, x_recon, e, predict_dir, mode)
-
-    elif model_mode == "aegan_mlp" or model_mode == "aegan_cnn":
-
-        # Convert to float
-        if xyz_path is not None:
-            x = torch.tensor(xyz_data).float()
-        if xanes_path is not None:
-            y = torch.tensor(xanes_data).float()
-
-        print(">> Reconstructing and predicting data with neural net...")
-
-        if xyz_path is not None:
-            x_recon = model.reconstruct_structure(x).detach().numpy()
-            y_pred = model.predict_spectrum(x).detach().numpy()
-            print(
-                f">> Reconstruction error (structure) = {mean_squared_error(x,x_recon):.4f}"
-            )
-
-        if xanes_path is not None:
-            y_recon = model.reconstruct_spectrum(y).detach().numpy()
-            x_pred = model.predict_structure(y).detach().numpy()
-            print(
-                f">> Reconstruction error (spectrum) =  {mean_squared_error(y,y_recon):.4f}"
-            )
-
-        if xyz_path is not None and xanes_path is not None:  # Get prediction errors
-            print(
-                f">> Prediction error (structure) =     {mean_squared_error(x,x_pred):.4f}"
-            )
-            print(
-                f">> Prediction error (spectrum) =      {mean_squared_error(y,y_pred):.4f}"
-            )
-
-        print(">> ...done!\n")
-
-        print(">> Saving predictions and reconstructions...")
-
-        if xyz_path is not None:
-            with open(model_dir / "dataset.npz", "rb") as f:
-                e = np.load(f)["e"]
-
-            for id_, y_pred_ in tqdm.tqdm(zip(ids, y_pred)):
-                with open(predict_dir / f"spectrum_{id_}.txt", "w") as f:
-                    save_xanes(f, XANES(e.flatten(), y_pred_))
-
-        # TODO: save structure in .xyz format?
-        if xanes_path is not None:
-            for id_, x_pred_ in tqdm.tqdm(zip(ids, x_pred)):
-                with open(predict_dir / f"structure_{id_}.txt", "w") as f:
-                    np.savetxt(f, x_pred_)
-
-        print(">> ...done!\n")
-
-        print(">> Plotting reconstructions and predictions...")
-
-        plots_dir = unique_path(Path(parent_model_dir), "plots_predictions")
-        plots_dir.mkdir()
+        model = torch.load(model_dir / "model.pt", map_location=torch.device("cpu"))
+        model.eval()
+        print("Loaded model from disk")
 
         if xyz_path is not None and xanes_path is not None:
-            from plot import plot_aegan_predict
+            from model_utils import model_mode_error
 
-            plot_aegan_predict(ids, x, y, x_recon, y_recon, x_pred, y_pred, plots_dir)
+            parent_model_dir, predict_dir = model_mode_error(
+                model, mode, model_mode, xyz_data.shape[1], xanes_data.shape[1]
+            )
+        else:
+            from model_utils import make_dir
 
-        elif x_path is not None:
-            from plot import plot_aegan_spectrum
-
-            plot_aegan_spectrum(ids, x, x_recon, y_pred, plots_dir)
-
-        elif y_path is not None:
-            from plot import plot_aegan_structure
-
-            plot_aegan_structure(ids, y, y_recon, x_pred, plots_dir)
-
-        if x_path is not None and y_path is not None:
-
-            print(">> Plotting and saving cosine-similarity...")
-
-            analysis_dir = unique_path(Path(parent_model_dir), "analysis")
-            analysis_dir.mkdir()
-
-            from plot import plot_cosine_similarity
-
-            plot_cosine_similarity(x, y, x_recon, y_recon, x_pred, y_pred, analysis_dir)
-
-            print("...saved!\n")
-
-
-    if run_shap:
+            parent_model_dir, predict_dir = make_dir()
 
         if model_mode == "mlp" or model_mode == "cnn":
+            if mode == "predict_xyz":
+                xyz_predict = predict_xyz(xanes_data, model)
 
-            if mode == 'predict_xanes':
-                data = xyz_data
+                x = xanes_data
+                y = xyz_data
+                y_predict = xyz_predict
 
-            elif mode == 'predict_xyz':
-                data = xanes_data
+            elif mode == "predict_xanes":
+                xanes_predict = predict_xanes(xyz_data, model)
 
-            data = torch.from_numpy(data).float()
+                x = xyz_data
+                y = xanes_data
+                y_predict = xanes_predict
 
-            print('>> Performing SHAP analysis on predicted data...')
-            run_shap_analysis(model, predict_dir, data, ids, shap_nsamples)
+            print(
+                "MSE y to y pred : ",
+                mean_squared_error(y, y_predict.detach().numpy()),
+            )
+            y_predict, e = y_predict_dim(y_predict, ids, model_dir)
 
+            if monte_carlo["mc_fn"] == "True":
+                from montecarlo_fn import montecarlo_dropout
+
+                data_compress = {"ids": ids, "y": y, "y_predict": y_predict, "e": e}
+                montecarlo_dropout(
+                    model, x, monte_carlo["mc_iter"], data_compress, predict_dir, mode
+                )
+
+            else:
+                from plot import plot_predict
+
+                plot_predict(ids, y, y_predict, e, predict_dir, mode)
 
         elif model_mode == "ae_mlp" or model_mode == "ae_cnn":
+            if mode == "predict_xyz":
+                recon_xanes, pred_xyz = predict_xyz(xanes_data, model)
 
-            if mode == "predict_xanes":
-                # Redefine forward function
-                print('>> Performing SHAP analysis on predicted data...')
-                model.forward = model.predict
-                data = xyz_data
-                data = torch.from_numpy(data).float()
-                run_shap_analysis(model, predict_dir, data, ids, shap_nsamples, shap_mode = 'predict')
+                x = xanes_data
+                x_recon = recon_xanes
+                y = xyz_data
+                y_predict = pred_xyz
 
-                print('>> Performing SHAP analysis on reconstructed data...')
-                model.forward = model.reconstruct
-                data = xyz_data
-                data = torch.from_numpy(data).float()
-                run_shap_analysis(model, predict_dir, data, ids, shap_nsamples, shap_mode = 'reconstruct')
+            elif mode == "predict_xanes":
+                recon_xyz, pred_xanes = predict_xanes(xyz_data, model)
 
+                x = xyz_data
+                x_recon = recon_xyz
+                y = xanes_data
+                y_predict = pred_xanes
 
-            elif mode == 'predict_xyz':
-                print('>> Performing SHAP analysis on predicted data...')
-                model.forward = model.predict
-                data = xanes_data
-                data = torch.from_numpy(data).float()
-                run_shap_analysis(model, predict_dir, data, ids, shap_nsamples, shap_mode = 'predict')
+            print(
+                "MSE x to x recon : ",
+                mean_squared_error(x, x_recon.detach().numpy()),
+            )
+            print(
+                "MSE y to y pred : ",
+                mean_squared_error(y, y_predict.detach().numpy()),
+            )
 
-                print('>> Performing SHAP analysis on reconstructed data...')
-                model.foward = model.reconstruct
-                data = xanes_data
-                data = torch.from_numpy(data).float()
-                run_shap_analysis(model, predict_dir, data, ids, shap_nsamples, shap_mode = 'reconstruct')
+            if monte_carlo["mc_fn"] == "True":
+                from montecarlo_fn import montecarlo_dropout_ae
 
+                data_compress = {
+                    "ids": ids,
+                    "y": y,
+                    "y_predict": y_predict,
+                    "e": e,
+                    "x": x,
+                    "x_recon": x_recon,
+                }
+                montecarlo_dropout_ae(
+                    model, x, monte_carlo["mc_iter"], data_compress, predict_dir, mode
+                )
+
+            else:
+                y_predict, e = y_predict_dim(y_predict, ids, model_dir)
+                from plot import plot_ae_predict
+
+                plot_ae_predict(ids, y, y_predict, x, x_recon, e, predict_dir, mode)
 
         elif model_mode == "aegan_mlp" or model_mode == "aegan_cnn":
+            # Convert to float
+            if xyz_path is not None:
+                x = torch.tensor(xyz_data).float()
+            if xanes_path is not None:
+                y = torch.tensor(xanes_data).float()
 
-            if mode == "predict_xanes":
-                print('>> Performing SHAP analysis on predicted data...')
-                model.forward = model.predict_spectrum
-                data = xyz_data
-                data = torch.from_numpy(data).float()
-                run_shap_analysis(model, predict_dir, data, ids, shap_nsamples, shap_mode = 'predict')
+            print(">> Reconstructing and predicting data with neural net...")
 
-                print('>> Performing SHAP analysis on reconstructed data...')
-                model.forward = model.reconstruct_structure
-                data = xyz_data
-                data = torch.from_numpy(data).float()
-                run_shap_analysis(model, predict_dir, data, ids, shap_nsamples, shap_mode = 'reconstruct')
+            if xyz_path is not None:
+                x_recon = model.reconstruct_structure(x).detach().numpy()
+                y_pred = model.predict_spectrum(x).detach().numpy()
+                print(
+                    f">> Reconstruction error (structure) = {mean_squared_error(x,x_recon):.4f}"
+                )
 
-            elif mode == 'predict_xyz':
-                print('>> Performing SHAP analysis on predicted data...')
-                model.forward = model.predict_structure
-                data = xanes_data
-                data = torch.from_numpy(data).float()
-                run_shap_analysis(model, predict_dir, data, ids, shap_nsamples, shap_mode = 'predict')
+            if xanes_path is not None:
+                y_recon = model.reconstruct_spectrum(y).detach().numpy()
+                x_pred = model.predict_structure(y).detach().numpy()
+                print(
+                    f">> Reconstruction error (spectrum) =  {mean_squared_error(y,y_recon):.4f}"
+                )
 
-                print('>> Performing SHAP analysis on reconstructed data...')
-                model.forward = model.reconstruct_spectrum
-                data = xanes_data
-                data = torch.from_numpy(data).float()
-                run_shap_analysis(model, predict_dir, data, ids, shap_nsamples, shap_mode = 'reconstruct')
+            if xyz_path is not None and xanes_path is not None:  # Get prediction errors
+                print(
+                    f">> Prediction error (structure) =     {mean_squared_error(x,x_pred):.4f}"
+                )
+                print(
+                    f">> Prediction error (spectrum) =      {mean_squared_error(y,y_pred):.4f}"
+                )
 
+            print(">> ...done!\n")
 
+            print(">> Saving predictions and reconstructions...")
 
-        
+            if xyz_path is not None:
+                with open(model_dir / "dataset.npz", "rb") as f:
+                    e = np.load(f)["e"]
 
-        
+                for id_, y_pred_ in tqdm.tqdm(zip(ids, y_pred)):
+                    with open(predict_dir / f"spectrum_{id_}.txt", "w") as f:
+                        save_xanes(f, XANES(e.flatten(), y_pred_))
 
+            # TODO: save structure in .xyz format?
+            if xanes_path is not None:
+                for id_, x_pred_ in tqdm.tqdm(zip(ids, x_pred)):
+                    with open(predict_dir / f"structure_{id_}.txt", "w") as f:
+                        np.savetxt(f, x_pred_)
 
+            print(">> ...done!\n")
 
-    return 0
+            print(">> Plotting reconstructions and predictions...")
+
+            plots_dir = unique_path(Path(parent_model_dir), "plots_predictions")
+            plots_dir.mkdir()
+
+            if xyz_path is not None and xanes_path is not None:
+                from plot import plot_aegan_predict
+
+                plot_aegan_predict(
+                    ids, x, y, x_recon, y_recon, x_pred, y_pred, plots_dir
+                )
+
+            elif x_path is not None:
+                from plot import plot_aegan_spectrum
+
+                plot_aegan_spectrum(ids, x, x_recon, y_pred, plots_dir)
+
+            elif y_path is not None:
+                from plot import plot_aegan_structure
+
+                plot_aegan_structure(ids, y, y_recon, x_pred, plots_dir)
+
+            if x_path is not None and y_path is not None:
+                print(">> Plotting and saving cosine-similarity...")
+
+                analysis_dir = unique_path(Path(parent_model_dir), "analysis")
+                analysis_dir.mkdir()
+
+                from plot import plot_cosine_similarity
+
+                plot_cosine_similarity(
+                    x, y, x_recon, y_recon, x_pred, y_pred, analysis_dir
+                )
+
+                print("...saved!\n")
+
+        if run_shap:
+            from shap_analysis import shap
+
+            shap(
+                model_mode,
+                mode,
+                xyz_data,
+                xanes_data,
+                model,
+                predict_dir,
+                ids,
+                shap_nsamples,
+            )
