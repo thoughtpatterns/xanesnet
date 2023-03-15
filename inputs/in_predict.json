@@ -9,7 +9,7 @@
         "fn": "False"
     },
     "ensemble": {
-        "fn": "False",
+        "fn": "True",
         "combine": "weight"
     }
 }

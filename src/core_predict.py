@@ -20,30 +20,19 @@ this program.  If not, see <https://www.gnu.org/licenses/>.
 ###############################################################################
 
 import os
-import numpy as np
 import pickle as pickle
-import tqdm as tqdm
-
 from pathlib import Path
 
-from inout import load_xyz
-from inout import load_xanes
-from inout import save_xanes
-from utils import unique_path
-from utils import list_filestems
-from utils import linecount
-from spectrum.xanes import XANES
-
+import numpy as np
 import torch
+import tqdm as tqdm
 from sklearn.metrics import mean_squared_error
 
-from predict import average
-from predict import y_predict_dim
-from predict import predict_xanes
-from predict import predict_xyz
-
 import data_transform
-
+from inout import load_xanes, load_xyz, save_xanes
+from predict import average, predict_xanes, predict_xyz, y_predict_dim
+from spectrum.xanes import XANES
+from utils import linecount, list_filestems, unique_path
 
 ###############################################################################
 ################################ MAIN FUNCTION ################################
@@ -61,6 +50,7 @@ def main(
     monte_carlo: dict = {},
     bootstrap: dict = {},
     ensemble: dict = {},
+    plot_save: bool = False,
     fourier_transform: bool = False,
 ):
     """
@@ -83,7 +73,8 @@ def main(
     xanes_path = Path(y_path) if y_path is not None else None
 
     if xyz_path is not None and xanes_path is not None:
-        ids = list(set(list_filestems(xyz_path)) & set(list_filestems(xanes_path)))
+        ids = list(set(list_filestems(xyz_path)) &
+                   set(list_filestems(xanes_path)))
     elif xyz_path is None:
         ids = list(set(list_filestems(xanes_path)))
     elif xanes_path is None:
@@ -91,6 +82,7 @@ def main(
 
     ids.sort()
 
+    print(model_dir)
     with open(model_dir / "descriptor.pickle", "rb") as f:
         descriptor = pickle.load(f)
 
@@ -126,15 +118,18 @@ def main(
     if bootstrap["fn"] == "True":
         from bootstrap_fn import bootstrap_predict
 
-        bootstrap_predict(model_dir, mode, model_mode, xyz_data, xanes_data, ids, fourier_transform)
+        bootstrap_predict(model_dir, mode, model_mode, xyz_data,
+                          xanes_data, ids, plot_save, fourier_transform)
 
     elif ensemble["fn"] == "True":
         from ensemble_fn import ensemble_predict
 
-        ensemble_predict(ensemble, model_dir, mode, model_mode, xyz_data, xanes_data, fourier_transform)
+        ensemble_predict(ensemble, model_dir, mode, model_mode,
+                         xyz_data, xanes_data, plot_save, fourier_transform)
 
     else:
-        model = torch.load(model_dir / "model.pt", map_location=torch.device("cpu"))
+        model = torch.load(model_dir / "model.pt",
+                           map_location=torch.device("cpu"))
         model.eval()
         print("Loaded model from disk")
 
@@ -158,7 +153,8 @@ def main(
             if mode == "predict_xyz":
 
                 if fourier_transform:
-                    xanes_data = data_transform.fourier_transform_data(xanes_data)
+                    xanes_data = data_transform.fourier_transform_data(
+                        xanes_data)
 
                 xyz_predict = predict_xyz(xanes_data, model)
 
@@ -174,8 +170,8 @@ def main(
                 y_predict = xanes_predict
 
                 if fourier_transform:
-                    y_predict = data_transform.inverse_fourier_transform_data(y_predict)
-
+                    y_predict = data_transform.inverse_fourier_transform_data(
+                        y_predict)
 
             print(
                 "MSE y to y pred : ",
@@ -186,15 +182,17 @@ def main(
             if monte_carlo["mc_fn"] == "True":
                 from montecarlo_fn import montecarlo_dropout
 
-                data_compress = {"ids": ids, "y": y, "y_predict": y_predict, "e": e}
+                data_compress = {"ids": ids, "y": y,
+                                 "y_predict": y_predict, "e": e}
                 montecarlo_dropout(
                     model, x, monte_carlo["mc_iter"], data_compress, predict_dir, mode
                 )
 
             else:
-                from plot import plot_predict
+                if plot_save:
+                    from plot import plot_predict
 
-                plot_predict(ids, y, y_predict, e, predict_dir, mode)
+                    plot_predict(ids, y, y_predict, e, predict_dir, mode)
 
         elif model_mode == "ae_mlp" or model_mode == "ae_cnn":
             if mode == "predict_xyz":
@@ -203,15 +201,17 @@ def main(
                 y = xyz_data
 
                 if fourier_transform:
-                    xanes_data = data_transform.fourier_transform_data(xanes_data)
+                    xanes_data = data_transform.fourier_transform_data(
+                        xanes_data)
 
                 recon_xanes, pred_xyz = predict_xyz(xanes_data, model)
-                
+
                 x_recon = recon_xanes
                 y_predict = pred_xyz
 
                 if fourier_transform:
-                    x_recon = data_transform.inverse_fourier_transform_data(x_recon)
+                    x_recon = data_transform.inverse_fourier_transform_data(
+                        x_recon)
 
             elif mode == "predict_xanes":
                 recon_xyz, pred_xanes = predict_xanes(xyz_data, model)
@@ -222,7 +222,8 @@ def main(
                 y_predict = pred_xanes
 
                 if fourier_transform:
-                    y_predict = data_transform.inverse_fourier_transform_data(y_predict)
+                    y_predict = data_transform.inverse_fourier_transform_data(
+                        y_predict)
 
             print(
                 "MSE x to x recon : ",
@@ -250,9 +251,11 @@ def main(
 
             else:
                 y_predict, e = y_predict_dim(y_predict, ids, model_dir)
-                from plot import plot_ae_predict
+                if plot_save == "True":
+                    from plot import plot_ae_predict
 
-                plot_ae_predict(ids, y, y_predict, x, x_recon, e, predict_dir, mode)
+                    plot_ae_predict(ids, y, y_predict, x,
+                                    x_recon, e, predict_dir, mode)
 
         elif model_mode == "aegan_mlp" or model_mode == "aegan_cnn":
             # Convert to float
@@ -270,7 +273,8 @@ def main(
                     f">> Reconstruction error (structure) = {mean_squared_error(x,x_recon):.4f}"
                 )
                 if fourier_transform:
-                    y_pred = data_transform.inverse_fourier_transform_data(y_pred)
+                    y_pred = data_transform.inverse_fourier_transform_data(
+                        y_pred)
 
                 y_pred = y_pred.detach().numpy()
 
@@ -280,12 +284,13 @@ def main(
                     z = data_transform.fourier_transform_data(xanes_data)
                     z = torch.tensor(z).float()
                     y_recon = model.reconstruct_spectrum(z)
-                    y_recon = data_transform.inverse_fourier_transform_data(y_recon).detach().numpy()
+                    y_recon = data_transform.inverse_fourier_transform_data(
+                        y_recon).detach().numpy()
                     x_pred = model.predict_structure(z).detach().numpy()
                 else:
                     y_recon = model.reconstruct_spectrum(y).detach().numpy()
                     x_pred = model.predict_structure(y).detach().numpy()
-    
+
                 print(
                     f">> Reconstruction error (spectrum) =  {mean_squared_error(y,y_recon):.4f}"
                 )
@@ -320,39 +325,42 @@ def main(
 
             print(">> Plotting reconstructions and predictions...")
 
-            plots_dir = unique_path(Path(parent_model_dir), "plots_predictions")
-            plots_dir.mkdir()
+            if plot_save:
+                plots_dir = unique_path(
+                    Path(parent_model_dir), "plots_predictions")
+                plots_dir.mkdir()
 
-            if xyz_path is not None and xanes_path is not None:
-                from plot import plot_aegan_predict
+                if xyz_path is not None and xanes_path is not None:
+                    from plot import plot_aegan_predict
 
-                plot_aegan_predict(
-                    ids, x, y, x_recon, y_recon, x_pred, y_pred, plots_dir
-                )
+                    plot_aegan_predict(
+                        ids, x, y, x_recon, y_recon, x_pred, y_pred, plots_dir
+                    )
 
-            elif x_path is not None:
-                from plot import plot_aegan_spectrum
+                elif x_path is not None:
+                    from plot import plot_aegan_spectrum
 
-                plot_aegan_spectrum(ids, x, x_recon, y_pred, plots_dir)
+                    plot_aegan_spectrum(ids, x, x_recon, y_pred, plots_dir)
 
-            elif y_path is not None:
-                from plot import plot_aegan_structure
+                elif y_path is not None:
+                    from plot import plot_aegan_structure
 
-                plot_aegan_structure(ids, y, y_recon, x_pred, plots_dir)
+                    plot_aegan_structure(ids, y, y_recon, x_pred, plots_dir)
 
-            if x_path is not None and y_path is not None:
-                print(">> Plotting and saving cosine-similarity...")
+                if x_path is not None and y_path is not None:
+                    print(">> Plotting and saving cosine-similarity...")
 
-                analysis_dir = unique_path(Path(parent_model_dir), "analysis")
-                analysis_dir.mkdir()
+                    analysis_dir = unique_path(
+                        Path(parent_model_dir), "analysis")
+                    analysis_dir.mkdir()
 
-                from plot import plot_cosine_similarity
+                    from plot import plot_cosine_similarity
 
-                plot_cosine_similarity(
-                    x, y, x_recon, y_recon, x_pred, y_pred, analysis_dir
-                )
+                    plot_cosine_similarity(
+                        x, y, x_recon, y_recon, x_pred, y_pred, analysis_dir
+                    )
 
-                print("...saved!\n")
+                    print("...saved!\n")
 
         if run_shap:
             from shap_analysis import shap
