@@ -27,16 +27,12 @@ from inout import save_xyz
 from inout import load_xanes
 from inout import save_xanes
 
-# from inout import load_pipeline
-# from inout import save_pipeline
 from utils import unique_path
 from utils import list_filestems
 from utils import linecount
 from structure.rdc import RDC
 from structure.wacsf import WACSF
 from spectrum.xanes import XANES
-
-# from tensorflow.keras.models import model_from_json
 
 import torch
 from sklearn.metrics import mean_squared_error
