@@ -1,3 +1,5 @@
+import model_utils
+from sklearn.model_selection import RepeatedKFold
 import time
 import torch
 import numpy as np
@@ -22,7 +24,17 @@ def kfold_init(kfold_params, rng):
 
 
 def kfold_train(
-    x, y, kfold_params, rng, exp_name, model_mode, hyperparams, epochs, weight_seed
+    x,
+    y,
+    kfold_params,
+    rng,
+    exp_name,
+    model_mode,
+    hyperparams,
+    epochs,
+    weight_seed,
+    lr_scheduler,
+    scheduler_param,
 ):
     kfold_spooler, fit_time, kfold_loss_fn, prev_score = kfold_init(kfold_params, rng)
     # K-fold Cross Validation model evaluation
@@ -40,6 +52,8 @@ def kfold_train(
             hyperparams,
             epochs,
             weight_seed,
+            lr_scheduler,
+            scheduler_param,
         )
         train_score.append(score)
         fit_time.append(time.time() - start)
@@ -60,12 +74,17 @@ def kfold_train(
     return result, best_model
 
 
-from sklearn.model_selection import RepeatedKFold
-import model_utils
-
-
 def kfold_ae_train(
-    x, y, kfold_params, rng, exp_name, model_mode, hyperparams, epochs, weight_seed
+    x,
+    y,
+    kfold_params,
+    rng,
+    exp_name,
+    model_mode,
+    hyperparams,
+    epochs,
+    weight_seed,
+    lr_scheduler,
 ):
     kfold_spooler, fit_time, kfold_loss_fn, prev_score = kfold_init(kfold_params, rng)
     train_score = []
@@ -83,6 +102,7 @@ def kfold_ae_train(
             hyperparams,
             epochs,
             weight_seed,
+            lr_scheduler,
         )
         train_score.append(score)
         fit_time.append(time.time() - start)
@@ -109,7 +129,17 @@ def kfold_ae_train(
 
 
 def kfold_aegan_train(
-    xyz, xanes, kfold_params, rng, exp_name, model_mode, hyperparams, epochs
+    xyz,
+    xanes,
+    kfold_params,
+    rng,
+    exp_name,
+    model_mode,
+    hyperparams,
+    epochs,
+    lr_scheduler,
+    scheduler_param,
+    weight_seed,
 ):
     kfold_spooler, fit_time, kfold_loss_fn, prev_score = kfold_init(kfold_params, rng)
     # K-fold Cross Validation model evaluation
@@ -123,7 +153,14 @@ def kfold_aegan_train(
         # Training
         start = time.time()
         model, score = aegan_train(
-            xyz[train_index], xanes[train_index], exp_name, hyperparams, epochs
+            xyz[train_index],
+            xanes[train_index],
+            exp_name,
+            hyperparams,
+            epochs,
+            lr_scheduler,
+            scheduler_param,
+            weight_seed,
         )
         train_score.append(score["train_loss"][-1])
         fit_time.append(time.time() - start)

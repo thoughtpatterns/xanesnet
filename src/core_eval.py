@@ -41,13 +41,7 @@ def main(
     mode: str,
     model_dir: str,
     model_mode: str,
-    x_train_path: str,
-    y_train_path: str,
-    x_test_path: str,
-    y_test_path: str,
-    test_params: dict = {},
-    save_tensorboard: bool = True,
-    seed: int = None,
+    config,
 ):
     # ---------- load model ----------#
     model_dir = Path(model_dir)
@@ -62,8 +56,8 @@ def main(
 
     # ---------- Load training data ----------#
 
-    x_train_path = Path(x_train_path)
-    y_train_path = Path(y_train_path)
+    x_train_path = Path(config["x_train_path"])
+    y_train_path = Path(config["y_train_path"])
 
     train_ids = list(
         set(list_filestems(x_train_path)) & set(list_filestems(y_train_path))
@@ -89,8 +83,8 @@ def main(
 
     # ---------- Load test data ----------#
 
-    x_test_path = Path(x_test_path)
-    y_test_path = Path(y_test_path)
+    x_test_path = Path(config["x_test_path"])
+    y_test_path = Path(config["y_test_path"])
 
     test_ids = list(set(list_filestems(x_test_path)) & set(list_filestems(y_test_path)))
     test_ids.sort()
@@ -146,7 +140,7 @@ def main(
     for (
         test_name,
         run_test,
-    ) in test_params.items():
+    ) in config["test_params"].items():
         if run_test:
             check = modeltest.run(test_name)
             print(f">> Test {test_name:20}: {check}")
