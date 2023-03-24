@@ -1,17 +1,16 @@
 import os
+import pickle
 import tempfile
 import time
 from datetime import datetime
-import pickle
-from sklearn.model_selection import train_test_split
 
-import torch
-from torch import optim
-import torch.optim.lr_scheduler as lr_scheduler
-from torch.utils.tensorboard import SummaryWriter
 import mlflow
 import mlflow.pytorch
-
+import torch
+import torch.optim.lr_scheduler as lr_scheduler
+from sklearn.model_selection import train_test_split
+from torch import optim
+from torch.utils.tensorboard import SummaryWriter
 
 import model_utils
 
@@ -35,13 +34,21 @@ def log_scalar(name, value, epoch):
     mlflow.log_metric(name, value)
 
 
-def train(x, y, exp_name, model_mode, hyperparams, n_epoch, weight_seed):
+def train(
+    x,
+    y,
+    exp_name,
+    model_mode,
+    hyperparams,
+    n_epoch,
+    weight_seed,
+    scheduler_lr,
+):
     EXPERIMENT_NAME = f"{exp_name}"
     RUN_NAME = f"run_{datetime.today()}"
 
     try:
-        EXPERIMENT_ID = mlflow.get_experiment_by_name(
-            EXPERIMENT_NAME).experiment_id
+        EXPERIMENT_ID = mlflow.get_experiment_by_name(EXPERIMENT_NAME).experiment_id
     except:
         EXPERIMENT_ID = mlflow.create_experiment(EXPERIMENT_NAME)
 
@@ -117,20 +124,12 @@ def train(x, y, exp_name, model_mode, hyperparams, n_epoch, weight_seed):
     )
     optimizer = optim.Adam(model.parameters(), lr=hyperparams["lr"])
 
-    # scheduler = lr_scheduler.LinearLR(
-    #     optimizer, start_factor=1.0, end_factor=0.1, total_iters=(n_epoch * 0.75)
-    # )
-
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.1)
-
-    # scheduler = lr_scheduler.CosineAnnealingWarmRestarts(
-    #     optimizer,
-    #     T_0=n_epoch,
-    #     T_mult=2,
-    #     eta_min=0.005,
-    #     last_epoch=-1,
-    #     verbose=False,
-    # )
+    if scheduler_lr["scheduler"]:
+        scheduler = model_utils.LRScheduler(
+            optimizer,
+            scheduler_type=scheduler_lr["scheduler_type"],
+            params=scheduler_lr["scheduler_param"],
+        )
 
     # Select loss function
     loss_fn = hyperparams["loss"]["loss_fn"]
@@ -145,17 +144,12 @@ def train(x, y, exp_name, model_mode, hyperparams, n_epoch, weight_seed):
         output_dir = dirpath = tempfile.mkdtemp()
 
         for epoch in range(n_epoch):
-            print(f'>>> epoch = {epoch}')
+            print(f">>> epoch = {epoch}")
             model.train()
             running_loss = 0
             for inputs, labels in trainloader:
                 inputs, labels = inputs.to(device), labels.to(device)
                 inputs, labels = inputs.float(), labels.float()
-
-                # print(total_step % n_noise)
-                # if total_step % 20 == 0:
-                #     noise = torch.randn_like(inputs) * 0.3
-                #     inputs = noise + inputs
 
                 optimizer.zero_grad()
                 logps = model(inputs)
@@ -163,7 +157,6 @@ def train(x, y, exp_name, model_mode, hyperparams, n_epoch, weight_seed):
                 loss = criterion(logps, labels)
                 loss.mean().backward()
                 optimizer.step()
-                # total_step += 1
 
                 running_loss += loss.item()
 
@@ -178,19 +171,17 @@ def train(x, y, exp_name, model_mode, hyperparams, n_epoch, weight_seed):
                 loss = criterion(target, labels)
                 valid_loss += loss.item()
 
-            before_lr = optimizer.param_groups[0]["lr"]
-            scheduler.step()
-            after_lr = optimizer.param_groups[0]["lr"]
-            print("Epoch %d: Adam lr %.5f -> %.5f" %
-                  (epoch, before_lr, after_lr))
+            if scheduler_lr["scheduler"]:
+                before_lr = optimizer.param_groups[0]["lr"]
+                scheduler.step()
+                after_lr = optimizer.param_groups[0]["lr"]
+                print("Epoch %d: Adam lr %.5f -> %.5f" % (epoch, before_lr, after_lr))
 
             print("Training loss:", running_loss / len(trainloader))
             print("Validation loss:", valid_loss / len(validloader))
 
             log_scalar("loss/train", (running_loss / len(trainloader)), epoch)
-            log_scalar("loss/validation",
-                       (valid_loss / len(validloader)), epoch)
-        # print("total step =", total_step)
+            log_scalar("loss/validation", (valid_loss / len(validloader)), epoch)
 
         # Upload the TensorBoard event logs as a run artifact
         print("Uploading TensorBoard events as a run artifact...")
