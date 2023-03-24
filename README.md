@@ -40,8 +40,10 @@ pip install mlflow
 
 To train a model, the following command is used:  
 ```python src/cli.py --mode MODE --model_mode MODEL_MODE --inp_f <inputs/in.yaml>```
-To perform inference, the following command is used:
-```python src/cli.py --mode MODE --model_mode MODEL_MODE --mdl <model/model_001> --inp_f <inputs/in.yaml>```
+
+
+To perform inference, the following command is used:    
+```python src/cli.py --mode MODE --model_mode MODEL_MODE --mdl <model/model_001> --inp_f <inputs/in_mlp.yaml>```
 
 Select MODE from the following:  
 `train_xanes`, `train_xyz`, `train_aegan`, `predict_xyz`, `predict_xanes`, `predict_aegan`, `predict_aegan_xanes`, `predict_aegan_xyz` 
@@ -52,7 +54,7 @@ Select MODEL_MODE from the following:
 Input for training and prediction should be given in yaml format. The prediction input file gives the path to the input data. Example input files for training and hyper parameter options can be found in the [inputs](https://github.com/NewcastleRSE/xray-spectroscopy-ml/tree/main/inputs) folder.
 
 #### Example of training and inference. 
-```python src/cli.py --mode train_xanes --model_mode mlp --inp_f inputs/in.yaml```  
+```python src/cli.py --mode train_xanes --model_mode mlp --inp_f inputs/in_mlp.yaml```  
 ```python src/cli.py --mode predict_xyz --model_mode mlp --mdl model/model_dir --inp_f inputs/in_predict.yaml```
 
 
@@ -103,7 +105,7 @@ A T-Test is used to return ```True``` or ```False``` if the model has passed the
 ### Original XANES PyTorch Implementation
 
 <!---
-To run the mlp version call ```model, score = train_mlp(... )``` in the ```core_learn.py``` and run ```python cli.py learn in.yaml```.
+To run the mlp version call ```model, score = train_mlp(... )``` in the ```core_learn.py``` and run ```python cli.py learn in_mlp.yaml```.
 
 To run the cnn version call ```model, score = train_cnn(... )``` in the ```core_learn.py``` and run ```python cli.py learn in_cnn.yaml```.
 --->
@@ -143,10 +145,12 @@ Example model parameters can be found in `in_aegan.yaml`. The user can specify h
 
 The flag ```"True" or "False"``` for bootstrap is in ```inputs/in.yaml```, ```inputs/in_cnn.yaml```, and ```inputs/in_aegan.yaml```. By default, the flag is set to "False".
 
-To run the bootstrap for prediction, run ```python src/cli.py --mode predict_xyz --model_mode xxx --mdl_dir bootstrap/bootstrap_0xx --inp_f inputs/in_predict.yaml```.
+To run the bootstrap for prediction, run   
+```python src/cli.py --mode predict_xyz --model_mode xxx --mdl_dir bootstrap/bootstrap_0xx --inp_f inputs/in_predict.yaml```.
 
 To run ensemble during prediction, change the flag for ensemble in ```inputs/in_predict.yaml``` to "True". Choose how to combine the model by either combining the prediction ```"combine": "prediction"``` or combining the weight ```"combine": "weight"```.
-Run ```python src/cli.py predict_xyz --model_mode xxx --mdl_dir ensemble/ensemble_0xx --inp_finputs/in_predict.yaml```.
+Run   
+```python src/cli.py predict_xyz --model_mode xxx --mdl_dir ensemble/ensemble_0xx --inp_finputs/in_predict.yaml```.
 
 The flag ```"True" or "False"``` for monte-carlo dropout is in ```inputs/in_predict.yaml```. By default, the flag is set to "False".
 
