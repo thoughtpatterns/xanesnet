@@ -67,7 +67,6 @@ def train(
     act_fn = activation_switch.fn(hyperparams["activation"])
 
     if model_eval:
-
         # Data split: train/valid/test
         train_ratio = 0.75
         test_ratio = 0.15
@@ -101,7 +100,6 @@ def train(
     )
 
     if model_eval:
-
         evalset = torch.utils.data.TensorDataset(X_eval, y_eval)
         evalloader = torch.utils.data.DataLoader(
             evalset,
@@ -278,12 +276,14 @@ def train(
         if model_eval:
             import core_eval
 
-            eval_results = core_eval.run_model_eval_tests(model, model_mode, trainloader, validloader, evalloader, n_in, out_dim)
+            eval_results = core_eval.run_model_eval_tests(
+                model, model_mode, trainloader, validloader, evalloader, n_in, out_dim
+            )
 
             # Log results
-            for k,v in eval_results.items():
-                mlflow.log_dict(v,f"{k}.yaml")
-
+            for k, v in eval_results.items():
+                mlflow.log_dict(v, f"{k}.yaml")
+                
     writer.close()
 
     return model, running_loss / len(trainloader)

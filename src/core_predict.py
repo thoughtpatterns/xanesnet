@@ -76,7 +76,6 @@ def main(
 
     ids.sort()
 
-    print(model_dir)
     with open(model_dir / "descriptor.pickle", "rb") as f:
         descriptor = pickle.load(f)
 
@@ -115,6 +114,10 @@ def main(
     print(">> ...loaded!\n")
 
     if config["bootstrap"]:
+        if not str(model_dir).startswith("bootstrap"):
+            raise ValueError(
+                "Invalid bootstrap directory, please use a bootstrap directory or turn of the bootstrap option in yaml file"
+            )
         from bootstrap_fn import bootstrap_predict
 
         bootstrap_predict(
@@ -123,6 +126,7 @@ def main(
             model_mode,
             xyz_data,
             xanes_data,
+            e,
             ids,
             config["plot_save"],
             fourier_transform,
@@ -130,6 +134,10 @@ def main(
         )
 
     elif config["ensemble"]:
+        if not model_dir.startswith("ensemble"):
+            raise ValueError(
+                "Invalid bootstrap directory, please use a bootstrap directory or turn of the bootstrap option in yaml file"
+            )
         from ensemble_fn import ensemble_predict
 
         ensemble_predict(
@@ -139,6 +147,7 @@ def main(
             model_mode,
             xyz_data,
             xanes_data,
+            e,
             config["plot_save"],
             fourier_transform,
             config,
@@ -290,6 +299,7 @@ def main(
 
             else:
                 y_predict, e = y_predict_dim(y_predict, ids, model_dir)
+
                 if save:
                     if mode == "predict_xanes":
                         for id_, y_predict_ in tqdm.tqdm(zip(ids, y_predict)):
