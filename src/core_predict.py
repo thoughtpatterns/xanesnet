@@ -220,6 +220,11 @@ def main(
                                 f.write(
                                     "\n".join(map(str, y_predict_.detach().numpy()))
                                 )
+                        for id_, y_ in tqdm.tqdm(zip(ids, y)):
+                            with open(predict_dir / f"{id_}.wacsf", "w") as f:
+                                f.write(
+                                    "\n".join(map(str, y_))
+                                )
 
                 if config["plot_save"]:
                     from plot import plot_predict
@@ -296,6 +301,11 @@ def main(
                             with open(predict_dir / f"{id_}.txt", "w") as f:
                                 f.write(
                                     "\n".join(map(str, y_predict_.detach().numpy()))
+                                )
+                        for id_, y_ in tqdm.tqdm(zip(ids, y)):
+                            with open(predict_dir / f"{id_}.wacsf", "w") as f:
+                                f.write(
+                                    "\n".join(map(str, y_))
                                 )
 
                 if config["plot_save"]:
