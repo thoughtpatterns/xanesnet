@@ -1,3 +1,18 @@
+"""
+XANESNET
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either Version 3 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
 import numpy as np
 import pickle as pickle
 import tqdm as tqdm
@@ -16,6 +31,9 @@ from utils import linecount
 from utils import list_filestems
 from structure.rdc import RDC
 from structure.wacsf import WACSF
+from structure.soap import SOAP
+from structure.mbtr import MBTR
+from structure.lmbtr import LMBTR
 
 import torch
 import random
@@ -57,14 +75,17 @@ def train_data(
 
             ids.sort()
 
-            descriptors = {"rdc": RDC, "wacsf": WACSF}
+            descriptors = {"rdc": RDC, "wacsf": WACSF, "soap": SOAP, "mbtr": MBTR, "lmbtr": LMBTR}
 
             descriptor = descriptors.get(config["descriptor"]["type"])(
                 **config["descriptor"]["params"]
             )
 
             n_samples = len(ids)
-            n_x_features = descriptor.get_len()
+            if config["descriptor"]["type"] == 'wacsf' or config["descriptor"]["type"] == 'rdc':
+                n_x_features = descriptor.get_len()
+            else:    
+                n_x_features = descriptor.get_number_of_features()
             n_y_features = linecount(xanes_path[n_element] / f"{ids[0]}.txt") - 2
 
             xyz_data = np.full((n_samples, n_x_features), np.nan)
@@ -73,16 +94,53 @@ def train_data(
             print(">> preallocated {}x{} array for Y data...".format(*xanes_data.shape))
             print(">> ...everything preallocated!\n")
 
-            print(">> loading data into array(s)...")
-            for i, id_ in enumerate(tqdm.tqdm(ids)):
-                element_label.append(element_name)
-                with open(xyz_path[n_element] / f"{id_}.xyz", "r") as f:
-                    atoms = load_xyz(f)
-                xyz_data[i, :] = descriptor.transform(atoms)
-                with open(xanes_path[n_element] / f"{id_}.txt", "r") as f:
-                    xanes = load_xanes(f)
-                e, xanes_data[i, :] = xanes.spectrum
-            print(">> ...loaded into array(s)!\n")
+            if config["descriptor"]["type"] == 'wacsf' or config["descriptor"]["type"] == 'rdc':
+                print(">> loading data into array(s)...")
+                for i, id_ in enumerate(tqdm.tqdm(ids)):
+                    element_label.append(element_name)
+                    with open(xyz_path[n_element] / f"{id_}.xyz", "r") as f:
+                        atoms = load_xyz(f)
+                    xyz_data[i, :] = descriptor.transform(atoms)
+                    with open(xanes_path[n_element] / f"{id_}.txt", "r") as f:
+                        xanes = load_xanes(f)
+                    e, xanes_data[i, :] = xanes.spectrum
+                print(">> ...loaded into array(s)!\n")
+            elif config["descriptor"]["type"] == 'mbtr': 
+                print(">> loading data into array(s)...")
+                for i, id_ in enumerate(tqdm.tqdm(ids)):
+                    element_label.append(element_name)
+                    with open(xyz_path[n_element] / f"{id_}.xyz", "r") as f:
+                        atoms = load_xyz(f)
+                        tmp = descriptor.create(atoms)
+                    xyz_data[i, :] = tmp
+                    with open(xanes_path[n_element] / f"{id_}.txt", "r") as f:
+                        xanes = load_xanes(f)
+                    e, xanes_data[i, :] = xanes.spectrum
+                print(">> ...loaded into array(s)!\n")
+            elif config["descriptor"]["type"] == 'lmbtr':
+                print(">> loading data into array(s)...")
+                for i, id_ in enumerate(tqdm.tqdm(ids)):
+                    element_label.append(element_name)
+                    with open(xyz_path[n_element] / f"{id_}.xyz", "r") as f:
+                        atoms = load_xyz(f)
+                        tmp = descriptor.create(atoms, positions=[0])
+                    xyz_data[i, :] = tmp
+                    with open(xanes_path[n_element] / f"{id_}.txt", "r") as f:
+                        xanes = load_xanes(f)
+                    e, xanes_data[i, :] = xanes.spectrum
+                print(">> ...loaded into array(s)!\n")
+            else:
+                print(">> loading data into array(s)...")
+                for i, id_ in enumerate(tqdm.tqdm(ids)):
+                    element_label.append(element_name)
+                    with open(xyz_path[n_element] / f"{id_}.xyz", "r") as f:
+                        atoms = load_xyz(f)
+                        tmp = descriptor.create_single(atoms, positions=[0])
+                    xyz_data[i, :] = tmp
+                    with open(xanes_path[n_element] / f"{id_}.txt", "r") as f:
+                        xanes = load_xanes(f)
+                    e, xanes_data[i, :] = xanes.spectrum
+                print(">> ...loaded into array(s)!\n")
 
             xyz_list.append(xyz_data)
             xanes_list.append(xanes_data)
@@ -156,6 +214,8 @@ def train_data(
             data_compress,
             config["lr_scheduler"],
             config["model_eval"],
+            config["load_guess"],
+            config["loadguess_params"],
         )
 
     elif config["ensemble"]:
@@ -179,6 +239,8 @@ def train_data(
             data_compress,
             config["lr_scheduler"],
             config["model_eval"],
+            config["load_guess"],
+            config["loadguess_params"],
         )
 
     else:
@@ -200,6 +262,8 @@ def train_data(
                 config["hyperparams"]["weight_init_seed"],
                 config["lr_scheduler"],
                 config["model_eval"],
+                config["load_guess"],
+                config["loadguess_params"],
             )
 
         elif mode == "train_xanes":
@@ -218,6 +282,8 @@ def train_data(
                 config["hyperparams"]["weight_init_seed"],
                 config["lr_scheduler"],
                 config["model_eval"],
+                config["load_guess"],
+                config["loadguess_params"],
             )
 
         elif mode == "train_aegan":
@@ -236,6 +302,8 @@ def train_data(
                 config["hyperparams"]["weight_init_seed"],
                 config["lr_scheduler"],
                 config["model_eval"],
+                config["load_guess"],
+                config["loadguess_params"],
             )
 
         if save:

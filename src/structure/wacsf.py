@@ -170,7 +170,6 @@ class WACSF(VectorDescriptor):
         wacsf = g1
 
         if self.n_g2:
-            # zi = system.get_atomic_numbers()[ij[:,0]]
             zj = system.get_atomic_numbers()[ij[:, 1]]
             zj = 0.1*zj
             rij = system.get_distances(ij[:, 0], ij[:, 1])
@@ -178,7 +177,6 @@ class WACSF(VectorDescriptor):
             wacsf = np.append(wacsf, g2)
 
         if self.n_g4:
-            # zi = system.get_atomic_numbers()[jik[:,1]]
             zj = system.get_atomic_numbers()[jik[:, 0]]
             zk = system.get_atomic_numbers()[jik[:, 2]]
             zj = 0.1*zj 
