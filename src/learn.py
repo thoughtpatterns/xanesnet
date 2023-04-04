@@ -134,7 +134,7 @@ def train(
              num_freeze = loadguess_params["n_freeze"]
              i=0
              for name, param in model.named_parameters():
-                 if i < (num_layers-(num_freeze*2)):
+                 if i > (num_layers-(num_freeze*2)):
                     param.requires_grad = False
                  else:
                     continue
@@ -162,7 +162,7 @@ def train(
              num_freeze = loadguess_params["n_freeze"]
              i=0
              for name, param in model.named_parameters():
-                 if i < (num_layers-(num_freeze*2)):
+                 if i > (num_layers-(num_freeze*2)):
                     param.requires_grad = False
                  else:
                     continue
