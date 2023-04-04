@@ -1,7 +1,24 @@
+"""
+XANESNET
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either Version 3 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
+
 import os
 import pickle
 import tempfile
 import time
+from glob import glob
 from datetime import datetime
 
 import mlflow
@@ -44,6 +61,8 @@ def train(
     weight_seed,
     scheduler_lr,
     model_eval,
+    load_guess,
+    loadguess_params,
 ):
     EXPERIMENT_NAME = f"{exp_name}"
     RUN_NAME = f"run_{datetime.today()}"
@@ -105,46 +124,79 @@ def train(
     if model_mode == "mlp":
         from model import MLP
 
-        model = MLP(
-            n_in,
-            hyperparams["hl_ini_dim"],
-            hyperparams["dropout"],
-            int(hyperparams["hl_ini_dim"] * hyperparams["hl_shrink"]),
-            out_dim,
-            act_fn,
-        )
+        if load_guess:
+             model_dir = loadguess_params["model_dir"] 
+             model = torch.load(model_dir, map_location=torch.device("cpu"))
+             i=0
+             for name, param in model.named_parameters():
+                 i = i + 1
+             num_layers = i
+             num_freeze = loadguess_params["n_freeze"]
+             i=0
+             for name, param in model.named_parameters():
+                 if i < (num_layers-(num_freeze*2)):
+                    param.requires_grad = False
+                 else:
+                    continue
+                 i=i+1
+        else:
+             model = MLP(
+                 n_in,
+                 hyperparams["hl_ini_dim"],
+                 hyperparams["dropout"],
+                 int(hyperparams["hl_ini_dim"] * hyperparams["hl_shrink"]),
+                 out_dim,
+                 act_fn,
+             )
 
     elif model_mode == "cnn":
         from model import CNN
 
-        model = CNN(
-            n_in,
-            hyperparams["out_channel"],
-            hyperparams["channel_mul"],
-            hyperparams["hidden_layer"],
-            out_dim,
-            hyperparams["dropout"],
-            hyperparams["kernel_size"],
-            hyperparams["stride"],
-            act_fn,
-        )
+        if load_guess:
+             model_dir = loadguess_params["model_dir"]
+             model = torch.load(model_dir, map_location=torch.device("cpu"))
+             i=0
+             for name, param in model.named_parameters():
+                 i = i + 1
+             num_layers = i
+             num_freeze = loadguess_params["n_freeze"]
+             i=0
+             for name, param in model.named_parameters():
+                 if i < (num_layers-(num_freeze*2)):
+                    param.requires_grad = False
+                 else:
+                    continue
+                 i=i+1
+        else:
+             model = CNN(
+                 n_in,
+                 hyperparams["out_channel"],
+                 hyperparams["channel_mul"],
+                 hyperparams["hidden_layer"],
+                 out_dim,
+                 hyperparams["dropout"],
+                 hyperparams["kernel_size"],
+                 hyperparams["stride"],
+                 act_fn,
+             )
 
     model.to(device)
 
-    # Model weight & bias initialisation
-    kernel_init = model_utils.WeightInitSwitch().fn(hyperparams["kernel_init"])
-    bias_init = model_utils.WeightInitSwitch().fn(hyperparams["bias_init"])
-
-    print(weight_seed)
-    # set seed
-    torch.cuda.manual_seed(
-        weight_seed
-    ) if torch.cuda.is_available() else torch.manual_seed(weight_seed)
-    model.apply(
-        lambda m: model_utils.weight_bias_init(
-            m=m, kernel_init_fn=kernel_init, bias_init_fn=bias_init
+    if load_guess == False:
+        # Model weight & bias initialisation
+        kernel_init = model_utils.WeightInitSwitch().fn(hyperparams["kernel_init"])
+        bias_init = model_utils.WeightInitSwitch().fn(hyperparams["bias_init"])
+        
+        # set seed
+        torch.cuda.manual_seed(
+            weight_seed
+        ) if torch.cuda.is_available() else torch.manual_seed(weight_seed)
+        model.apply(
+            lambda m: model_utils.weight_bias_init(
+                m=m, kernel_init_fn=kernel_init, bias_init_fn=bias_init
+            )
         )
-    )
+
     optimizer = optim.Adam(model.parameters(), lr=hyperparams["lr"])
 
     if scheduler_lr["scheduler"]:
