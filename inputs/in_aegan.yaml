@@ -9,6 +9,11 @@ descriptor:
       n_g2: 16
       n_g4: 32
 
+load_guess: False 
+loadguess_params:
+  model_dir: /home/tom/ML-XS/code-test/model/model_001/model.pt
+  n_freeze: 1
+
 bootstrap: False
 bootstrap_params: 
   n_boot: 3
@@ -62,6 +67,8 @@ hyperparams:
     loss_args: null
   lr_gen: 0.01
   lr_dis: 0.0001
+  optim_fn_gen: Adam
+  optim_fn_dis: Adam
   dropout: 0.0
   weight_init_seed: 2023
   kernel_init: xavier_uniform
@@ -70,4 +77,16 @@ hyperparams:
 seed: 2021
 epochs: 1
 variance_threshold: 0.0
-model_eval : True
+model_eval : False
+
+optuna_params:
+  tune: True
+  n_trials: 3
+  tune_optim_fn: True
+  tune_batch_size: True
+  tune_activation: True
+  tune_loss_fn: True
+  tune_lr: True
+  tune_dropout: True
+  tune_hidden_layers: True
+
