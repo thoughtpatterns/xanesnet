@@ -82,8 +82,13 @@ def main(
 
     n_samples = len(ids)
 
+    (str(type(descriptor).__name__))
+
     if xyz_path is not None:
-        n_x_features = descriptor.get_len()
+        if str(type(descriptor).__name__) == 'WACSF' or str(type(descriptor).__name__) == 'RDC':
+            n_x_features = descriptor.get_len()
+        else:
+            n_x_features = descriptor.get_number_of_features()
         xyz_data = np.full((n_samples, n_x_features), np.nan)
         print(">> preallocated {}x{} array for X data...".format(*xyz_data.shape))
 
@@ -96,10 +101,28 @@ def main(
 
     print(">> loading data into array(s)...")
     if xyz_path is not None:
-        for i, id_ in enumerate(tqdm.tqdm(ids)):
-            with open(xyz_path / f"{id_}.xyz", "r") as f:
-                atoms = load_xyz(f)
-            xyz_data[i, :] = descriptor.transform(atoms)
+        if str(type(descriptor).__name__) == 'WACSF' or str(type(descriptor).__name__) == 'RDC':
+            for i, id_ in enumerate(tqdm.tqdm(ids)):
+                with open(xyz_path / f"{id_}.xyz", "r") as f:
+                    atoms = load_xyz(f)
+                xyz_data[i, :] = descriptor.transform(atoms)
+        elif str(type(descriptor).__name__) == 'MBTR':
+                with open(xyz_path / f"{id_}.xyz", "r") as f:
+                    atoms = load_xyz(f)
+                    tmp = descriptor.create(atoms)
+                xyz_data[i, :] = tmp
+        elif str(type(descriptor).__name__) == 'LMBTR':
+                with open(xyz_path / f"{id_}.xyz", "r") as f:
+                    atoms = load_xyz(f)
+                    tmp = descriptor.create(atoms, positions=[0])
+                xyz_data[i, :] = tmp
+        elif str(type(descriptor).__name__) == 'SOAP':
+                with open(xyz_path / f"{id_}.xyz", "r") as f:
+                    atoms = load_xyz(f)
+                    tmp = descriptor.create_single(atoms, positions=[0])
+                xyz_data[i, :] = tmp
+        else:
+            print(">> ...This descriptor doesn't exist, try again!!\n") 
 
     if xanes_path is not None:
         for i, id_ in enumerate(tqdm.tqdm(ids)):
