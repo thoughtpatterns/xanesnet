@@ -31,9 +31,9 @@ from utils import linecount
 from utils import list_filestems
 from structure.rdc import RDC
 from structure.wacsf import WACSF
-# from structure.soap import SOAP
-# from structure.mbtr import MBTR
-# from structure.lmbtr import LMBTR
+from structure.soap import SOAP
+from structure.mbtr import MBTR
+from structure.lmbtr import LMBTR
 
 import torch
 import random
@@ -61,8 +61,7 @@ def train_data(mode: str, model_mode: str, config, save: bool = True, fourier_tr
 
         ids.sort()
 
-        # descriptors = {"rdc": RDC, "wacsf": WACSF, "soap": SOAP, "mbtr": MBTR, "lmbtr": LMBTR}
-        descriptors = {"rdc": RDC, "wacsf": WACSF}
+        descriptors = {"rdc": RDC, "wacsf": WACSF, "soap": SOAP, "mbtr": MBTR, "lmbtr": LMBTR}
 
         descriptor = descriptors.get(config["descriptor"]["type"])(
             **config["descriptor"]["params"]
@@ -115,7 +114,7 @@ def train_data(mode: str, model_mode: str, config, save: bool = True, fourier_tr
                     xanes = load_xanes(f)
                 e, xanes_data[i, :] = xanes.spectrum
             print(">> ...loaded into array(s)!\n")
-        else:
+        elif config["descriptor"]["type"] == 'soap':
             print(">> loading data into array(s)...")
             for i, id_ in enumerate(tqdm.tqdm(ids)):
                 with open(xyz_path / f"{id_}.xyz", "r") as f:
@@ -126,6 +125,8 @@ def train_data(mode: str, model_mode: str, config, save: bool = True, fourier_tr
                     xanes = load_xanes(f)
                 e, xanes_data[i, :] = xanes.spectrum
             print(">> ...loaded into array(s)!\n")
+        else:
+            print(">> ...This descriptor doesn't exist, try again!!\n")
 
     elif xyz_path.is_file() and xanes_path.is_file():
         print(">> loading data from .npz archive(s)...\n")
