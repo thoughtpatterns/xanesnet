@@ -1,7 +1,6 @@
 # https://github.com/SINGROUP/dscribe/blob/master/dscribe/descriptors/soap.py
 # Also see https://github.com/wjm41/soapgp
 
-
 import time
 import numpy as np
 from warnings import warn
