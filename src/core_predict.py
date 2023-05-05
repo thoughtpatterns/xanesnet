@@ -31,6 +31,7 @@ from inout import load_xanes, load_xyz, save_xanes
 from predict import predict_xanes, predict_xyz, y_predict_dim
 from utils import linecount, list_filestems
 from spectrum.xanes import XANES
+from model_utils import make_dir
 
 ###############################################################################
 ################################ MAIN FUNCTION ################################
@@ -107,22 +108,22 @@ def main(
                     atoms = load_xyz(f)
                 xyz_data[i, :] = descriptor.transform(atoms)
         elif str(type(descriptor).__name__) == 'MBTR':
-                with open(xyz_path / f"{id_}.xyz", "r") as f:
-                    atoms = load_xyz(f)
-                    tmp = descriptor.create(atoms)
-                xyz_data[i, :] = tmp
+            with open(xyz_path / f"{id_}.xyz", "r") as f:
+                atoms = load_xyz(f)
+                tmp = descriptor.create(atoms)
+            xyz_data[i, :] = tmp
         elif str(type(descriptor).__name__) == 'LMBTR':
-                with open(xyz_path / f"{id_}.xyz", "r") as f:
-                    atoms = load_xyz(f)
-                    tmp = descriptor.create(atoms, positions=[0])
-                xyz_data[i, :] = tmp
+            with open(xyz_path / f"{id_}.xyz", "r") as f:
+                atoms = load_xyz(f)
+                tmp = descriptor.create(atoms, positions=[0])
+            xyz_data[i, :] = tmp
         elif str(type(descriptor).__name__) == 'SOAP':
-                with open(xyz_path / f"{id_}.xyz", "r") as f:
-                    atoms = load_xyz(f)
-                    tmp = descriptor.create_single(atoms, positions=[0])
-                xyz_data[i, :] = tmp
+            with open(xyz_path / f"{id_}.xyz", "r") as f:
+                atoms = load_xyz(f)
+                tmp = descriptor.create_single(atoms, positions=[0])
+            xyz_data[i, :] = tmp
         else:
-            print(">> ...This descriptor doesn't exist, try again!!\n") 
+            print(">> ...This descriptor doesn't exist, try again!!\n")
 
     if xanes_path is not None:
         for i, id_ in enumerate(tqdm.tqdm(ids)):
@@ -184,21 +185,20 @@ def main(
         model.eval()
         print("Loaded model from disk")
 
-        if xyz_path is not None and xanes_path is not None:
-            from model_utils import model_mode_error
+        # if xyz_path is not None and xanes_path is not None:
+        #     from model_utils import model_mode_error
 
-            if fourier_transform:
-                parent_model_dir, predict_dir = model_mode_error(
-                    model, mode, model_mode, xyz_data.shape[1], xanes_data.shape[1] * 2
-                )
-            else:
-                parent_model_dir, predict_dir = model_mode_error(
-                    model, mode, model_mode, xyz_data.shape[1], xanes_data.shape[1]
-                )
-        else:
-            from model_utils import make_dir
+        #     if fourier_transform:
+        #         parent_model_dir, predict_dir = model_mode_error(
+        #             model, mode, model_mode, xyz_data.shape[1], xanes_data.shape[1] * 2
+        #         )
+        #     else:
+        #         parent_model_dir, predict_dir = model_mode_error(
+        #             model, mode, model_mode, xyz_data.shape[1], xanes_data.shape[1]
+        #         )
+        # else:
 
-            parent_model_dir, predict_dir = make_dir()
+        parent_model_dir, predict_dir = make_dir()
 
         if model_mode == "mlp" or model_mode == "cnn":
             if mode == "predict_xyz":
