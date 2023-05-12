@@ -92,11 +92,12 @@ def bootstrap_train(
                 kfold,
                 kfold_params,
                 rng,
-                hyperparams["weight_init_seed"],
+                bootstrap["seed_boot"][i],
                 lr_scheduler,
                 model_eval,
                 load_guess,
                 loadguess_params,
+                optuna_params
             )
         elif mode == "train_xanes":
             from core_learn import train_xanes
@@ -111,7 +112,7 @@ def bootstrap_train(
                 kfold,
                 kfold_params,
                 rng,
-                hyperparams["weight_init_seed"],
+                bootstrap["seed_boot"][i],
                 lr_scheduler,
                 model_eval,
                 load_guess,
@@ -132,7 +133,7 @@ def bootstrap_train(
                 kfold,
                 kfold_params,
                 rng,
-                hyperparams["weight_init_seed"],
+                bootstrap["seed_boot"][i],
                 lr_scheduler,
                 model_eval,
                 load_guess,
