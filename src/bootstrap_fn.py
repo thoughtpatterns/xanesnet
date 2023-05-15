@@ -39,8 +39,9 @@ def bootstrap_data(xyz, xanes, n_size, seed):
     new_xanes = []
 
     for i in range(int(xyz.shape[0] * n_size)):
-        new_xyz.append(random.choice(xyz))
-        new_xanes.append(random.choice(xanes))
+        idx = random.randint(0, xyz.shape[0]-1)
+        new_xyz.append(xyz[idx])
+        new_xanes.append(xanes[idx])
 
     return np.asarray(new_xyz), np.asarray(new_xanes)
 
