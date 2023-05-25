@@ -136,6 +136,9 @@ Tuning uses [Optuna](https://optuna.org), an open source hyperparameter optimiza
 
 The user should specify the number of trials they wish to run during tuning. After tuning the optimal values found will be used to train the model.
 
+## LICENSE
+
+This project is licensed under the GPL-3.0 License - see the LICENSE.md file for details.
 
 ## PUBLICATIONS
 
