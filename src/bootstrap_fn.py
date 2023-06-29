@@ -208,18 +208,20 @@ def bootstrap_predict(
                 if fourier_transform:
                     y_predict = data_transform.inverse_fourier_transform_data(
                         y_predict)
-
-            print(
-                "MSE y to y pred : ",
-                mean_squared_error(y, y_predict.detach().numpy()),
-            )
+                    
+            if y is not None:
+                print(
+                    "MSE y to y pred : ",
+                    mean_squared_error(y, y_predict.detach().numpy()),
+                )
             y_predict = y_predict_dim(y_predict, ids)
 
             if plot_save:
                 plot.plot_predict(ids, y, y_predict, predict_dir, mode)
 
-            y_predict_score.append(mean_squared_error(
-                y, y_predict.detach().numpy()))
+            if y is not None:
+                y_predict_score.append(mean_squared_error(
+                    y, y_predict.detach().numpy()))
 
             y_predict_all.append(y_predict.detach().numpy())
 
@@ -253,60 +255,50 @@ def bootstrap_predict(
                     y_predict = data_transform.inverse_fourier_transform_data(
                         y_predict)
 
-            y_predict_score.append(mean_squared_error(
-                y, y_predict.detach().numpy()))
+            if y is not None:
+                y_predict_score.append(mean_squared_error(
+                    y, y_predict.detach().numpy()))
+                
             x_recon_score.append(mean_squared_error(
                 x, x_recon.detach().numpy()))
+            
+            y_predict_all.append(y_predict.detach().numpy())
 
             print(
                 "MSE x to x recon : ",
                 mean_squared_error(x, x_recon.detach().numpy()),
             )
-            print(
-                "MSE y to y pred : ",
-                mean_squared_error(y, y_predict.detach().numpy()),
-            )
-            y_predict = y_predict_dim(y_predict, ids, model_dir)
+            if y is not None:
+                print(
+                    "MSE y to y pred : ",
+                    mean_squared_error(y, y_predict.detach().numpy()),
+                )
+            y_predict = y_predict_dim(y_predict, ids)
             if plot_save:
                 plot.plot_ae_predict(
-                    ids, y, y_predict, x, x_recon, predict_dir, mode
+                    ids, y, y_predict, x, x_recon, e, predict_dir, mode
                 )
 
         elif model_mode == "aegan_mlp" or model_mode == "aegan_cnn":
-            # Convert to float
-            if config["x_path"] is not None and config["y_path"] is not None:
-                x = torch.tensor(xyz_data).float()
-                y = torch.tensor(xanes_data).float()
-            elif config["x_path"] is not None and config["y_path"] is None:
-                x = torch.tensor(xyz_data).float()
-                y = None
-            elif config["y_path"] is not None and config["x_path"] is None:
-                y = torch.tensor(xanes_data).float()
-                x = None
+
+            x = xyz_data
+            y = xanes_data
 
             import aegan_predict
 
-            x_recon, y_predict, y_recon, x_predict = aegan_predict.main(
-                config,
-                x,
-                y,
-                model,
-                fourier_transform,
-                model_dir,
-                predict_dir,
-                ids,
-                parent_model_dir,
-            )
+            x_recon, y_pred, y_recon, x_pred = aegan_predict.predict_aegan(x, y, model, mode, fourier_transform)
 
-            if config["x_path"] is not None:
-                x_recon_score.append(mean_squared_error(x, x_recon))
+            if x is not None and x_recon is not None:
+                x_recon_score.append(mean_squared_error(x, x_recon.detach().numpy()))
 
-            if config["y_path"] is not None:
-                y_recon_score.append(mean_squared_error(y, y_recon))
+            if x is not None and x_pred is not None:
+                x_predict_score.append(mean_squared_error(x, x_pred.detach().numpy()))
 
-            if config["x_path"] is not None and config["y_path"] is not None:
-                y_predict_score.append(mean_squared_error(y, y_predict))
-                x_predict_score.append(mean_squared_error(x, x_predict))
+            if y is not None and y_recon is not None:
+                y_recon_score.append(mean_squared_error(y, y_recon.detach().numpy()))
+
+            if y is not None and y_pred is not None:
+                y_predict_score.append(mean_squared_error(y, y_pred.detach().numpy()))
 
     if model_mode == "mlp" or model_mode == "cnn":
         mean_score = torch.mean(torch.tensor(y_predict_score))
@@ -316,6 +308,10 @@ def bootstrap_predict(
         y_predict_all = np.asarray(y_predict_all)
         mean_y_predict = np.mean(y_predict_all, axis=0)
         std_y_predict = np.std(y_predict_all, axis=0)
+
+        if y is None:
+            # Dummy array for e
+            e = np.arange(y_predict.shape[1])
 
         if mode == "predict_xyz":
             for id_, mean_y_predict_, std_y_predict_ in tqdm.tqdm(zip(ids, mean_y_predict, std_y_predict)):
@@ -338,6 +334,15 @@ def bootstrap_predict(
         print(
             f"Mean score reconstruction: {mean_score:.4f}, Std score: {std_score:.4f}"
         )
+
+        y_predict_all = np.asarray(y_predict_all)
+        mean_y_predict = np.mean(y_predict_all, axis=0)
+        std_y_predict = np.std(y_predict_all, axis=0)
+
+        if y is None:
+            # Dummy array for e
+            e = np.arange(y_predict.shape[1])
+
         if mode == "predict_xyz":
             for id_, mean_y_predict_, std_y_predict_ in tqdm.tqdm(zip(ids, mean_y_predict, std_y_predict)):
                 with open(predict_dir / f"{id_}.txt", "w") as f:
