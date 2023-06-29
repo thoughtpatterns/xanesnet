@@ -42,10 +42,11 @@ def montecarlo_dropout(
     prob_mean = torch.mean(torch.stack(prob_output), dim=0)
     prob_var = torch.std(torch.stack(prob_output), dim=0)
 
-    print(
-        "MSE y to y prob : ",
-        mean_squared_error(data_compress["y"], prob_mean.detach().numpy()),
-    )
+    if data_compress["y"] is not None:
+        print(
+            "MSE y to y prob : ",
+            mean_squared_error(data_compress["y"], prob_mean.detach().numpy()),
+        )
 
     if plot_save:
         plot_mc_predict(
@@ -109,10 +110,12 @@ def montecarlo_dropout_ae(
         "MSE x to x prob : ",
         mean_squared_error(data_compress["x"], mean_recon.detach().numpy()),
     )
-    print(
-        "MSE y to y prob : ",
-        mean_squared_error(data_compress["y"], mean_output.detach().numpy()),
-    )
+
+    if data_compress["y"] is not None:
+        print(
+            "MSE y to y prob : ",
+            mean_squared_error(data_compress["y"], mean_output.detach().numpy()),
+        )
     # confidence interval
     if plot_save:
         plot_mc_ae_predict(
@@ -133,6 +136,9 @@ def montecarlo_dropout_ae(
 
 def montecarlo_dropout_aegan(model, x, y, n_mc):
     model.train()
+
+    x = torch.tensor(x).float() if x is not None else None
+    y = torch.tensor(y).float() if y is not None else None 
 
     if x is not None and y is not None:
         prob_x_pred = []
