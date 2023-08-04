@@ -130,7 +130,8 @@ def train(
 			n_in,
 			hyperparams["hl_ini_dim"],
 			hyperparams["dropout"],
-			int(hyperparams["hl_ini_dim"] * hyperparams["hl_shrink"]),
+			hyperparams["n_hl"],
+			hyperparams["hl_shrink"],
 			out_dim,
 			act_fn,
 		)
@@ -148,6 +149,7 @@ def train(
 			hyperparams["kernel_size"],
 			hyperparams["stride"],
 			act_fn,
+			hyperparams["n_cl"]
 		)
 
 	model.to(device)

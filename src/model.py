@@ -19,6 +19,7 @@ from torch import nn
 from model_utils import ActivationSwitch
 from model_utils import LossSwitch
 from model_utils import OptimSwitch
+from model_utils import get_conv_layers_output_size
 
 
 class MLP(nn.Module):
@@ -44,67 +45,68 @@ class MLP(nn.Module):
 
         # check if the last hidden layer size is at least 1 and not less than the output size
         last_hidden_layer_size = int(
-            self.hidden_size * self.hl_shrink ** (self.num_hidden_layers - 1))
+            self.hidden_size * self.hl_shrink ** (self.num_hidden_layers - 1)
+        )
 
         if last_hidden_layer_size < 1:
             raise ValueError(
-                "The size of the last hidden layer is less than 1, please adjust hyperparameters.")
+                "The size of the last hidden layer is less than 1, please adjust hyperparameters."
+            )
         # if last_hidden_layer_size < self.output_size:
         #     raise ValueError(
         #         "The size of the last hidden layer is less than the output size, please adjust hyperparameters.")
 
-        # Define input and output layers
-        self.output_layer = nn.Linear(
-            int(self.hidden_size * self.hl_shrink **
-                (self.num_hidden_layers - 1)),
-            self.output_size,
-        )
 
-        # Define hidden layers
-        self.hidden_layers = nn.ModuleList()
-        for i in range(self.num_hidden_layers):
+        layers = []
+
+        for i in range(self.num_hidden_layers-1):
+
             if i == 0:
                 layer = nn.Sequential(
-                    nn.Linear(self.input_size, self.hidden_size),
-                    nn.Dropout(p=dropout_rate),
-                    self.act_fn(),
-                )
+                            nn.Linear(self.input_size, self.hidden_size),
+                            nn.Dropout(self.dropout_rate),
+                            self.act_fn(),
+                        )
             else:
                 layer = nn.Sequential(
-                    nn.Linear(
-                        int(self.hidden_size * self.hl_shrink ** (i - 1)),
-                        int(self.hidden_size * self.hl_shrink**i),
-                    ),
-                    nn.Dropout(p=self.dropout_rate),
-                    self.act_fn(),
-                )
-            self.hidden_layers.append(layer)
+                            nn.Linear(int(self.hidden_size * self.hl_shrink ** (i - 1)), int(self.hidden_size * self.hl_shrink ** i)),
+                            nn.Dropout(self.dropout_rate),
+                            self.act_fn(),
+                        )
+
+            layers.append(layer)
+
+        output_layer = nn.Sequential(
+            nn.Linear(int(self.hidden_size * self.hl_shrink ** (self.num_hidden_layers - 2)), self.output_size)
+        )
+
+        layers.append(output_layer)
+
+        self.dense_layers = nn.Sequential(*layers)
 
     def forward(self, x):
         # Feed forward through hidden layers
-        for i, hidden_layer in enumerate(self.hidden_layers):
-            x = hidden_layer(x)
-            if i != 0:
-                x = x[:, : int(self.hidden_size * self.hl_shrink**i)]
+        out = self.dense_layers(x)
 
         # Feed forward through output layer
-        x = self.output_layer(x)
+        # x = self.output_layer(x)
 
-        return x
+        return out
 
 
 class CNN(nn.Module):
     def __init__(
-            self,
-            input_size,
-            out_channel,
-            channel_mul,
-            hidden_layer,
-            out_dim,
-            dropout,
-            kernel_size,
-            stride,
-            act_fn,
+        self,
+        input_size,
+        out_channel,
+        channel_mul,
+        hidden_layer,
+        out_dim,
+        dropout,
+        kernel_size,
+        stride,
+        act_fn,
+        n_cl,
     ):
         super().__init__()
 
@@ -117,144 +119,194 @@ class CNN(nn.Module):
         self.kernel_size = kernel_size
         self.stride = stride
         self.act_fn = act_fn
+        self.n_cl = n_cl
 
-        self.conv1_shape = int(
-            ((self.input_size - self.kernel_size) / self.stride) + 1)
-        self.conv2_shape = int(
-            ((self.conv1_shape - self.kernel_size) / self.stride) + 1
+        # Convolutional layers output size
+        out_conv_block_size = get_conv_layers_output_size(
+            self.input_size,
+            self.n_cl,
+            self.channel_mul,
+            self.kernel_size,
+            self.stride,
+            self.out_channel,
+            include_pooling=False,
         )
 
-        self.conv1 = nn.Sequential(
-            nn.Conv1d(
-                in_channels=1,
-                out_channels=self.out_channel,
-                kernel_size=self.kernel_size,
-                stride=self.stride,
-            ),
-            nn.BatchNorm1d(num_features=self.out_channel),
-            self.act_fn(),
-            nn.Dropout(p=self.dropout),
-        )
+        # Convolutional Layers
+        conv_layers = []
+        dense_layers = []
 
-        self.conv2 = nn.Sequential(
-            nn.Conv1d(
-                in_channels=self.out_channel,
-                out_channels=self.out_channel * self.channel_mul,
-                kernel_size=self.kernel_size,
-                stride=self.stride,
-            ),
-            nn.BatchNorm1d(num_features=self.out_channel * self.channel_mul),
-            self.act_fn(),
-            nn.Dropout(p=self.dropout),
-        )
+        in_channel = 1
 
-        self.dense_layer1 = nn.Sequential(
-            nn.Linear(
-                self.conv2_shape * (self.out_channel * self.channel_mul),
-                self.hidden_layer,
-            ),
-            self.act_fn(),
-        )
+        for layer in range(n_cl):
+            # Collect layers
+            conv_layer = nn.Sequential(
+                nn.Conv1d(
+                    in_channels=in_channel,
+                    out_channels=out_channel,
+                    kernel_size=self.kernel_size,
+                    stride=self.stride,
+                ),
+                nn.BatchNorm1d(num_features=out_channel),
+                self.act_fn(),
+                nn.Dropout(p=self.dropout),
+            )
 
-        self.dense_layer2 = nn.Sequential(
-            nn.Linear(self.hidden_layer, self.out_dim))
+            conv_layers.append(conv_layer)
+
+            # Update in/out channels
+            in_channel = out_channel
+            out_channel = out_channel * channel_mul
+
+        self.conv_layers = nn.Sequential(*conv_layers)
+
+        # Fully Connected Layers
+
+        dense_layer1 = nn.Sequential(
+            nn.Linear(out_conv_block_size, self.hidden_layer,), 
+            self.act_fn()
+            )
+
+        dense_layer2 = nn.Sequential(
+            nn.Linear(self.hidden_layer, self.out_dim)
+            )
+
+        dense_layers.append(dense_layer1)
+        dense_layers.append(dense_layer2)
+        
+        self.dense_layers = nn.Sequential(*dense_layers)
+
+
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = x.unsqueeze(0)
         x = x.permute(1, 0, 2)
-        x = self.conv1(x)
-        x = self.conv2(x)
+        x = self.conv_layers(x)
         x = x.view(x.size(0), -1)
-        x = self.dense_layer1(x)
-        out = self.dense_layer2(x)
+        out = self.dense_layers(x)
 
         return out
 
 
 class AE_mlp(nn.Module):
-    def __init__(self, input_size, hidden_size, dropout, hl_size, out_dim, act_fn):
+
+    def __init__(
+        self,
+        input_size,
+        hidden_size,
+        dropout_rate,
+        num_hidden_layers,
+        hl_shrink,
+        output_size,
+        act_fn,
+    ):
+
         super().__init__()
 
         self.input_size = input_size
         self.hidden_size = hidden_size
-        self.dropout = dropout
-        self.hl_size = hl_size
-        self.out_dim = out_dim
+        self.dropout_rate = dropout_rate
+        self.output_size = output_size
+        self.num_hidden_layers = num_hidden_layers
+        self.hl_shrink = hl_shrink
         self.act_fn = act_fn
 
-        self.encoder_hidden_1 = nn.Sequential(
-            nn.Linear(self.input_size, self.hidden_size),
-            self.act_fn(),
+        # check if the last hidden layer size is at least 1 and not less than the output size
+        last_hidden_layer_size = int(
+            self.hidden_size * self.hl_shrink ** (self.num_hidden_layers - 1)
         )
 
-        self.encoder_hidden_2 = nn.Sequential(
-            nn.Linear(self.hidden_size, self.hl_size),
-            self.act_fn(),
+        if last_hidden_layer_size < 1:
+            raise ValueError(
+                "The size of the last hidden layer is less than 1, please adjust hyperparameters."
+            )
+
+        enc_layers = []
+        dec_layers = []
+
+        for i in range(self.num_hidden_layers):
+
+            if i == 0:
+                enc_layer = nn.Sequential(
+                                nn.Linear(self.input_size, self.hidden_size),
+                                act_fn(),
+                            )
+                dec_layer = nn.Sequential(
+                                nn.Linear(self.hidden_size, self.input_size),
+                                act_fn(),
+                            )
+            else:
+                enc_layer = nn.Sequential(
+                                nn.Linear(int(self.hidden_size * self.hl_shrink ** (i - 1)), int(self.hidden_size * self.hl_shrink ** i)),
+                                act_fn(),
+                            )
+                dec_layer = nn.Sequential(
+                                nn.Linear(int(self.hidden_size * self.hl_shrink ** i), int(self.hidden_size * self.hl_shrink ** (i - 1))),
+                                act_fn(),
+                            )
+
+            enc_layers.append(enc_layer)
+            dec_layers.insert(0,dec_layer)
+
+
+        self.encoder_layers = nn.Sequential(*enc_layers)
+        self.decoder_layers = nn.Sequential(*dec_layers)
+
+
+        fc_layers = []
+
+        fc_layer1 = nn.Sequential(
+                        nn.Linear(int(self.hidden_size * self.hl_shrink ** (self.num_hidden_layers-1)), self.hidden_size),
+                        act_fn(),
+                        nn.Dropout(self.dropout_rate),
+                    )
+        fc_layer2 = nn.Sequential(
+            nn.Linear(self.hidden_size, self.output_size)
         )
 
-        self.fc1 = nn.Sequential(
-            nn.Linear(self.hl_size, self.hl_size),
-            self.act_fn(),
-            nn.Dropout(self.dropout),
-        )
+        fc_layers.append(fc_layer1)
+        fc_layers.append(fc_layer2)
 
-        self.fc2 = nn.Sequential(
-            nn.Linear(self.hl_size, self.out_dim),
-        )
-
-        self.decoder_hidden_1 = nn.Sequential(
-            nn.Linear(self.hl_size, self.hidden_size),
-            self.act_fn(),
-        )
-
-        self.decoder_hidden_2 = nn.Sequential(
-            nn.Linear(self.hidden_size, self.input_size),
-            # self.act_fn(),
-        )
+        self.dense_layers = nn.Sequential(*fc_layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.encoder_hidden_1(x)
-        latent_space = self.encoder_hidden_2(x)
 
-        in_fc = self.fc1(latent_space)
-        pred_y = self.fc2(in_fc)
+        out = self.encoder_layers(x)
 
-        out = self.decoder_hidden_1(latent_space)
-        recon = self.decoder_hidden_2(out)
+        pred = self.dense_layers(out)
 
-        return recon, pred_y
+        recon = self.decoder_layers(out)
+
+        return recon, pred
 
     def predict(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.encoder_hidden_1(x)
-        latent_space = self.encoder_hidden_2(x)
 
-        in_fc = self.fc1(latent_space)
-        pred_y = self.fc2(in_fc)
+        out = self.encoder_layers(x)
+        pred = self.dense_layers(out)
 
-        return pred_y
+        return pred
 
     def reconstruct(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.encoder_hidden_1(x)
-        latent_space = self.encoder_hidden_2(x)
 
-        out = self.decoder_hidden_1(latent_space)
-        recon = self.decoder_hidden_2(out)
+        out = self.encoder_layers(x)
+        recon = self.decoder_layers(out)
 
         return recon
 
 
 class AE_cnn(nn.Module):
     def __init__(
-            self,
-            input_size,
-            out_channel,
-            channel_mul,
-            hidden_layer,
-            out_dim,
-            dropout,
-            kernel_size,
-            stride,
-            act_fn,
+        self,
+        input_size,
+        out_channel,
+        channel_mul,
+        hidden_layer,
+        out_dim,
+        dropout,
+        kernel_size,
+        stride,
+        act_fn,
+        n_cl,
     ):
         super().__init__()
 
@@ -267,151 +319,127 @@ class AE_cnn(nn.Module):
         self.kernel_size = kernel_size
         self.stride = stride
         self.act_fn = act_fn
+        self.n_cl = n_cl
 
-        # checking the sign for encoder for input_channel for linear
-        self.conv1_shape = int(
-            ((self.input_size - self.kernel_size) / self.stride) + 1)
-        self.conv2_shape = int(
-            ((self.conv1_shape - self.kernel_size) / self.stride) + 1
-        )
-        self.conv3_shape = int(
-            ((self.conv2_shape - self.kernel_size) / self.stride) + 1
-        )
+        # Start collecting shape of convolutional layers for calculating padding
+        all_conv_shapes = [input_size]
 
-        # checking the size for decoder to assign padding
-        self.convt1_shape = int(
-            ((self.conv3_shape - 1) * self.stride) + self.kernel_size
-        )
-        if self.convt1_shape != self.conv2_shape:
-            if self.convt1_shape > self.conv2_shape:
-                self.p1 = self.convt1_shape - self.conv2_shape
-                self.op1 = 0
-            elif self.convt1_shape < self.conv2_shape:
-                self.op1 = self.conv2_shape - self.convt1_shape
-                self.p1 = 0
-        else:
-            self.p1 = 0
-            self.op1 = 0
+        # Starting shape
+        conv_shape = self.input_size
 
-        self.convt2_shape = int(
-            ((self.conv2_shape - 1) * self.stride) + self.kernel_size
-        )
-        if self.convt2_shape != self.conv1_shape:
-            if self.convt2_shape > self.conv1_shape:
-                self.p2 = self.convt2_shape - self.conv1_shape
-                self.op2 = 0
-            elif self.convt2_shape < self.conv1_shape:
-                self.op2 = self.conv1_shape - self.convt2_shape
-                self.p2 = 0
-        else:
-            self.p2 = 0
-            self.op2 = 0
+        # ENCODER CONVOLUTIONAL LAYERS
+        enc_layers = []
 
-        self.convt3_shape = int(
-            ((self.conv1_shape - 1) * self.stride) + self.kernel_size
-        )
-        if self.convt3_shape != self.input_size:
-            if self.convt3_shape > self.input_size:
-                self.p3 = self.convt3_shape - self.input_size
-                self.op3 = 0
-            elif self.convt3_shape < self.input_size:
-                self.op3 = self.input_size - self.convt3_shape
-                self.p3 = 0
-        else:
-            self.p3 = 0
-            self.op3 = 0
+        enc_in_channel = 1
+        enc_out_channel = self.out_channel
 
-        self.encoder_layer1 = nn.Sequential(
-            nn.Conv1d(
-                in_channels=1,
-                out_channels=self.out_channel,
-                kernel_size=self.kernel_size,
-                stride=self.stride,
-            ),
+        for block in range(self.n_cl):
+
+            # Create conv layer
+            conv_layer = nn.Sequential(
+                nn.Conv1d(
+                    in_channels=enc_in_channel,
+                    out_channels=enc_out_channel,
+                    kernel_size=self.kernel_size,
+                    stride=self.stride,
+                ),
+                self.act_fn(),
+            )
+
+            enc_layers.append(conv_layer)
+
+            # Update in and out channels
+            enc_in_channel = enc_out_channel
+            enc_out_channel = enc_out_channel * self.channel_mul
+
+            # Update output shape for conv layer
+            conv_shape = int(((conv_shape - self.kernel_size) / self.stride) + 1)
+            all_conv_shapes.append(conv_shape)
+
+        self.encoder_layers = nn.Sequential(*enc_layers)
+
+        # PREDICTOR DENSE LAYERS
+
+        dense_in_shape = self.out_channel * self.channel_mul ** (self.n_cl-1) * all_conv_shapes[-1]
+
+        dense_layers = []
+
+        dense_layer1 = nn.Sequential(
+            nn.Linear(dense_in_shape, self.hidden_layer),
             self.act_fn(),
+            nn.Dropout(self.dropout)
         )
 
-        self.encoder_layer2 = nn.Sequential(
-            nn.Conv1d(
-                in_channels=self.out_channel,
-                out_channels=int(self.out_channel * self.channel_mul),
-                kernel_size=self.kernel_size,
-                stride=self.stride,
-            ),
-            self.act_fn(),
-        )
-
-        self.encoder_output = nn.Sequential(
-            nn.Conv1d(
-                in_channels=int(self.out_channel * self.channel_mul),
-                out_channels=int(self.out_channel * self.channel_mul * 2),
-                kernel_size=self.kernel_size,
-                stride=self.stride,
-            ),
-            self.act_fn(),
-        )
-
-        self.dense_layers = nn.Sequential(
-            nn.Linear(
-                self.conv3_shape *
-                int(self.out_channel * self.channel_mul * 2),
-                self.hidden_layer,
-            ),
-            self.act_fn(),
-            nn.Dropout(self.dropout),
+        dense_layer2 = nn.Sequential(
             nn.Linear(self.hidden_layer, self.out_dim),
         )
 
-        self.decoder_layer1 = nn.Sequential(
-            nn.ConvTranspose1d(
-                in_channels=int(self.out_channel * self.channel_mul * 2),
-                out_channels=int(self.out_channel * self.channel_mul),
-                kernel_size=self.kernel_size,
-                stride=self.stride,
-                output_padding=self.op1,
-                padding=self.p1,
-            ),
-            self.act_fn(),
-        )
+        dense_layers.append(dense_layer1)
+        dense_layers.append(dense_layer2)
 
-        self.decoder_layer2 = nn.Sequential(
-            nn.ConvTranspose1d(
-                in_channels=int(self.out_channel * self.channel_mul),
-                out_channels=self.out_channel,
-                kernel_size=self.kernel_size,
-                stride=self.stride,
-                output_padding=self.op2,
-                padding=self.p2,
-            ),
-            self.act_fn(),
-        )
+        self.dense_layers = nn.Sequential(*dense_layers)
+        
+        # DECODER TRANSPOSE CONVOLUTIONAL LAYERS
 
-        self.decoder_output = nn.Sequential(
-            nn.ConvTranspose1d(
-                in_channels=self.out_channel,
-                out_channels=1,
-                kernel_size=self.kernel_size,
-                stride=self.stride,
-                output_padding=self.op3,
-                padding=self.p3,
-            ),
-            self.act_fn(),
-        )
+        dec_in_channel = self.out_channel * self.channel_mul ** (self.n_cl-1)
+        dec_out_channel = self.out_channel * self.channel_mul  ** (self.n_cl-2)
+
+        dec_layers = []
+
+        for block in range(self.n_cl):
+
+            tconv_out_shape = all_conv_shapes[self.n_cl - block - 1]
+            tconv_in_shape = all_conv_shapes[self.n_cl - block]
+
+            tconv_shape = int(((tconv_in_shape - 1) * self.stride) + self.kernel_size)
+
+            # Calculate padding to input or output of transpose conv layer
+            if tconv_shape != tconv_out_shape:
+                if tconv_shape > tconv_out_shape:
+                    # Pad input to transpose conv layer
+                    padding = tconv_shape - tconv_out_shape
+                    output_padding = 0
+                elif tconv_shape < tconv_out_shape:
+                    # Pad output of transpose conv layer
+                    padding = 0
+                    output_padding = tconv_out_shape - tconv_shape
+            else:
+                padding = 0
+                output_padding = 0
+
+            if block == self.n_cl - 1:
+                dec_out_channel = 1
+
+            tconv_layer = nn.Sequential(
+                nn.ConvTranspose1d(
+                    in_channels=dec_in_channel,
+                    out_channels=dec_out_channel,
+                    kernel_size=self.kernel_size,
+                    stride=self.stride,
+                    output_padding=output_padding,
+                    padding=padding,
+                ),
+                self.act_fn(),
+            )
+            dec_layers.append(tconv_layer)
+
+            # Update in/out channels
+            if block < self.n_cl - 1:
+                dec_in_channel = dec_out_channel
+                dec_out_channel = dec_out_channel // self.channel_mul
+
+        self.decoder_layers = nn.Sequential(*dec_layers)
 
     def forward(self, x):
         x = x.unsqueeze(0)
         x = x.permute(1, 0, 2)
 
-        out = self.encoder_layer1(x)
-        out = self.encoder_layer2(out)
-        out = self.encoder_output(out)
+        out = self.encoder_layers(x)
 
         pred = out.view(out.size(0), -1)
         pred = self.dense_layers(pred)
 
-        recon = self.decoder_layer1(out)
-        recon = self.decoder_layer2(recon)
-        recon = self.decoder_output(recon)
+        recon = self.decoder_layers(out)
         recon = recon.squeeze(dim=1)
 
         return recon, pred
@@ -420,9 +448,7 @@ class AE_cnn(nn.Module):
         x = x.unsqueeze(0)
         x = x.permute(1, 0, 2)
 
-        out = self.encoder_layer1(x)
-        out = self.encoder_layer2(out)
-        out = self.encoder_output(out)
+        out = self.encoder_layers(x)
 
         pred = out.view(out.size(0), -1)
         pred = self.dense_layers(pred)
@@ -433,13 +459,9 @@ class AE_cnn(nn.Module):
         x = x.unsqueeze(0)
         x = x.permute(1, 0, 2)
 
-        out = self.encoder_layer1(x)
-        out = self.encoder_layer2(out)
-        out = self.encoder_output(out)
+        out = self.encoder_layers(x)
 
-        recon = self.decoder_layer1(out)
-        recon = self.decoder_layer2(recon)
-        recon = self.decoder_output(recon)
+        recon = self.decoder_layers(out)
         recon = recon.squeeze(dim=1)
 
         return recon
@@ -527,17 +549,14 @@ class AEGANTrainer(nn.Module):
         params_gen = [
             param for name, param in self.named_parameters() if "dis" not in name
         ]
-        params_dis = [param for name,
-                      param in self.named_parameters() if "dis" in name]
+        params_dis = [param for name, param in self.named_parameters() if "dis" in name]
 
         # Optim for generators and discriminators
         optim_fn_gen = OptimSwitch().fn(params["optim_fn_gen"])
         optim_fn_dis = OptimSwitch().fn(params["optim_fn_dis"])
 
-        self.gen_opt = optim_fn_gen(
-            params_gen, lr=self.lr_gen, weight_decay=1e-5)
-        self.dis_opt = optim_fn_dis(
-            params_dis, lr=self.lr_dis, weight_decay=1e-5)
+        self.gen_opt = optim_fn_gen(params_gen, lr=self.lr_gen, weight_decay=1e-5)
+        self.dis_opt = optim_fn_dis(params_dis, lr=self.lr_dis, weight_decay=1e-5)
 
     def get_optimizer(self):
         return self.gen_opt, self.dis_opt
@@ -700,21 +719,30 @@ class SharedLayer(nn.Module):
         self.hidden_size = hidden_size
         self.activation = activation
         self.dropout = dropout
-        linear_layers = []
+
+        dense_layers = []
         for layer in range(num_hidden_layer):
-            linear_layers.append(nn.Linear(self.hidden_size, self.hidden_size))
-            linear_layers.append(nn.BatchNorm1d(self.hidden_size))
-            linear_layers.append(self.activation())
-        self.linear_layers = nn.Sequential(*linear_layers)
-        self.out_layer = nn.Sequential(
+            dense_layer = nn.Sequential(
+                nn.Linear(self.hidden_size, self.hidden_size),
+                nn.BatchNorm1d(self.hidden_size),
+                self.activation()
+            )
+            dense_layers.append(dense_layer)
+        
+        output_layer = nn.Sequential(
             nn.Linear(self.hidden_size, self.hidden_size),
             nn.BatchNorm1d(self.hidden_size),
         )
 
+        dense_layers.append(output_layer)
+
+
+
+        self.dense_layers = nn.Sequential(*dense_layers)
+
     def forward(self, x):
-        x = self.linear_layers(x)
-        x = self.out_layer(x)
-        return x
+        out = self.dense_layers(x)
+        return out
 
 
 class AEGen(nn.Module):
@@ -728,48 +756,70 @@ class AEGen(nn.Module):
         self.hidden_size = hidden_size
         self.dropout = dropout
 
-        enc_layer = []
-        for layer in range(num_hidden_layer - 1):
-            enc_layer.append(nn.Linear(self.hidden_size, self.hidden_size))
-            enc_layer.append(nn.BatchNorm1d(self.hidden_size))
-            enc_layer.append(self.activation())
-        self.enc_layer = nn.Sequential(*enc_layer)
-
-        dec_layer = []
-        for layer in range(num_hidden_layer):
-            dec_layer.append(nn.Linear(self.hidden_size, self.hidden_size))
-            dec_layer.append(nn.BatchNorm1d(self.hidden_size))
-            dec_layer.append(self.activation())
-        self.dec_layer = nn.Sequential(*dec_layer)
-        self.enc_input = nn.Sequential(
+        # Encoder input layer
+        encoder_input = nn.Sequential(
             nn.Linear(self.input_size, self.hidden_size),
             nn.BatchNorm1d(self.hidden_size),
             self.activation(),
         )
-        self.enc_output = nn.Sequential(
+        # Encoder mid layers
+        encoder_mid_layers = []
+        for layer in range(num_hidden_layer - 1):
+            mid_layer = nn.Sequential(
+                nn.Linear(self.hidden_size, self.hidden_size),
+                nn.BatchNorm1d(self.hidden_size),
+                self.activation()
+            )
+            encoder_mid_layers.append(mid_layer)
+        encoder_mid_layers = nn.Sequential(*encoder_mid_layers)
+        # Encoder output layer
+        encoder_output = nn.Sequential(
             nn.Linear(self.hidden_size, self.hidden_size),
             nn.BatchNorm1d(self.hidden_size),
         )
-        self.dec_output = nn.Sequential(
-            nn.Linear(self.hidden_size, self.output_size), self.activation()
+
+        # Decoder input and mid layer
+        decoder_mid_layers = []
+        for layer in range(num_hidden_layer):
+            mid_layer = nn.Sequential(
+                nn.Linear(self.hidden_size, self.hidden_size),
+                nn.BatchNorm1d(self.hidden_size),
+                self.activation()
+            )
+            decoder_mid_layers.append(mid_layer)
+        decoder_mid_layers = nn.Sequential(*decoder_mid_layers)
+        # Decoder output layer
+        decoder_output = nn.Sequential(
+            nn.Linear(self.hidden_size, self.output_size),
+            self.activation()
         )
 
+        # Collect encoder layers
+        encoder_layers = []
+        encoder_layers.append(encoder_input)
+        encoder_layers.append(encoder_mid_layers)
+        encoder_layers.append(encoder_output)
+        self.encoder_layers = nn.Sequential(*encoder_layers)
+
+        # Collect decoder layers
+        decoder_layers = []
+        decoder_layers.append(decoder_mid_layers)
+        decoder_layers.append(decoder_output)
+        self.decoder_layers = nn.Sequential(*decoder_layers)
+
     def encode(self, x):
-        x = self.enc_input(x)
-        x = self.enc_layer(x)
-        out = self.enc_output(x)
-        return x
+        out = self.encoder_layers(x)
+        return out
 
     def decode(self, x):
-        x = self.dec_layer(x)
-        out = self.dec_output(x)
+        out = self.decoder_layers(x)
         return out
 
 
 class Dis(nn.Module):
     # Discriminator architecture
     def __init__(
-            self, input_size, num_hidden_layer, hidden_size, dropout, activation, loss_fn
+        self, input_size, num_hidden_layer, hidden_size, dropout, activation, loss_fn
     ):
         super().__init__()
         self.input_size = input_size
@@ -778,24 +828,40 @@ class Dis(nn.Module):
         self.dropout = dropout
         self.activation = activation
         self.loss_fn = loss_fn
-        linear_layers = []
+
+        mid_layers = []
         for layer in range(num_hidden_layer - 1):
-            linear_layers.append(nn.Linear(self.hidden_size, self.hidden_size))
-            linear_layers.append(nn.BatchNorm1d(self.hidden_size))
-            linear_layers.append(self.activation())
-        self.linear_layers = nn.Sequential(*linear_layers)
-        self.input_layer = nn.Sequential(
+
+            mid_layer = nn.Sequential(
+                nn.Linear(self.hidden_size, self.hidden_size),
+                nn.BatchNorm1d(self.hidden_size),
+                self.activation()            
+            )
+            mid_layers.append(mid_layer)
+
+        mid_layers = nn.Sequential(*mid_layers)
+
+        input_layer = nn.Sequential(
             nn.Linear(self.input_size, self.hidden_size),
             nn.BatchNorm1d(self.hidden_size),
             self.activation(),
         )
-        self.output_layer = nn.Sequential(
-            nn.Linear(self.hidden_size, 1), nn.Sigmoid())
+        
+        output_layer = nn.Sequential(
+            nn.Linear(self.hidden_size, 1), 
+            nn.Sigmoid()
+            )
+
+        dense_layers = []
+
+        dense_layers.append(input_layer)
+        dense_layers.append(mid_layers)
+        dense_layers.append(output_layer)
+
+        self.dense_layers = nn.Sequential(*dense_layers)
 
     def forward(self, x):
-        x = self.input_layer(x)
-        x = self.linear_layers(x)
-        out = self.output_layer(x)
+        out = self.dense_layers(x)
         return out
 
     def calc_dis_loss(self, input_fake, input_real):
@@ -877,7 +943,7 @@ class AEGANEnsemble(nn.Module):
             x_reconstructions = torch.stack(x_reconstructions).mean(dim=0)
             y_reconstructions = None
             x_predictions = None
-            y_predictions = torch.stack(y_predictions).mean(dim=0)     
+            y_predictions = torch.stack(y_predictions).mean(dim=0)
 
         elif y is not None and x is None:
             y_reconstructions = []
@@ -888,6 +954,6 @@ class AEGANEnsemble(nn.Module):
             x_reconstructions = None
             y_reconstructions = torch.stack(y_reconstructions).mean(dim=0)
             x_predictions = torch.stack(x_predictions).mean(dim=0)
-            y_predictions = None            
+            y_predictions = None
 
         return x_reconstructions, y_reconstructions, x_predictions, y_predictions

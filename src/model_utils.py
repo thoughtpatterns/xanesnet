@@ -240,6 +240,9 @@ class WCCLoss(nn.Module):
 
     def __init__(self, gaussianHWHM):
         super().__init__()
+        if gaussianHWHM is None:
+            print(">> WCC Loss Function Gaussian HWHM parameter not set in input yaml file. Setting equal to 10")
+            gaussianHWHM = 10
         self.gaussianHWHM = gaussianHWHM
 
     def forward(self, y_true, y_pred):
@@ -447,3 +450,31 @@ def loss_reg_fn(
             l_reg += torch.norm(param)
     
     return l_reg
+
+
+def get_conv_layers_output_size(input_size, num_conv_layers, channel_mul, kernel_size, stride, out_channel, include_pooling = False):
+    """
+    Calculates size of flattened output from N 1D Convolutional layers
+    For use with CNN and AE_CNN models
+    """
+    in_channel = 1
+    
+    for block in range(num_conv_layers):
+
+        out_length = int(np.floor((input_size - kernel_size) / stride + 1))
+        in_channel = int(out_channel)
+        out_channel = out_channel * (channel_mul)
+        input_size = out_length
+
+    if include_pooling:
+
+        out_length = int(np.floor((input_size - kernel_size) / stride + 1))
+
+    return in_channel * out_length
+
+
+
+
+
+
+
