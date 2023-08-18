@@ -109,20 +109,23 @@ def main(
                     atoms = load_xyz(f)
                 xyz_data[i, :] = descriptor.transform(atoms)
         elif str(type(descriptor).__name__) == 'MBTR':
-            with open(xyz_path / f"{id_}.xyz", "r") as f:
-                atoms = load_xyz(f)
-                tmp = descriptor.create(atoms)
-            xyz_data[i, :] = tmp
+            for i, id_ in enumerate(tqdm.tqdm(ids)):
+                with open(xyz_path / f"{id_}.xyz", "r") as f:
+                    atoms = load_xyz(f)
+                    tmp = descriptor.create(atoms)
+                xyz_data[i, :] = tmp
         elif str(type(descriptor).__name__) == 'LMBTR':
-            with open(xyz_path / f"{id_}.xyz", "r") as f:
-                atoms = load_xyz(f)
-                tmp = descriptor.create(atoms, positions=[0])
-            xyz_data[i, :] = tmp
+            for i, id_ in enumerate(tqdm.tqdm(ids)):
+                with open(xyz_path / f"{id_}.xyz", "r") as f:
+                    atoms = load_xyz(f)
+                    tmp = descriptor.create(atoms, positions=[0])
+                xyz_data[i, :] = tmp
         elif str(type(descriptor).__name__) == 'SOAP':
-            with open(xyz_path / f"{id_}.xyz", "r") as f:
-                atoms = load_xyz(f)
-                tmp = descriptor.create_single(atoms, positions=[0])
-            xyz_data[i, :] = tmp
+            for i, id_ in enumerate(tqdm.tqdm(ids)):
+                with open(xyz_path / f"{id_}.xyz", "r") as f:
+                    atoms = load_xyz(f)
+                    tmp = descriptor.create_single(atoms, positions=[0])
+                xyz_data[i, :] = tmp
         else:
             print(">> ...This descriptor doesn't exist, try again!!\n")
 
