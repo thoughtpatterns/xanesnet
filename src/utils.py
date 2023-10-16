@@ -18,9 +18,18 @@ this program.  If not, see <https://www.gnu.org/licenses/>.
 ############################### LIBRARY IMPORTS ###############################
 ###############################################################################
 
+import torch
+import yaml
 import numpy as np
+import pickle as pickle
 
 from pathlib import Path
+from ase import Atoms
+from typing import TextIO
+
+from tqdm import tqdm
+
+from spectrum.xanes import XANES
 
 ###############################################################################
 ################################## FUNCTIONS ##################################
@@ -92,170 +101,154 @@ def print_nested_dict(dict_: dict, nested_level: int = 0):
     return 0
 
 
-def print_cross_validation_scores(scores: dict, model_mode: str):
-    # prints a summary table of the scores from k-fold cross validation;
-    # summarises the elapsed time and train/test metric scores for each k-fold
-    # with overall k-fold cross validation statistics (mean and std. dev.)
-    # using the `scores` dictionary returned from `cross_validate`
+def save_model(path, model, descriptor, data_compress, metadata):
+    Path(path).mkdir(parents=True, exist_ok=True)
 
-    # print(scores)
-    print("")
-    print(">> summarising scores from k-fold cross validation...")
-    print("")
+    model_dir = unique_path(Path(path), "model")
+    model_dir.mkdir()
 
-    if model_mode == "mlp" or model_mode == "cnn":
-        #
-        print("*" * 16 * 3)
-        fmt = "{:<10s}{:>6s}{:>16s}{:>16s}"
-        print(fmt.format("k-fold", "time", "train", "test"))
-        print("*" * 16 * 3)
-
-        fmt = "{:<10.0f}{:>5.1f}s{:>16.8f}{:>16.8f}"
-        for kf, (t, train, test) in enumerate(
-            zip(scores["fit_time"], scores["train_score"], scores["test_score"])
-        ):
-            print(fmt.format(kf, t, np.absolute(train), np.absolute(test)))
-
-        print("*" * 16 * 3)
-        fmt = "{:<10s}{:>5.1f}s{:>16.8f}{:>16.8f}"
-        means_ = (
-            np.mean(np.absolute(scores[score]))
-            for score in ("fit_time", "train_score", "test_score")
+    with open(model_dir / "descriptor.pickle", "wb") as f:
+        pickle.dump(descriptor, f)
+    with open(model_dir / "dataset.npz", "wb") as f:
+        np.savez_compressed(
+            f,
+            ids=data_compress["ids"],
+            x=data_compress["x"],
+            y=data_compress["y"],
         )
-        print(fmt.format("mean", *means_))
-        stdevs_ = (
-            np.std(np.absolute(scores[score]))
-            for score in ("fit_time", "train_score", "test_score")
+
+    torch.save(model, model_dir / f"model.pt")
+    print("saved model to disk")
+
+    with open(model_dir / "metadata.yaml", "w") as f:
+        yaml.dump_all([metadata], f)
+
+
+def save_models(path, models, descriptor, data_compress, metadata):
+    for model in models:
+        save_model(path, model, descriptor, data_compress, metadata)
+
+
+def save_prediction(save_path, mode, pred_data, index, e):
+    if e is None:
+        e = np.arange(pred_data.shape[1])
+    if mode == "predict_xanes":
+        for id_, y_predict_ in tqdm.tqdm(zip(index, pred_data)):
+            with open(save_path / f"{id_}.txt", "w") as f:
+                save_xanes(f, XANES(e, y_predict_.detach().numpy()))
+
+    elif mode == "predict_xyz":
+        for id_, y_predict_ in tqdm.tqdm(zip(index, pred_data)):
+            with open(save_path / f"{id_}.txt", "w") as f:
+                f.write("\n".join(map(str, y_predict_.detach().numpy())))
+
+
+def load_xyz(xyz_f: TextIO) -> Atoms:
+    # loads an Atoms object from a .xyz file
+
+    xyz_f_l = xyz_f.readlines()
+
+    # pop the number of atoms `n_ats`
+    n_ats = int(xyz_f_l.pop(0))
+
+    # pop the .xyz comment block
+    comment_block = xyz_f_l.pop(0)
+
+    # pop the .xyz coordinate block
+    coord_block = [xyz_f_l.pop(0).split() for _ in range(n_ats)]
+    # atomic symbols or atomic numbers
+    ats = np.array([l[0] for l in coord_block], dtype="str")
+    # atomic coordinates in .xyz format
+    xyz = np.array([l[1:] for l in coord_block], dtype="float32")
+
+    try:
+        info = dict(
+            [
+                [key, str_to_numeric(val)]
+                for key, val in [
+                    pair.split(" = ") for pair in comment_block.split(" | ")
+                ]
+            ]
         )
-        print(fmt.format("std. dev.", *stdevs_))
+    except ValueError:
+        info = dict()
 
-        print("*" * 16 * 3)
+    try:
+        # return Atoms object, assuming `ats` contains atomic symbols
+        return Atoms(ats, xyz, info=info)
+    except KeyError:
+        # return Atoms object, assuming `ats` contains atomic numbers
+        return Atoms(ats.astype("uint8"), xyz, info=info)
 
-        print("")
 
-    if model_mode == "ae_mlp" or model_mode == "ae_cnn":
-        #
-        print("*" * 16 * 4)
-        fmt = "{:<10s}{:>6s}{:>16s}{:>16s}{:>16s}"
-        print(fmt.format("k-fold", "time", "train", "test recon", "test pred"))
-        print("*" * 16 * 4)
+def save_xyz(xyz_f: TextIO, atoms: Atoms):
+    # saves an Atoms object in .xyz format
 
-        fmt = "{:<10.0f}{:>5.1f}s{:>16.8f}{:>16.8f}{:>16.8f}"
-        for kf, (t, train, test_recon, test_pred) in enumerate(
-            zip(
-                scores["fit_time"],
-                scores["train_score"],
-                scores["test_recon_score"],
-                scores["test_pred_score"],
-            )
-        ):
-            print(
-                fmt.format(
-                    kf,
-                    t,
-                    np.absolute(train),
-                    np.absolute(test_recon),
-                    np.absolute(test_pred),
-                )
-            )
+    # write the number of atoms in `atoms`
+    xyz_f.write(f"{len(atoms)}\n")
+    # write additional info ('key = val', '|'-delimited) from the `atoms.info`
+    # dictionary to the .xyz comment block
+    for i, (key, val) in enumerate(atoms.info.items()):
+        if i < len(atoms.info) - 1:
+            xyz_f.write(f"{key} = {val} | ")
+        else:
+            xyz_f.write(f"{key} = {val}")
+    xyz_f.write("\n")
+    # write atomic symbols and atomic coordinates in .xyz format
+    for atom in atoms:
+        fmt = "{:<4}{:>16.8f}{:>16.8f}{:>16.8f}\n"
+        xyz_f.write(fmt.format(atom.symbol, *atom.position))
 
-        print("*" * 16 * 4)
+    return 0
 
-        fmt = "{:<10s}{:>5.1f}s{:>16.8f}{:>16.8f}{:>16.8f}"
-        means_ = (
-            np.mean(np.absolute(scores[score]))
-            for score in (
-                "fit_time",
-                "train_score",
-                "test_recon_score",
-                "test_pred_score",
-            )
-        )
-        print(fmt.format("mean", *means_))
-        stdevs_ = (
-            np.std(np.absolute(scores[score]))
-            for score in (
-                "fit_time",
-                "train_score",
-                "test_recon_score",
-                "test_pred_score",
-            )
-        )
-        print(fmt.format("std. dev.", *stdevs_))
 
-        print("*" * 16 * 4)
+def load_xanes(xanes_f: TextIO) -> XANES:
+    # loads a XANES object from an FDMNES (.txt) output file
 
-        print("")
+    xanes_f_l = xanes_f.readlines()
 
-    if model_mode == "aegan_mlp" or model_mode == "aegan_cnn":
-        #
-        print("*" * (16 + 18 * 5))
-        fmt = "{:<10s}{:>6s}{:>18s}{:>18s}{:>18s}{:>18s}{:>18s}"
-        print(
-            fmt.format(
-                "k-fold",
-                "time",
-                "train",
-                "test recon xyz",
-                "test recon xanes",
-                "test pred xyz",
-                "test pred xanes",
-            )
-        )
-        print("*" * (16 + 18 * 5))
+    # pop the FDMNES header block
+    for _ in range(2):
+        xanes_f_l.pop(0)
 
-        fmt = "{:<10.0f}{:>5.1f}s{:>18.8f}{:>18.8f}{:>18.8f}{:>18.8f}{:>18.8f}"
-        for kf, (t, train, recon_xyz, recon_xanes, pred_xyz, pred_xanes) in enumerate(
-            zip(
-                scores["fit_time"],
-                scores["train_score"],
-                scores["test_recon_xyz_score"],
-                scores["test_recon_xanes_score"],
-                scores["test_pred_xyz_score"],
-                scores["test_pred_xanes_score"],
-            )
-        ):
-            print(
-                fmt.format(
-                    kf,
-                    t,
-                    np.absolute(train),
-                    np.absolute(recon_xyz),
-                    np.absolute(recon_xanes),
-                    np.absolute(pred_xyz),
-                    np.absolute(pred_xanes),
-                )
-            )
+    # pop the XANES spectrum block
+    xanes_block = [xanes_f_l.pop(0).split() for _ in range(len(xanes_f_l))]
+    # absorption energies
+    e = np.array([l[0] for l in xanes_block], dtype="float64")
+    # absorption intensities
+    m = np.array([l[1] for l in xanes_block], dtype="float64")
 
-        print("*" * (16 + 18 * 5))
+    return XANES(e, m)
 
-        fmt = "{:<10s}{:>5.1f}s{:>18.8f}{:>18.8f}{:>18.8f}{:>18.8f}{:>18.8f}"
-        means_ = (
-            np.mean(np.absolute(scores[score]))
-            for score in (
-                "fit_time",
-                "train_score",
-                "test_recon_xyz_score",
-                "test_recon_xanes_score",
-                "test_pred_xyz_score",
-                "test_pred_xanes_score",
-            )
-        )
-        print(fmt.format("mean", *means_))
-        stdevs_ = (
-            np.std(np.absolute(scores[score]))
-            for score in (
-                "fit_time",
-                "train_score",
-                "test_recon_xyz_score",
-                "test_recon_xanes_score",
-                "test_pred_xyz_score",
-                "test_pred_xanes_score",
-            )
-        )
-        print(fmt.format("std. dev.", *stdevs_))
-        print("*" * (16 + 18 * 5))
 
-        print("")
+def save_xanes(xanes_f: TextIO, xanes: XANES):
+    # saves a XANES object in FDMNES (.txt) output format
+
+    xanes_f.write(f'{"FDMNES":>10}\n{"energy":>10}{"<xanes>":>12}\n')
+    for e_, m_ in zip(*xanes.spectrum):
+        fmt = f"{e_:>10.2f}{m_:>15.7E}\n"
+        xanes_f.write(fmt.format(e_, m_))
+
+    return 0
+
+
+def save_xanes_mean(xanes_f: TextIO, xanes: XANES, std):
+    # saves a mean and sandard deviation of XANES object in FDMNES (.txt) output format
+    xanes_f.write(
+        f'{"FDMNES":>10}\n{"energy":>10}{"<mean_xanes>":>12}{"<std_xanes>":>12}\n'
+    )
+    for e_, m_, std_ in zip(*xanes.spectrum, std):
+        fmt = f"{e_:>10.2f}{m_:>15.7E}{std_:>15.7E}\n"
+        xanes_f.write(fmt.format(e_, m_, std_))
+
+    return 0
+
+
+def save_xyz_mean(xyz_f: TextIO, mean, std):
+    # saves a mean and sandard deviation of XANES object in FDMNES (.txt) output format
+    xyz_f.write(f'{"<mean_xyz>":>12}{"<std_xyz>":>12}\n')
+    for m_, std_ in zip(mean, std):
+        fmt = f"{m_:>15.7E}{std_:>15.7E}\n"
+        xyz_f.write(fmt.format(m_, std_))
 
     return 0

@@ -2,366 +2,147 @@
 XANESNET
 
 This program is free software: you can redistribute it and/or modify it under
-the terms of the GNU General Public License as published by the Free Software 
-Foundation, either Version 3 of the License, or (at your option) any later 
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either Version 3 of the License, or (at your option) any later
 version.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY
-WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A 
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
 PARTICULAR PURPOSE. See the GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License along with 
+You should have received a copy of the GNU General Public License along with
 this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-###############################################################################
-############################### LIBRARY IMPORTS ###############################
-###############################################################################
+from pathlib import Path
+from numpy.random import RandomState
+from sklearn.utils import shuffle
 
-import pickle as pickle
-import tqdm as tqdm
-
-from torchinfo import summary
-
-from utils import print_cross_validation_scores
-
-from learn import train
-from ae_learn import train as ae_train
-from aegan_learn import train_aegan as aegan_train
-
-from kfold_fn import kfold_train
-from kfold_fn import kfold_ae_train
-from kfold_fn import kfold_aegan_train
+from data_descriptor import encode_train
+from utils import save_models
+from utils import save_model
+from creator import (
+    create_model,
+    create_descriptor,
+    create_learn_scheme,
+)
 
 
-def train_xyz(
-	xyz,
-	xanes,
-	exp_name,
-	model_mode,
-	hyperparams,
-	epochs,
-	kfold,
-	kfold_params,
-	rng,
-	weight_seed,
-	lr_scheduler,
-	model_eval,
-	load_guess,
-	loadguess_params,
-	optuna_params,
-):
-	print("training xyz structure")
+def train_model(config, args):
+    """
+    Train a ML model based on the provided configuration and arguments
+    """
+    # Encode training dataset with specified descriptor type
+    print(
+        ">> Encoding training dataset with %s descriptor"
+        % config["descriptor"]["type"],
+    )
 
-	if model_mode == "mlp" or model_mode == "cnn" or model_mode == "lstm":
-		if kfold:
-			x = xyz
-			y = xanes
-			result, model = kfold_train(
-				x,
-				y,
-				kfold_params,
-				rng,
-				exp_name,
-				model_mode,
-				hyperparams,
-				epochs,
-				weight_seed,
-				lr_scheduler,
-				model_eval,
-				load_guess,
-				loadguess_params,
-			)
-			print_cross_validation_scores(result, model_mode)
-		else:
-			if optuna_params["tune"]:
-				from optuna_learn import main as learn_optparams
+    descriptor = create_descriptor(
+        config["descriptor"]["type"], **config["descriptor"]["params"]
+    )
 
-				print(">> Finding optimal hyperparams...")
-				opt_trial, opt_score = learn_optparams(optuna_params,
-								xyz,
-								xanes,
-								exp_name,
-								model_mode,
-								hyperparams,
-								epochs,
-								weight_seed,
-								lr_scheduler,
-								model_eval,
-							)
-				hyperparams.update(opt_trial.params)
+    xyz, xanes, index, n_x_features, n_y_features = encode_train(
+        config["xyz_path"], config["xanes_path"], descriptor
+    )
 
-			print(">> fitting neural net...")
-			model, score = train(
-				xyz,
-				xanes,
-				exp_name,
-				model_mode,
-				hyperparams,
-				epochs,
-				weight_seed,
-				lr_scheduler,
-				model_eval,
-				load_guess,
-				loadguess_params,
-			)
+    # Shuffle the encoded data for randomness
+    xyz, xanes = shuffle(
+        xyz, xanes, random_state=RandomState(seed=config["hyperparams"]["seed"])
+    )
 
-	elif model_mode == "ae_mlp" or model_mode == "ae_cnn":
-		if kfold:
-			x = xyz
-			y = xanes
-			result, model = kfold_ae_train(
-				x,
-				y,
-				kfold_params,
-				rng,
-				exp_name,
-				model_mode,
-				hyperparams,
-				epochs,
-				weight_seed,
-				lr_scheduler,
-				model_eval,
-				load_guess,
-				loadguess_params,
-			)
-			print_cross_validation_scores(result, model_mode)
-		else:
+    # Apply Fourier's transformation to spectra dataset if specified
+    if args.fourier_transform:
+        from data_transform import fourier_transform_data
 
-			if optuna_params["tune"]:
-				from optuna_learn import main as learn_optparams
+        print(">> Transforming training data using Fourier transform...")
+        xanes = fourier_transform_data(xanes)
 
-				print(">> Finding optimal hyperparams...")
-				opt_trial, opt_score = learn_optparams(optuna_params,
-								xyz,
-								xanes,
-								exp_name,
-								model_mode,
-								hyperparams,
-								epochs,
-								weight_seed,
-								lr_scheduler,
-								model_eval,
-							)
-				hyperparams.update(opt_trial.params)
+    # Apply data augmentation if specified
+    if config["data_augment"]:
+        from data_augmentation import data_augment
 
-			print(">> fitting neural net...")
-			model, score = ae_train(
-				xyz,
-				xanes,
-				exp_name,
-				model_mode,
-				hyperparams,
-				epochs,
-				weight_seed,
-				lr_scheduler,
-				model_eval,
-				load_guess,
-				loadguess_params,
-			)
+        print(">> Applying data augmentation...")
+        xyz, xanes = data_augment(
+            config["augment_params"],
+            xyz,
+            xanes,
+            index,
+            n_x_features,
+            n_y_features,
+        )
 
-	summary(model, (1, xyz.shape[1]))
-	return model
+    # assign descriptor and spectra datasets to X and Y based on train mode
+    if args.mode == "train_xyz":
+        x_data = xyz
+        y_data = xanes
+    elif args.mode == "train_xanes":
+        x_data = xanes
+        y_data = xyz
+    else:
+        raise ValueError(f"Unsupported mode name: {args.mode}")
 
+    # Initialise ML model with specified model parameters
+    config["model_params"]["x_data"] = x_data
+    config["model_params"]["y_data"] = y_data
 
-def train_xanes(
-	xyz,
-	xanes,
-	exp_name,
-	model_mode,
-	hyperparams,
-	epochs,
-	kfold,
-	kfold_params,
-	rng,
-	weight_seed,
-	lr_scheduler,
-	model_eval,
-	load_guess,
-	loadguess_params,
-	optuna_params,
-):
-	print("training xanes spectrum")
+    model = create_model(args.model_mode, **config["model_params"])
 
-	if model_mode == "mlp" or model_mode == "cnn" or model_mode == "lstm":
-		if kfold:
-			x = xanes
-			y = xyz
-			result, model = kfold_train(
-				x,
-				y,
-				kfold_params,
-				rng,
-				exp_name,
-				model_mode,
-				hyperparams,
-				epochs,
-				weight_seed,
-				lr_scheduler,
-				model_eval,
-				load_guess,
-				loadguess_params,
-			)
-			print_cross_validation_scores(result, model_mode)
-		else:
-			if optuna_params["tune"]:
-				from optuna_learn import main as learn_optparams
+    # Initialise learning rate scheduler
+    if config["lr_scheduler"] and not args.model_mode.startswith("aegan"):
+        from model_utils import LRScheduler
 
-				print(">> Finding optimal hyperparams...")
-				opt_trial, opt_score = learn_optparams(optuna_params,
-								xyz,
-								xanes,
-								exp_name,
-								model_mode,
-								hyperparams,
-								epochs,
-								weight_seed,
-								lr_scheduler,
-								model_eval,
-							)
-				hyperparams.update(opt_trial.params)
+        scheduler = LRScheduler(
+            model,
+            config["hyperparams"]["optim_fn"],
+            config["hyperparams"]["lr"],
+            scheduler_type=config["scheduler_type"],
+            params=config["scheduler_params"],
+        )
+    else:
+        scheduler = None
 
-			print(">> fitting neural net...")
-			model, score = train(
-				xanes,
-				xyz,
-				exp_name,
-				model_mode,
-				hyperparams,
-				epochs,
-				weight_seed,
-				lr_scheduler,
-				model_eval,
-				load_guess,
-				loadguess_params,
-			)
+    # Initialise learn scheme
+    scheme = create_learn_scheme(
+        args.model_mode,
+        model,
+        x_data,
+        y_data,
+        config["hyperparams"],
+        config["kfold"],
+        config["kfold_params"],
+        config["bootstrap_params"],
+        config["ensemble_params"],
+        schedular=scheduler,
+    )
 
-	elif model_mode == "ae_mlp" or model_mode == "ae_cnn":
-		if kfold:
-			x = xanes
-			y = xyz
-			result, model = kfold_ae_train(
-				x,
-				y,
-				kfold_params,
-				rng,
-				exp_name,
-				model_mode,
-				hyperparams,
-				epochs,
-				weight_seed,
-				lr_scheduler,
-				model_eval,
-				load_guess,
-				loadguess_params,
-			)
-			print_cross_validation_scores(result, model_mode)
+    # Train the model using selected training strategy
+    if config["bootstrap"]:
+        model_list = scheme.train_bootstrap()
+        save_path = "bootstrap/"
+    elif config["ensemble"]:
+        model_list = scheme.train_ensemble()
+        save_path = "ensemble/"
+    else:
+        if config["kfold"]:
+            model = scheme.train_kfold()
+        else:
+            model = scheme.train()
+        save_path = "model/"
 
-		else:
-			if optuna_params["tune"]:
-				from optuna_learn import main as learn_optparams
+    # Save model to file if specified
+    if args.save:
+        metadata = {
+            "mode": args.mode,
+            "model_mode": args.model_mode,
+            "descriptor_type": config["descriptor"]["type"],
+            "descriptor_param": config["descriptor"]["params"],
+            "hyperparams": config["hyperparams"],
+            "lr_scheduler": config["lr_scheduler"],
+        }
 
-				print(">> Finding optimal hyperparams...")
-				opt_trial, opt_score = learn_optparams(optuna_params,
-								xyz,
-								xanes,
-								exp_name,
-								model_mode,
-								hyperparams,
-								epochs,
-								weight_seed,
-								lr_scheduler,
-								model_eval,
-							)
-				hyperparams.update(opt_trial.params)
-
-			print(">> fitting neural net...")
-			model, score = ae_train(
-				xanes,
-				xyz,
-				exp_name,
-				model_mode,
-				hyperparams,
-				epochs,
-				weight_seed,
-				lr_scheduler,
-				model_eval,
-				load_guess,
-				loadguess_params,
-			)
-
-	summary(model, (1, xanes.shape[1]))
-	return model
-
-
-def train_aegan(
-	xyz,
-	xanes,
-	exp_name,
-	model_mode,
-	hyperparams,
-	epochs,
-	kfold,
-	kfold_params,
-	rng,
-	weight_seed,
-	lr_scheduler,
-	model_eval,
-	load_guess,
-	loadguess_params,
-	optuna_params,
-):
-	if kfold:
-		result, model = kfold_aegan_train(
-			xyz,
-			xanes,
-			kfold_params,
-			rng,
-			exp_name,
-			model_mode,
-			hyperparams,
-			epochs,
-			weight_seed,
-			lr_scheduler,
-			model_eval,
-	  		load_guess,
-	  		loadguess_params,
-		)
-		print_cross_validation_scores(result, model_mode)
-
-	else:
-		if optuna_params["tune"]:
-			from optuna_learn import main as learn_optparams
-
-			print(">> Finding optimal hyperparams...")
-			opt_trial, opt_score = learn_optparams(optuna_params,
-							xyz,
-							xanes,
-							exp_name,
-							model_mode,
-							hyperparams,
-							epochs,
-							weight_seed,
-							lr_scheduler,
-							model_eval,
-						)
-			hyperparams.update(opt_trial.params)
-
-		print(">> fitting neural net...")
-		model, score = aegan_train(
-			xyz,
-			xanes,
-			exp_name,
-			hyperparams,
-			epochs,
-			weight_seed,
-			lr_scheduler,
-			model_eval,
-	  		load_guess,
-	  		loadguess_params,
-		)
-	summary(model)
-	# from plot import plot_running_aegan
-
-	# plot_running_aegan(losses, model_dir)
-	return model
+        data_compress = {"ids": index, "x": xyz, "y": xanes}
+        if config["bootstrap"] or config["ensemble"]:
+            save_models(save_path, model_list, descriptor, data_compress, metadata)
+        else:
+            save_model(save_path, model, descriptor, data_compress, metadata)

@@ -15,15 +15,12 @@ this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 import random
-
 import numpy as np
 
 
 # DATA AUGMENTATION
-def data_augment(
-    data_params, xyz_data, xanes_data, n_samples, n_x_features, n_y_features
-):
-    data_aug_params = data_params["augment_params"]
+def data_augment(data_params, xyz_data, xanes_data, index, n_x_features, n_y_features):
+    n_samples = len(index)
     n_aug_samples = np.multiply(n_samples, data_params["augment_mult"]) - n_samples
     print(">> ...AUGMENTING DATA...\n")
     if data_params["augment_type"].lower() == "random_noise":
@@ -31,13 +28,13 @@ def data_augment(
 
         rand = random.choices(range(n_samples), k=n_aug_samples)
         noise1 = np.random.normal(
-            data_aug_params["normal_mean"],
-            data_aug_params["normal_sd"],
+            data_params["normal_mean"],
+            data_params["normal_sd"],
             (n_aug_samples, n_x_features),
         )
         noise2 = np.random.normal(
-            data_aug_params["normal_mean"],
-            data_aug_params["normal_sd"],
+            data_params["normal_mean"],
+            data_params["normal_sd"],
             (n_aug_samples, n_y_features),
         )
 

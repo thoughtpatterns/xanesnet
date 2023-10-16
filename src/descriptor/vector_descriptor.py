@@ -22,21 +22,14 @@ this program.  If not, see <https://www.gnu.org/licenses/>.
 import numpy as np
 
 from ase import Atoms
-from abc import ABC
-from abc import abstractmethod
-from abc import abstractproperty
+from abc import ABC, abstractmethod
 
 ###############################################################################
 ################################## CLASSES ####################################
 ###############################################################################
 
 
-class Descriptor(ABC):
-    def __init__():
-        pass
-
-
-class VectorDescriptor(Descriptor, ABC):
+class VectorDescriptor(ABC):
     """
     An abstract base class for transforming a molecular system into a
     fingerprint feature vector, or 'descriptor', that encodes the local
@@ -96,10 +89,10 @@ class VectorDescriptor(Descriptor, ABC):
         pass
 
     @abstractmethod
-    def get_len(self) -> int:
+    def get_number_of_features(self) -> int:
         """
         Returns:
-            int: Length of the vector descriptor.
+            int: Number of features for this descriptor.
         """
 
         pass

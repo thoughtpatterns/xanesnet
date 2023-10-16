@@ -24,10 +24,8 @@ import numpy as np
 from ase import Atoms
 from abc import ABC
 from abc import abstractmethod
-from abc import abstractproperty
 
-from structure.descriptors import Descriptor
-from structure.descriptors import VectorDescriptor
+from .vector_descriptor import VectorDescriptor
 
 ###############################################################################
 ################################## CLASSES ####################################
@@ -130,7 +128,6 @@ class WACSF(VectorDescriptor):
             )
 
     def transform(self, system: Atoms) -> np.ndarray:
-
         rij_in_range = system.get_distances(0, range(len(system))) < self.r_max
         system = system[rij_in_range]
 
@@ -154,7 +151,7 @@ class WACSF(VectorDescriptor):
 
         if self.n_g2:
             zj = system.get_atomic_numbers()[ij[:, 1]]
-            zj = 0.1*zj
+            zj = 0.1 * zj
             rij = system.get_distances(ij[:, 0], ij[:, 1])
             g2 = self.g2_transformer.transform(zj, rij)
             wacsf = np.append(wacsf, g2)
@@ -162,8 +159,8 @@ class WACSF(VectorDescriptor):
         if self.n_g4:
             zj = system.get_atomic_numbers()[jik[:, 0]]
             zk = system.get_atomic_numbers()[jik[:, 2]]
-            zj = 0.1*zj 
-            zk = 0.1*zk 
+            zj = 0.1 * zj
+            zk = 0.1 * zk
             rij = system.get_distances(jik[:, 1], jik[:, 0])
             rik = system.get_distances(jik[:, 1], jik[:, 2])
             rjk = system.get_distances(jik[:, 0], jik[:, 2])
@@ -179,8 +176,12 @@ class WACSF(VectorDescriptor):
 
         return wacsf
 
-    def get_len(self) -> int:
+    def get_number_of_features(self) -> int:
         return int(1 + self.n_g2 + self.n_g4 + self.use_charge + self.use_spin)
+
+    def process(self, atoms: Atoms):
+        return self.transform(atoms)
+
 
 class SymmetryFunctionTransformer(ABC):
     """

@@ -23,8 +23,7 @@ import numpy as np
 
 from ase import Atoms
 
-from structure.descriptors import Descriptor
-from structure.descriptors import VectorDescriptor
+from .vector_descriptor import VectorDescriptor
 
 ###############################################################################
 ################################## CLASSES ####################################
@@ -121,5 +120,8 @@ class RDC(VectorDescriptor):
 
         return rdc
 
-    def get_len(self) -> int:
+    def get_number_of_features(self) -> int:
         return len(self.r_aux) + self.use_charge + self.use_spin
+
+    def process(self, atoms: Atoms):
+        return self.transform(atoms)
