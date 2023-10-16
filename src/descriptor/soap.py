@@ -2,22 +2,20 @@
 # Also see https://github.com/wjm41/soapgp
 
 import time
+import ase.geometry.cell
+import ase.data
 import numpy as np
+import sparse as sp
+import dscribe.ext
 from warnings import warn
 
 from scipy.special import gamma
 from scipy.linalg import sqrtm, inv
-
 from ase import Atoms
-import ase.geometry.cell
-import ase.data
-
-import sparse as sp
-
 from dscribe.descriptors import Descriptor
 from dscribe.core import System
 from dscribe.utils.dimensionality import is1d
-import dscribe.ext
+
 
 class SOAP(Descriptor):
     """Class for generating a partial power spectrum from Smooth Overlap of
@@ -37,7 +35,7 @@ class SOAP(Descriptor):
     Lauri Himanen & Adam S. Foster, npj Comput. Mater., 4, 37 (2018),
     https://doi.org/10.1038/s41524-018-0096-5
     """
-    
+
     def __init__(
         self,
         r_cut=6.0,
@@ -48,12 +46,11 @@ class SOAP(Descriptor):
         weighting=None,
         crossover=True,
         average="off",
-        species=[1,2,3,4],
+        species=[1, 2, 3, 4],
         periodic=False,
         sparse=False,
         dtype="float64",
     ):
-    
         """
         Args:
             r_cut (float): A cutoff for local region in angstroms. Should be
@@ -495,7 +492,6 @@ class SOAP(Descriptor):
 
         # Determine the function to call based on rbf
         if self._rbf == "gto":
-
             # Orthonormalized RBF coefficients
             alphas = self._alphas.flatten()
             betas = self._betas.flatten()
@@ -797,7 +793,7 @@ class SOAP(Descriptor):
     ):
         """Return the SOAP output for the given system and given positions.
         Args:
-            system (:class:`ase.Atoms`): Atomic structure.
+            system (:class:`ase.Atoms`): Atomic descriptor.
             positions (list): Positions where to calculate SOAP. Can be
                 provided as cartesian positions or atomic indices. If no
                 positions are defined, the SOAP output will be created for all
@@ -1262,30 +1258,7 @@ class SOAP(Descriptor):
 
         gss = np.dot(betas, fs)
 
-        return rx, gss    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+        return rx, gss
+
+    def process(self, atoms: Atoms):
+        return self.create_single(atoms, positions=[0])

@@ -19,13 +19,13 @@ import matplotlib.pyplot as plt
 import tqdm as tqdm
 import numpy as np
 
-from inout import save_xanes
+from utils import save_xanes
 from spectrum.xanes import XANES
 
 from sklearn.metrics.pairwise import cosine_similarity
 
 
-def plot_predict(ids, y, y_predict, predict_dir, mode):
+def plot_nn_predict(ids, y, y_predict, predict_dir, mode):
     total_y = []
     total_y_pred = []
     if y is not None:
@@ -41,7 +41,10 @@ def plot_predict(ids, y, y_predict, predict_dir, mode):
             plt.savefig(predict_dir / f"{id_}.pdf")
             plt.close()
     else:
-        for id_, y_predict_, in tqdm.tqdm(zip(ids, y_predict)):
+        for (
+            id_,
+            y_predict_,
+        ) in tqdm.tqdm(zip(ids, y_predict)):
             sns.set()
             plt.figure()
             plt.plot(y_predict_.detach().numpy(), label="prediction")
@@ -126,9 +129,7 @@ def plot_ae_predict(ids, y, y_predict, x, x_recon, e, predict_dir, mode):
             fig.clf()
             plt.close(fig)
     else:
-        for id_, y_predict_, x_recon_, x_ in tqdm.tqdm(
-        zip(ids, y_predict, x_recon, x)
-        ):
+        for id_, y_predict_, x_recon_, x_ in tqdm.tqdm(zip(ids, y_predict, x_recon, x)):
             sns.set()
             fig, (ax1, ax2) = plt.subplots(2)
 
@@ -262,7 +263,6 @@ def plot_running_aegan(losses, model_dir):
 
 
 def plot_aegan_predict(ids, x, y, x_recon, y_recon, x_pred, y_pred, predict_dir, mode):
-
     x_recon = x_recon.detach().numpy() if x_recon is not None else None
     y_recon = y_recon.detach().numpy() if y_recon is not None else None
 
@@ -270,9 +270,7 @@ def plot_aegan_predict(ids, x, y, x_recon, y_recon, x_pred, y_pred, predict_dir,
     y_pred = y_pred.detach().numpy() if y_pred is not None else None
 
     if mode == "predict_xyz":
-
         if x is None and y is not None:
-
             for id_, y_, y_recon_, x_pred_ in tqdm.tqdm(zip(ids, y, y_recon, x_pred)):
                 sns.set()
                 fig, (ax1, ax2) = plt.subplots(2, figsize=(20, 20))
@@ -289,10 +287,11 @@ def plot_aegan_predict(ids, x, y, x_recon, y_recon, x_pred, y_pred, predict_dir,
                 plt.savefig(predict_dir / f"{id_}.pdf")
                 fig.clf()
                 plt.close(fig)
-        
-        elif x is not None and y is not None:
 
-            for id_, y_, x_, y_recon_, x_pred_ in tqdm.tqdm(zip(ids, y, x, y_recon, x_pred)):
+        elif x is not None and y is not None:
+            for id_, y_, x_, y_recon_, x_pred_ in tqdm.tqdm(
+                zip(ids, y, x, y_recon, x_pred)
+            ):
                 sns.set()
                 fig, (ax1, ax2) = plt.subplots(2, figsize=(20, 20))
 
@@ -310,11 +309,8 @@ def plot_aegan_predict(ids, x, y, x_recon, y_recon, x_pred, y_pred, predict_dir,
                 fig.clf()
                 plt.close(fig)
 
-
     elif mode == "predict_xanes":
-
         if x is not None and y is None:
-
             for id_, x_, x_recon_, y_pred_ in tqdm.tqdm(zip(ids, x, x_recon, y_pred)):
                 sns.set()
                 fig, (ax1, ax2) = plt.subplots(2, figsize=(20, 20))
@@ -331,10 +327,11 @@ def plot_aegan_predict(ids, x, y, x_recon, y_recon, x_pred, y_pred, predict_dir,
                 plt.savefig(predict_dir / f"{id_}.pdf")
                 fig.clf()
                 plt.close(fig)
-        
-        elif x is not None and y is not None:
 
-            for id_, x_, y_, x_recon_, y_pred_ in tqdm.tqdm(zip(ids, x, y, x_recon, y_pred)):
+        elif x is not None and y is not None:
+            for id_, x_, y_, x_recon_, y_pred_ in tqdm.tqdm(
+                zip(ids, x, y, x_recon, y_pred)
+            ):
                 sns.set()
                 fig, (ax1, ax2) = plt.subplots(2, figsize=(20, 20))
 
@@ -353,9 +350,7 @@ def plot_aegan_predict(ids, x, y, x_recon, y_recon, x_pred, y_pred, predict_dir,
                 plt.close(fig)
 
     elif mode == "predict_all":
-
         if x is not None and y is not None:
-
             for id_, x_, y_, x_recon_, y_recon_, x_pred_, y_pred_ in tqdm.tqdm(
                 zip(ids, x, y, x_recon, y_recon, x_pred, y_pred)
             ):
@@ -516,7 +511,6 @@ def plot_mc_predict(ids, y, y_predict, prob_mean, prob_var, e, predict_dir, mode
 
             plt.close()
 
-
     print(">> saving Y data predictions...")
 
     total_y = np.asarray(total_y)
@@ -577,8 +571,28 @@ def plot_mc_ae_predict(
     total_x_recon = []
 
     if y is not None:
-        for id_, y_predict_, y_, x_recon_, x_, mean_output_, var_output_, mean_recon_, var_recon_ in tqdm.tqdm(
-            zip(ids, y_predict, y, x_recon, x, mean_output, var_output, mean_recon, var_recon)
+        for (
+            id_,
+            y_predict_,
+            y_,
+            x_recon_,
+            x_,
+            mean_output_,
+            var_output_,
+            mean_recon_,
+            var_recon_,
+        ) in tqdm.tqdm(
+            zip(
+                ids,
+                y_predict,
+                y,
+                x_recon,
+                x,
+                mean_output,
+                var_output,
+                mean_recon,
+                var_recon,
+            )
         ):
             sns.set()
             fig, (ax1, ax2) = plt.subplots(2)
@@ -620,7 +634,7 @@ def plot_mc_ae_predict(
             elif mode == "predict_xyz":
                 with open(predict_dir / f"{id_}.txt", "w") as f:
                     f.write("\n".join(map(str, y_predict_.detach().numpy())))
-                    
+
             plt.savefig(predict_dir / f"{id_}.pdf")
             fig.clf()
             plt.close(fig)
@@ -632,8 +646,26 @@ def plot_mc_ae_predict(
             total_x_recon.append(x_recon_.detach().numpy())
 
     else:
-        for id_, y_predict_, x_recon_, x_, mean_output_, var_output_, mean_recon_, var_recon_ in tqdm.tqdm(
-            zip(ids, y_predict, x_recon, x, mean_output, var_output, mean_recon, var_recon)
+        for (
+            id_,
+            y_predict_,
+            x_recon_,
+            x_,
+            mean_output_,
+            var_output_,
+            mean_recon_,
+            var_recon_,
+        ) in tqdm.tqdm(
+            zip(
+                ids,
+                y_predict,
+                x_recon,
+                x,
+                mean_output,
+                var_output,
+                mean_recon,
+                var_recon,
+            )
         ):
             sns.set()
             fig, (ax1, ax2) = plt.subplots(2)
@@ -669,7 +701,7 @@ def plot_mc_ae_predict(
 
             if mode == "predict_xanes":
                 with open(predict_dir / f"{id_}.txt", "w") as f:
-                    save_xanes(f, XANES(e, y_predict_.detach().numpy()))                 
+                    save_xanes(f, XANES(e, y_predict_.detach().numpy()))
 
             elif mode == "predict_xyz":
                 with open(predict_dir / f"{id_}.txt", "w") as f:

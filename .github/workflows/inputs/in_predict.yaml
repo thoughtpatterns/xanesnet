@@ -1,6 +1,9 @@
-x_path: .github/workflows/data/datasets/fe/preconv/xyz_test
-y_path: .github/workflows/data/datasets/fe/preconv/xanes_test
 
+xyz_path: data/datasets/fe/preconv/xyz_test
+# y_path: null
+xanes_path: data/datasets/fe/preconv/xanes_test
+
+eval: True
 plot_save: False
 
 monte_carlo: False
@@ -9,4 +12,4 @@ mc_iter: 100
 bootstrap: False
 
 ensemble: False
-ensemble_combine: prediction
+ensemble_combine: weight

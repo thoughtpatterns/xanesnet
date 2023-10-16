@@ -11,22 +11,18 @@ limitations under the License.
 """
 import sys
 import math
-import numpy as np
-
-from sklearn.preprocessing import normalize
-
-from scipy.sparse import lil_matrix
 import sparse
-
+import ase.data
+import ase.data
+import numpy as np
+import dscribe.utils.geometry
 import scipy.spatial.distance
 
+from scipy.sparse import lil_matrix
 from ase import Atoms
-import ase.data
-
 from dscribe.core import System
 from dscribe.descriptors import MBTR
 from dscribe.ext import MBTRWrapper
-import dscribe.utils.geometry
 
 
 class LMBTR(MBTR):
@@ -90,18 +86,18 @@ class LMBTR(MBTR):
 
     def __init__(
         self,
-#       k2=None,
-#       k3=None,
-        k2 = {
+        #       k2=None,
+        #       k3=None,
+        k2={
             "geometry": {"function": "inverse_distance"},
             "grid": {"min": 1.0, "max": 6, "sigma": 0.1, "n": 5},
-            "weighting": {"function": "exp", "scale": 0.75, "threshold": 1e-2}
+            "weighting": {"function": "exp", "scale": 0.75, "threshold": 1e-2},
         },
-        k3 = {
+        k3={
             "geometry": {"function": "angle"},
             "grid": {"min": 0, "max": 180, "sigma": 5, "n": 5},
-            "weighting": {"function": "exp", "scale": 0.5, "threshold": 1e-3}
-        },       
+            "weighting": {"function": "exp", "scale": 0.5, "threshold": 1e-3},
+        },
         normalize_gaussians=True,
         normalization="none",
         flatten=True,
@@ -556,7 +552,7 @@ class LMBTR(MBTR):
             ext_system.get_atomic_numbers(),
             dmat_dense,
             adj_list,
-            geom_func_name.encode(),
+            geom_func_name.encode_train(),
             weighting_function.encode(),
             parameters,
             start,
@@ -661,7 +657,6 @@ class LMBTR(MBTR):
         ext_pos = ext_system.get_positions()
         new_pos = new_system.get_positions()
         if radial_cutoff is not None:
-
             # Calculate distance within the extended system
             dmat_ext_to_ext = ext_system.get_distance_matrix_within_radius(
                 radial_cutoff, pos=ext_pos
@@ -733,7 +728,7 @@ class LMBTR(MBTR):
             fin_system.get_atomic_numbers(),
             dmat_dense,
             adj_list,
-            geom_func_name.encode(),
+            geom_func_name.encode_train(),
             weighting_function.encode(),
             parameters,
             start,
@@ -908,3 +903,5 @@ class LMBTR(MBTR):
         self.max_atomic_number = max(self._atomic_numbers)
         self.min_atomic_number = min(self._atomic_numbers)
 
+    def process(self, atoms: Atoms):
+        return self.create(atoms, positions=[0])

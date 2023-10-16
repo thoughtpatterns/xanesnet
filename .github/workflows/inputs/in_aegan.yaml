@@ -1,5 +1,5 @@
-x_path: .github/workflows/data/datasets/fe/preconv/xyz_train
-y_path: .github/workflows/data/datasets/fe/preconv/xanes_train
+xyz_path: data/datasets/fe/preconv/xyz_train
+xanes_path: data/datasets/fe/preconv/xanes_train
 
 descriptor:
     type: wacsf
@@ -9,40 +9,66 @@ descriptor:
       n_g2: 16
       n_g4: 32
 
-load_guess: False
-loadguess_params:
-  model_dir: ./model/model_001/model.pt
-  freeze_params:
-    freeze_encoder1: True
-    freeze_encoder2: True
-    freeze_decoder1: True
-    freeze_decoder2: True
-    freeze_shared_encoder: True
-    freeze_shared_decoder: True
-    freeze_discrim1: True
-    freeze_discrim2: True
-    n_freeze_encoder1: 1
-    n_freeze_encoder2: 1
-    n_freeze_decoder1: 1
-    n_freeze_decoder2: 1
-    n_freeze_shared_encoder: 1
-    n_freeze_shared_decoder: 1
-    n_freeze_discrim1: 1
-    n_freeze_discrim2: 1
+model_params:
+  hidden_size: 256
+  dropout: 0.0
+  n_hl_gen: 2
+  n_hl_shared: 2
+  n_hl_dis: 2
+  activation: prelu
+  lr_gen: 0.01
+  lr_dis: 0.0001
+  optim_fn_gen: Adam
+  optim_fn_dis: Adam
+  loss_gen:
+    loss_fn: mse
+    loss_args:
+    loss_reg_type: null # null, L1, L2
+    loss_reg_param: 0.001
+  loss_dis:
+    loss_fn: bce
+    loss_args: null
+    loss_reg_type: null # null, L1, L2
+    loss_reg_param: 0.001
+
+hyperparams:
+  scheme: aegan
+  batch_size: 64
+  epochs: 1
+  kernel_init: xavier_uniform
+  bias_init: zeros
+  model_eval: False
+  seed: 2021
+  weight_seed: 2023
+  loss_gen:
+    loss_fn: mse
+    loss_args:
+    loss_reg_type: null # null, L1, L2
+    loss_reg_param: 0.001
+  loss_dis:
+    loss_fn: bce
+    loss_args: null
+    loss_reg_type: null # null, L1, L2
+    loss_reg_param: 0.001
+
+lr_scheduler: True
+scheduler_type: Exponential
+scheduler_param:
+    gamma: 0.001
 
 bootstrap: False
-bootstrap_params: 
+bootstrap_params:
   n_boot: 3
   n_size: 1.0
-  seed_boot: [97, 39, 22]
+  weight_seed: [97, 39, 22]
 
 ensemble: False
 ensemble_params:
   n_ens: 3
-  weight_init_seed: [97, 39, 22]
+  weight_seed: [97, 39, 22]
 
-data_params: False
-augment:
+data_augment: False
+augment_params:
   augment_type: random_noise
   # augment_type: random_combination
   augment_mult: 5
@@ -57,56 +83,7 @@ kfold: False
 kfold_params:
   n_splits: 5
   n_repeats: 1
-  loss: 
-    loss_fn: mse 
-    loss_args: null
+  seed: 2022
 
-lr_scheduler: 
-  scheduler: True
-  scheduler_type: step
-  scheduler_param:
-    step_size: 50
-    gamma: 0.1
 
-hyperparams: 
-  model: aegan
-  batch_size: 64
-  n_hl_gen: 2
-  n_hl_shared: 2
-  n_hl_dis: 2
-  hidden_size: 256
-  activation: prelu
-  loss_gen:
-    loss_fn: wcc
-    loss_args: 10
-    loss_reg_type: null # null, L1, L2
-    loss_reg_param: 0.001
-  loss_dis:
-    loss_fn: bce
-    loss_args: null
-    loss_reg_type: null # null, L1, L2
-    loss_reg_param: 0.001
-  lr_gen: 0.01
-  lr_dis: 0.0001
-  optim_fn_gen: Adam
-  optim_fn_dis: Adam
-  dropout: 0.0
-  weight_init_seed: 2023
-  kernel_init: xavier_uniform
-  bias_init: zeros
 
-seed: 2021
-epochs: 1
-variance_threshold: 0.0
-model_eval: False # Split training data 75/15/10% train/valid/test for model evaluation
-
-optuna_params:
-  tune: False
-  n_trials: 3
-  tune_optim_fn: True
-  tune_batch_size: True
-  tune_activation: True
-  tune_loss_fn: True
-  tune_lr: True
-  tune_dropout: True
-  tune_hidden_layers: True

@@ -11,17 +11,15 @@ limitations under the License.
 """
 import sys
 import math
-import numpy as np
-
 import sparse
+import ase.data
+import numpy as np
+import dscribe.utils.geometry
 
 from ase import Atoms
-import ase.data
-
 from dscribe.core import System
 from dscribe.descriptors import Descriptor
 from dscribe.ext import MBTRWrapper
-import dscribe.utils.geometry
 
 
 class MBTR(Descriptor):
@@ -90,22 +88,22 @@ class MBTR(Descriptor):
 
     def __init__(
         self,
-#       k1=None,
-#       k2=None,
-#       k3=None,
+        #       k1=None,
+        #       k2=None,
+        #       k3=None,
         k1={
-           "geometry": {"function": "atomic_number"},
-           "grid": {"min": 1, "max": 6, "n": 50, "sigma": 0.1},
+            "geometry": {"function": "atomic_number"},
+            "grid": {"min": 1, "max": 6, "n": 50, "sigma": 0.1},
         },
         k2={
-           "geometry": {"function": "inverse_distance"},
-           "grid": {"min": 0, "max": 1, "n": 50, "sigma": 0.1},
-           "weighting": {"function": "exp", "scale": 0.5, "threshold": 1e-3},
+            "geometry": {"function": "inverse_distance"},
+            "grid": {"min": 0, "max": 1, "n": 50, "sigma": 0.1},
+            "weighting": {"function": "exp", "scale": 0.5, "threshold": 1e-3},
         },
         k3={
-           "geometry": {"function": "cosine"},
-           "grid": {"min": -1, "max": 1, "n": 50, "sigma": 0.1},
-           "weighting": {"function": "exp", "scale": 0.5, "threshold": 1e-3},
+            "geometry": {"function": "cosine"},
+            "grid": {"min": -1, "max": 1, "n": 50, "sigma": 0.1},
+            "weighting": {"function": "exp", "scale": 0.5, "threshold": 1e-3},
         },
         normalize_gaussians=True,
         normalization="none",
@@ -248,7 +246,6 @@ class MBTR(Descriptor):
     @k1.setter
     def k1(self, value):
         if value is not None:
-
             # Check that only valid keys are used in the setups
             for key in value.keys():
                 valid_keys = set(("geometry", "grid", "weighting"))
@@ -291,7 +288,6 @@ class MBTR(Descriptor):
     @k2.setter
     def k2(self, value):
         if value is not None:
-
             # Check that only valid keys are used in the setups
             for key in value.keys():
                 valid_keys = set(("geometry", "grid", "weighting"))
@@ -351,7 +347,6 @@ class MBTR(Descriptor):
     @k3.setter
     def k3(self, value):
         if value is not None:
-
             # Check that only valid keys are used in the setups
             for key in value.keys():
                 valid_keys = set(("geometry", "grid", "weighting"))
@@ -754,7 +749,7 @@ class MBTR(Descriptor):
 
         k1_map = cmbtr.get_k1(
             system.get_atomic_numbers(),
-            geom_func_name.encode(),
+            geom_func_name.encode_train(),
             b"unity",
             {},
             start,
@@ -861,7 +856,7 @@ class MBTR(Descriptor):
             ext_system.get_atomic_numbers(),
             dmat_dense,
             adj_list,
-            geom_func_name.encode(),
+            geom_func_name.encode_train(),
             weighting_function.encode(),
             parameters,
             start,
@@ -1002,7 +997,7 @@ class MBTR(Descriptor):
             ext_system.get_atomic_numbers(),
             dmat_dense,
             adj_list,
-            geom_func_name.encode(),
+            geom_func_name.encode_train(),
             weighting_function.encode(),
             parameters,
             start,
@@ -1066,3 +1061,6 @@ class MBTR(Descriptor):
             k3 = k3.to_coo()
 
         return k3
+
+    def process(self, atoms: Atoms):
+        return self.create(atoms)

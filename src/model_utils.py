@@ -16,17 +16,17 @@ this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import random
 import warnings
-from pathlib import Path
-
 import numpy as np
-import shap
 import torch
-from torch import optim
 import torch.optim.lr_scheduler as lr_scheduler
+
+from torch import optim
+from pathlib import Path
 from torch import nn
 
-# Suppress non-significant warning for WCCLoss function
+# Suppress non-significant warning for shap and WCCLoss function
 warnings.filterwarnings("ignore")
+import shap
 
 
 # Select activation function from hyperparams inputs
@@ -130,14 +130,14 @@ def weight_bias_init(m, kernel_init_fn, bias_init_fn):
         bias_init_fn(m.bias)
 
 
-class LRScheduler():
+class LRScheduler:
     """
     Initialise the learning rate scheduler
     """
 
-    def __init__(self, optimizer, scheduler_type, params=None):
-        self.optimizer = optimizer
-        scheduler_type = scheduler_type.lower()
+    def __init__(self, model, optim_fn, lr, scheduler_type=None, params=None):
+        optim_fn = OptimSwitch().fn(optim_fn)
+        optimizer = optim_fn(model.parameters(), lr=lr)
 
         if scheduler_type == "step":
             self.scheduler = lr_scheduler.StepLR(optimizer, **params)
@@ -156,12 +156,10 @@ class LRScheduler():
         self.scheduler.step()
 
 
-class OptimSwitch():
+class OptimSwitch:
     def fn(self, opt_fn):
         default = optim.Adam
-        return getattr(
-            self, f"optim_function_{opt_fn.lower()}", lambda: default
-        )()
+        return getattr(self, f"optim_function_{opt_fn.lower()}", lambda: default)()
 
     # Adam
     def optim_function_adam(self):
@@ -233,7 +231,9 @@ class WCCLoss(nn.Module):
     def __init__(self, gaussianHWHM):
         super().__init__()
         if gaussianHWHM is None:
-            print(">> WCC Loss Function Gaussian HWHM parameter not set in input yaml file. Setting equal to 10")
+            print(
+                ">> WCC Loss Function Gaussian HWHM parameter not set in input yaml file. Setting equal to 10"
+            )
             gaussianHWHM = 10
         self.gaussianHWHM = gaussianHWHM
 
@@ -270,7 +270,13 @@ class WCCLoss(nn.Module):
         return loss
 
 
-def model_mode_error(model, mode, model_mode, xyz_shape, xanes_shape):
+def model_mode_error(
+    model: object,
+    mode: object,
+    model_mode: object,
+    xyz_shape: object,
+    xanes_shape: object,
+) -> object:
     for child in model.modules():
         if type(child).__name__ == "Linear":
             output_size = child.weight.shape[0]
@@ -420,53 +426,48 @@ def run_shap_analysis(
             f.writelines(map("{} {}\n".format, np.arange(n_features), energy_imp[i, :]))
 
 
-def loss_reg_fn(
-    model, loss_reg_type, device
-):
-    """ Computes L1 or L2 norm of model parameters for use in regularisation of loss function
+def loss_reg_fn(model, loss_reg_type, device):
+    """Computes L1 or L2 norm of model parameters for use in regularisation of loss function
 
     Args:
-        model 
-        loss_reg_type (_str_): Regularisation type. L1 or 
+        model
+        loss_reg_type (_str_): Regularisation type. L1 or
         device
     """
     l_reg = torch.tensor(0.0).to(device)
     if loss_reg_type.lower() == "l1":
-
         for param in model.parameters():
-            l_reg += torch.norm(param, p = 1)
-    
+            l_reg += torch.norm(param, p=1)
+
     elif loss_reg_type.lower() == "l2":
-    
         for param in model.parameters():
             l_reg += torch.norm(param)
-    
+
     return l_reg
 
 
-def get_conv_layers_output_size(input_size, num_conv_layers, channel_mul, kernel_size, stride, out_channel, include_pooling = False):
+def get_conv_layers_output_size(
+    input_size,
+    num_conv_layers,
+    channel_mul,
+    kernel_size,
+    stride,
+    out_channel,
+    include_pooling=False,
+):
     """
     Calculates size of flattened output from N 1D Convolutional layers
     For use with CNN and AE_CNN models
     """
     in_channel = 1
-    
-    for block in range(num_conv_layers):
 
+    for block in range(num_conv_layers):
         out_length = int(np.floor((input_size - kernel_size) / stride + 1))
         in_channel = int(out_channel)
         out_channel = out_channel * (channel_mul)
         input_size = out_length
 
     if include_pooling:
-
         out_length = int(np.floor((input_size - kernel_size) / stride + 1))
 
     return in_channel * out_length
-
-
-
-
-
-
-
