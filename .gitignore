@@ -1,7 +1,6 @@
 __pycache__/
 .DS_Store
 .vscode/
-model*/
 predictions*/
 plots_predictions*/
 analysis*/
@@ -9,4 +8,5 @@ analysis*/
 mlruns/
 ensemble/
 bootstrap/
-
+model/
+!src/model/
