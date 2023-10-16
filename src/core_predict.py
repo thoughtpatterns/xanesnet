@@ -22,9 +22,9 @@ import yaml
 
 from pathlib import Path
 
-from src.creator import create_predict_scheme
-from src.data_descriptor import encode_predict
-from src.model_utils import make_dir
+from creator import create_predict_scheme
+from data_descriptor import encode_predict
+from model_utils import make_dir
 from src.utils import save_prediction
 
 
