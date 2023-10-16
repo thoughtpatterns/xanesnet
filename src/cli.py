@@ -23,7 +23,7 @@ import yaml
 
 from argparse import ArgumentParser
 from core_learn import train_model
-from src.core_predict import predict_data
+from core_predict import predict_data
 
 
 ###############################################################################
