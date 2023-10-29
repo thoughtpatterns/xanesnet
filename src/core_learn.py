@@ -14,7 +14,6 @@ You should have received a copy of the GNU General Public License along with
 this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-from pathlib import Path
 from numpy.random import RandomState
 from sklearn.utils import shuffle
 
@@ -22,7 +21,6 @@ from data_descriptor import encode_train
 from utils import save_models
 from utils import save_model
 from creator import (
-    create_model,
     create_descriptor,
     create_learn_scheme,
 )
@@ -30,7 +28,7 @@ from creator import (
 
 def train_model(config, args):
     """
-    Train a ML model based on the provided configuration and arguments
+    Train an ML model based on the provided configuration and arguments
     """
     # Encode training dataset with specified descriptor type
     print(
@@ -73,7 +71,7 @@ def train_model(config, args):
         )
 
     # assign descriptor and spectra datasets to X and Y based on train mode
-    if args.mode == "train_xyz":
+    if args.mode == "train_xyz" or args.mode == "train_aegan":
         x_data = xyz
         y_data = xanes
     elif args.mode == "train_xanes":
@@ -82,41 +80,23 @@ def train_model(config, args):
     else:
         raise ValueError(f"Unsupported mode name: {args.mode}")
 
-    # Initialise ML model with specified model parameters
-    config["model_params"]["x_data"] = x_data
-    config["model_params"]["y_data"] = y_data
-
-    model = create_model(args.model_mode, **config["model_params"])
-
-    # Initialise learning rate scheduler
-    if config["lr_scheduler"] and not args.model_mode.startswith("aegan"):
-        from model_utils import LRScheduler
-
-        scheduler = LRScheduler(
-            model,
-            config["hyperparams"]["optim_fn"],
-            config["hyperparams"]["lr"],
-            scheduler_type=config["scheduler_type"],
-            params=config["scheduler_params"],
-        )
-    else:
-        scheduler = None
-
     # Initialise learn scheme
+    print(">> Initialising learn scheme...")
     scheme = create_learn_scheme(
-        args.model_mode,
-        model,
         x_data,
         y_data,
+        config["model"],
         config["hyperparams"],
         config["kfold"],
         config["kfold_params"],
         config["bootstrap_params"],
         config["ensemble_params"],
-        schedular=scheduler,
+        config["lr_scheduler"],
+        config["scheduler_params"],
     )
 
     # Train the model using selected training strategy
+    print(">> Training model...")
     if config["bootstrap"]:
         model_list = scheme.train_bootstrap()
         save_path = "bootstrap/"
@@ -127,18 +107,18 @@ def train_model(config, args):
         if config["kfold"]:
             model = scheme.train_kfold()
         else:
-            model = scheme.train()
+            model = scheme.train_std()
         save_path = "model/"
 
     # Save model to file if specified
     if args.save:
         metadata = {
             "mode": args.mode,
-            "model_mode": args.model_mode,
+            "model_mode": config["model"]["type"],
             "descriptor_type": config["descriptor"]["type"],
             "descriptor_param": config["descriptor"]["params"],
             "hyperparams": config["hyperparams"],
-            "lr_scheduler": config["lr_scheduler"],
+            "lr_scheduler": config["scheduler_params"],
         }
 
         data_compress = {"ids": index, "x": xyz, "y": xanes}

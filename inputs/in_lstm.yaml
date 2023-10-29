@@ -10,12 +10,14 @@ descriptor:
       n_g4: 32
 
 #LSTM
-model_params:
-   hidden_size: 100
-   hidden_out_size: 50
-   num_layers: 1
-   dropout: 0.2
-   activation: prelu
+model:
+   type: lstm
+   params:
+     hidden_size: 100
+     hidden_out_size: 50
+     num_layers: 1
+     dropout: 0.2
+     activation: prelu
 
 hyperparams:
   batch_size: 64
@@ -40,14 +42,14 @@ kfold_params:
   seed: 2022
 
 lr_scheduler: True
-scheduler_type: step
 scheduler_params:
+  type: step
   step_size: 100
   gamma: 0.5
 
 data_augment: False
 augment_params:
-  augment_type: random_noise
+  type: random_noise
   # augment_type: random_combination
   augment_mult: 5
   # for random noise

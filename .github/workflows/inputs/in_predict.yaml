@@ -1,6 +1,6 @@
-xyz_path: .github/workflows/data/datasets/fe/preconv/xyz_test
-# y_path: null
-xanes_path: .github/workflows/data/datasets/fe/preconv/xanes_test
+
+xyz_path:  .github/workflows/data/datasets/fe/preconv/xyz_test
+xanes_path:  .github/workflows/data/datasets/fe/preconv/xanes_test
 
 eval: True
 plot_save: False

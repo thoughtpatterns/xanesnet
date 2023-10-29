@@ -135,9 +135,9 @@ class LRScheduler:
     Initialise the learning rate scheduler
     """
 
-    def __init__(self, model, optim_fn, lr, scheduler_type=None, params=None):
-        optim_fn = OptimSwitch().fn(optim_fn)
-        optimizer = optim_fn(model.parameters(), lr=lr)
+    def __init__(self, optimizer, scheduler_type, params=None):
+        self.optimizer = optimizer
+        scheduler_type = scheduler_type.lower()
 
         if scheduler_type == "step":
             self.scheduler = lr_scheduler.StepLR(optimizer, **params)

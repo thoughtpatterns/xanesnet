@@ -25,7 +25,7 @@ from pathlib import Path
 from creator import create_predict_scheme
 from data_descriptor import encode_predict
 from model_utils import make_dir
-from src.utils import save_prediction
+from utils import save_prediction
 
 
 def predict_data(config, args):

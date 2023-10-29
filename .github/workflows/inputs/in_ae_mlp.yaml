@@ -10,7 +10,7 @@ descriptor:
     n_g4: 32
 
 model:
-  type: mlp
+  type: ae_mlp
   params:
     hidden_size: 512
     dropout: 0.2

@@ -22,23 +22,25 @@ from scipy.stats import ttest_ind
 
 
 class Eval(ABC):
-    def __init__(self, model, train_loader, valid_loader, eval_loader, n_in, out_dim):
+    def __init__(
+        self, model, train_loader, valid_loader, eval_loader, input_size, output_size
+    ):
         self.model = model
         self.train_loader = train_loader
         self.valid_loader = valid_loader
         self.eval_loader = eval_loader
-        self.n_in = n_in
-        self.out_dim = out_dim
+        self.input_size = input_size
+        self.output_size = output_size
 
         self.model.eval()
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         # Get mean, sd for model input and output
-        mean_input = torch.tensor([0] * self.n_in).to(self.device).float()
-        mean_output = torch.tensor([0] * self.out_dim).to(self.device).float()
+        mean_input = torch.tensor([0] * self.input_size).to(self.device).float()
+        mean_output = torch.tensor([0] * self.output_size).to(self.device).float()
 
-        std_input = torch.tensor([0] * self.n_in).to(self.device).float()
-        std_output = torch.tensor([0] * self.out_dim).to(self.device).float()
+        std_input = torch.tensor([0] * self.input_size).to(self.device).float()
+        std_output = torch.tensor([0] * self.output_size).to(self.device).float()
 
         for x, y in self.train_loader:
             # Move input and output tensors to the same device as mean_input and mean_output
@@ -52,8 +54,8 @@ class Eval(ABC):
         std_input = torch.sqrt(std_input / len(self.train_loader))
         std_output = torch.sqrt(std_output / len(self.train_loader))
 
-        self.mean_input = mean_input.to(self.device).float().view(1, self.n_in)
-        self.mean_output = mean_output.to(self.device).float().view(1, self.out_dim)
+        self.mean_input = mean_input.to(self.device).float().view(1, self.input_size)
+        self.mean_output = mean_output.to(self.device).float().view(1, self.output_size)
 
         self.std_input = std_input.to(self.device).float()
         self.std_output = std_output.to(self.device).float()

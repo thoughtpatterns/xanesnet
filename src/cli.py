@@ -48,7 +48,7 @@ def parse_args(args: list):
         "--model_mode",
         type=str,
         help="the model to use to train or to predict",
-        required=True,
+        required=False,
     )
     parser.add_argument(
         "--mdl_dir",

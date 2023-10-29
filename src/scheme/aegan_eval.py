@@ -312,20 +312,24 @@ class AEGANEval(Eval):
         )
 
     def get_loss_input_mean_sd_train(self):
+        device = self.device
+
         other_recon_x_loss = []
         other_recon_y_loss = []
         other_pred_x_loss = []
         other_pred_y_loss = []
 
         for inputs, labels in self.eval_loader:
-            inputs, labels = inputs.to(self.device), labels.to(self.device)
+            inputs, labels = inputs.to(device), labels.to(device)
             inputs, labels = inputs.float(), labels.float()
 
             mean_sd_input = self.mean_input.repeat(labels.shape[0], 1) + torch.normal(
-                torch.zeros([labels.shape[0], self.n_in]), self.std_input
+                torch.zeros([labels.shape[0], self.input_size], device=device),
+                self.std_input,
             )
             mean_sd_output = self.mean_output.repeat(labels.shape[0], 1) + torch.normal(
-                torch.zeros([labels.shape[0], self.out_dim]), self.std_output
+                torch.zeros([labels.shape[0], self.output_size], device=device),
+                self.std_output,
             )
 
             (
@@ -353,6 +357,7 @@ class AEGANEval(Eval):
         )
 
     def get_loss_output_mean_sd_train(self):
+        device = self.device
         other_recon_x_loss = []
         other_recon_y_loss = []
         other_pred_x_loss = []
@@ -363,16 +368,20 @@ class AEGANEval(Eval):
             inputs, labels = inputs.float(), labels.float()
 
             recon_x = self.mean_input.repeat(labels.shape[0], 1) + torch.normal(
-                torch.zeros([labels.shape[0], self.n_in]), self.std_input
+                torch.zeros([labels.shape[0], self.input_size], device=device),
+                self.std_input,
             )
             recon_y = self.mean_output.repeat(labels.shape[0], 1) + torch.normal(
-                torch.zeros([labels.shape[0], self.out_dim]), self.std_output
+                torch.zeros([labels.shape[0], self.output_size], device=device),
+                self.std_output,
             )
             pred_x = self.mean_input.repeat(labels.shape[0], 1) + torch.normal(
-                torch.zeros([labels.shape[0], self.n_in]), self.std_input
+                torch.zeros([labels.shape[0], self.input_size], device=device),
+                self.std_input,
             )
             pred_y = self.mean_output.repeat(labels.shape[0], 1) + torch.normal(
-                torch.zeros([labels.shape[0], self.out_dim]), self.std_output
+                torch.zeros([labels.shape[0], self.output_size], device=device),
+                self.std_output,
             )
 
             recon_x_loss = Eval.functional_mse(recon_x, inputs)
