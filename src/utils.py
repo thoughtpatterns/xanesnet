@@ -118,8 +118,9 @@ def save_model(path, model, descriptor, data_compress, metadata):
         )
 
     torch.save(model, model_dir / f"model.pt")
-    print("saved model to disk")
+    print(f"saved model to disk: {model_dir}")
 
+    metadata["mdl_dir"] = str(model_dir)
     with open(model_dir / "metadata.yaml", "w") as f:
         yaml.dump_all([metadata], f)
 

@@ -41,7 +41,7 @@ def create_model(name, **kwargs):
 
 
 def create_descriptor(name, **kwargs):
-    from descriptor import RDC, WACSF, SOAP, MBTR, LMBTR, MSR, ARMSR
+    from descriptor import RDC, WACSF, SOAP, MBTR, LMBTR
 
     descriptors = {
         "rdc": RDC,
@@ -49,8 +49,6 @@ def create_descriptor(name, **kwargs):
         "soap": SOAP,
         "mbtr": MBTR,
         "lmbtr": LMBTR,
-        "msr": MSR,
-        "armsr": ARMSR,
     }
 
     if name in descriptors:
@@ -60,16 +58,16 @@ def create_descriptor(name, **kwargs):
 
 
 def create_learn_scheme(
-    name,
-    model,
     x_data,
     y_data,
+    model_params,
     hyperparams,
     kfold,
-    kfoldparams,
+    kfold_params,
     bootstrap_params,
     ensemble_params,
-    schedular,
+    scheduler,
+    schedular_param,
 ):
     from scheme import NNLearn, AELearn, AEGANLearn
 
@@ -82,25 +80,27 @@ def create_learn_scheme(
         "aegan_mlp": AEGANLearn,
     }
 
+    name = model_params["type"]
+
     if name in scheme:
         return scheme[name](
-            model,
             x_data,
             y_data,
+            model_params,
             hyperparams,
             kfold,
-            kfoldparams,
+            kfold_params,
             bootstrap_params,
             ensemble_params,
-            name,
-            schedular=schedular,
+            scheduler,
+            schedular_param,
         )
     else:
         raise ValueError(f"Unsupported learn scheme name: {name}")
 
 
 def create_eval_scheme(
-    name, model, train_loader, valid_loader, eval_loader, n_in, out_dim
+    name, model, train_loader, valid_loader, eval_loader, input_size, output_size
 ):
     from scheme import NNEval, AEEval, AEGANEval
 
@@ -119,8 +119,8 @@ def create_eval_scheme(
             train_loader,
             valid_loader,
             eval_loader,
-            n_in,
-            out_dim,
+            input_size,
+            output_size,
         )
     else:
         raise ValueError(f"Unsupported eval scheme name: {name}")

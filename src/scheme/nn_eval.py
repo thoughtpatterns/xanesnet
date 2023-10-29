@@ -60,9 +60,10 @@ class NNEval(Eval):
 
     def get_true_loss(self):
         true_loss = []
+        device = self.device
 
         for inputs, labels in self.eval_loader:
-            inputs, labels = inputs.to(self.device), labels.to(self.device)
+            inputs, labels = inputs.to(device), labels.to(device)
             inputs, labels = inputs.float(), labels.float()
             target = self.model(inputs)
             loss = Eval.functional_mse(target, labels)
@@ -72,9 +73,10 @@ class NNEval(Eval):
 
     def get_loss_input_shuffle(self):
         other_loss = []
+        device = self.device
 
         for inputs, labels in self.eval_loader:
-            inputs, labels = inputs.to(self.device), labels.to(self.device)
+            inputs, labels = inputs.to(device), labels.to(device)
             inputs, labels = inputs.float(), labels.float()
 
             idx = torch.randperm(inputs.shape[0])
@@ -89,9 +91,10 @@ class NNEval(Eval):
 
     def get_loss_output_shuffle(self):
         other_loss = []
+        device = self.device
 
         for inputs, labels in self.eval_loader:
-            inputs, labels = inputs.to(self.device), labels.to(self.device)
+            inputs, labels = inputs.to(device), labels.to(device)
             inputs, labels = inputs.float(), labels.float()
 
             idx = torch.randperm(labels.shape[0])
@@ -106,11 +109,11 @@ class NNEval(Eval):
 
     def get_loss_input_mean_train(self):
         other_loss = []
-
+        device = self.device
         target_output = self.model(self.mean_input)
 
         for _, labels in self.eval_loader:
-            labels = labels.to(self.device)
+            labels = labels.to(device)
             labels = labels.float()
             target = target_output.repeat(labels.shape[0], 1)
             loss = Eval.functional_mse(target, labels)
@@ -120,11 +123,11 @@ class NNEval(Eval):
 
     def get_loss_output_mean_train(self):
         other_loss = []
-
+        device = self.device
         target_output = self.mean_output
 
         for _, labels in self.eval_loader:
-            labels = labels.to(self.device)
+            labels = labels.to(device)
             labels = labels.float()
             target = target_output.repeat(labels.shape[0], 1)
             loss = Eval.functional_mse(target, labels)
@@ -134,14 +137,15 @@ class NNEval(Eval):
 
     def get_loss_input_mean_sd_train(self):
         other_loss = []
+        device = self.device
 
         for _, labels in self.eval_loader:
-            labels = labels.to(self.device)
+            labels = labels.to(device)
             labels = labels.float()
 
             mean_sd_input = self.mean_input.repeat(labels.shape[0], 1) + torch.normal(
-                torch.zeros([labels.shape[0], self.n_in], device=self.device),
-                self.std_input.to(self.device),
+                torch.zeros([labels.shape[0], self.input_size], device=device),
+                self.std_input,
             )
 
             target = self.model(mean_sd_input)
@@ -153,14 +157,15 @@ class NNEval(Eval):
 
     def get_loss_output_mean_sd_train(self):
         other_loss = []
+        device = self.device
 
         for _, labels in self.eval_loader:
-            labels = labels.to(self.device)
+            labels = labels.to(device)
             labels = labels.float()
 
             target = self.mean_output.repeat(labels.shape[0], 1) + torch.normal(
-                torch.zeros([labels.shape[0], self.out_dim], device=self.device),
-                self.std_output.to(self.device),
+                torch.zeros([labels.shape[0], self.output_size], device=device),
+                self.std_output,
             )
 
             loss = Eval.functional_mse(target, labels)
@@ -170,14 +175,14 @@ class NNEval(Eval):
 
     def get_loss_input_random_valid(self):
         other_loss = []
-
+        device = self.device
         it = iter(self.valid_loader)
 
         for _, labels in self.eval_loader:
-            labels = labels.to(self.device)
+            labels = labels.to(device)
             labels = labels.float()
             alt_inputs, _ = next(it)
-            alt_inputs = alt_inputs.to(self.device).float()
+            alt_inputs = alt_inputs.to(device).float()
             if labels.shape[0] < alt_inputs.shape[0]:
                 alt_inputs = alt_inputs[: labels.shape[0], :]
 
@@ -190,14 +195,14 @@ class NNEval(Eval):
 
     def get_loss_output_random_valid(self):
         other_loss = []
-
+        device = self.device
         it = iter(self.valid_loader)
 
         for _, labels in self.eval_loader:
-            labels = labels.to(self.device)
+            labels = labels.to(device)
             labels = labels.float()
             _, target = next(it)
-            target = target.to(self.device).float()
+            target = target.to(device).float()
             if labels.shape[0] < target.shape[0]:
                 target = target[: labels.shape[0], :]
 

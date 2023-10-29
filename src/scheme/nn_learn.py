@@ -14,9 +14,6 @@ You should have received a copy of the GNU General Public License along with
 this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-import os
-import pickle
-import tempfile
 import random
 import mlflow
 import time
@@ -24,108 +21,99 @@ import mlflow.pytorch
 import numpy as np
 import torch
 
-from sklearn.model_selection import RepeatedKFold
-from torch.utils.tensorboard import SummaryWriter
+from numpy.random import RandomState
 from torchinfo import summary
+from sklearn.model_selection import RepeatedKFold
 
 from .base_learn import Learn
 from src.creator import create_eval_scheme
 from src.model_utils import (
     loss_reg_fn,
-    WeightInitSwitch,
     OptimSwitch,
     LossSwitch,
-    weight_bias_init,
 )
 
 
 class NNLearn(Learn):
     def __init__(
         self,
-        model,
         x_data,
         y_data,
-        hyperparams,
+        model_params,
+        hyper_params,
         kfold,
-        kfoldparams,
+        kfold_params,
         bootstrap_params,
         ensemble_params,
-        label=None,
-        schedular=None,
+        scheduler,
+        scheduler_params,
     ):
         # Call the constructor of the parent class
         super().__init__(
-            model,
             x_data,
             y_data,
-            hyperparams,
+            model_params,
+            hyper_params,
             kfold,
-            kfoldparams,
+            kfold_params,
             bootstrap_params,
             ensemble_params,
-            label,
-            schedular,
+            scheduler,
+            scheduler_params,
         )
 
-        # hyperparameter set
-        self.loss_fn = hyperparams["loss"]["loss_fn"]
-        self.loss_args = hyperparams["loss"]["loss_args"]
-        self.loss_reg_type = hyperparams["loss"]["loss_reg_type"]
-        self.lambda_reg = hyperparams["loss"]["loss_reg_param"]
+        # loss parameter set
+        self.lr = hyper_params["lr"]
+        self.optim_fn = hyper_params["optim_fn"]
+        self.loss_fn = hyper_params["loss"]["loss_fn"]
+        self.loss_args = hyper_params["loss"]["loss_args"]
+        self.loss_reg_type = hyper_params["loss"]["loss_reg_type"]
+        self.lambda_reg = hyper_params["loss"]["loss_reg_param"]
 
-        self.n_epoch = hyperparams["epochs"]
-        self.kernel = hyperparams["kernel_init"]
-        self.bias = hyperparams["bias_init"]
-        self.optim_fn = hyperparams["optim_fn"]
-        self.batch_size = hyperparams["batch_size"]
-        self.lr = hyperparams["lr"]
-        self.model_eval = hyperparams["model_eval"]
-        self.weight_seed_hyper = hyperparams["weight_seed"]
-        self.seed = hyperparams["seed"]
-
-        self.weight_seed = self.weight_seed_hyper
-
-    def setup_writer(self):
-        # setup tensorboard stuff
         layout = {
             "Multi": {
                 "loss": ["Multiline", ["loss/train", "loss/validation"]],
             },
         }
-        self.writer = SummaryWriter(f"/tmp/tensorboard/{int(time.time())}")
-        self.writer.add_custom_scalars(layout)
+        self.writer = self.setup_writer(layout)
 
-    def train(self):
-        # Move model to the available device
-        self.model.to(self.device)
-        self.setup_dataloader()
-        self.setup_weight
+    def train(self, model, x_data, y_data):
+        device = self.device
+        writer = self.writer
 
-        # Initialise optimizer using specified optimization function and learning rate
+        # initialise dataloader
+        train_loader, valid_loader, eval_loader = self.setup_dataloader(x_data, y_data)
+
+        # initialise optimizer
         optim_fn = OptimSwitch().fn(self.optim_fn)
-        optimizer = optim_fn(self.model.parameters(), lr=self.lr)
-
+        optimizer = optim_fn(model.parameters(), self.lr)
         criterion = LossSwitch().fn(self.loss_fn, self.loss_args)
 
+        # initialise schedular
+        if self.lr_scheduler:
+            scheduler = self.setup_scheduler(optimizer)
+
         with mlflow.start_run(experiment_id=self.exp_id, run_name=self.exp_time):
-            mlflow.log_params(self.hyperparams)
+            mlflow.log_params(self.hyper_params)
             mlflow.log_param("n_epoch", self.n_epoch)
 
             for epoch in range(self.n_epoch):
                 print(f">>> epoch = {epoch}")
-                self.model.train()
+                model.train()
+
                 running_loss = 0
-                for inputs, labels in self.train_loader:
-                    inputs, labels = inputs.to(self.device), labels.to(self.device)
+
+                for inputs, labels in train_loader:
+                    inputs, labels = inputs.to(device), labels.to(device)
                     inputs, labels = inputs.float(), labels.float()
 
                     optimizer.zero_grad()
-                    logps = self.model(inputs)
+                    logps = model(inputs)
 
                     loss = criterion(logps, labels)
 
                     if self.loss_reg_type is not None:
-                        l_reg = loss_reg_fn(self.model, self.loss_reg_type, self.device)
+                        l_reg = loss_reg_fn(model, self.loss_reg_type, device)
                         loss += self.lambda_reg * l_reg
 
                     loss.mean().backward()
@@ -134,63 +122,86 @@ class NNLearn(Learn):
                     running_loss += loss.item()
 
                 valid_loss = 0
-                self.model.eval()
+                model.eval()
 
-                for inputs, labels in self.valid_loader:
-                    inputs, labels = inputs.to(self.device), labels.to(self.device)
+                for inputs, labels in valid_loader:
+                    inputs, labels = inputs.to(device), labels.to(device)
                     inputs, labels = inputs.float(), labels.float()
 
-                    target = self.model(inputs)
+                    target = model(inputs)
 
                     loss = criterion(target, labels)
                     valid_loss += loss.item()
 
-                if self.schedular is not None:
+                if self.lr_scheduler:
                     before_lr = optimizer.param_groups[0]["lr"]
-                    self.schedular.step()
+                    scheduler.step()
                     after_lr = optimizer.param_groups[0]["lr"]
                     print(
                         "Epoch %d: Adam lr %.5f -> %.5f" % (epoch, before_lr, after_lr)
                     )
 
-                print("Training loss:", running_loss / len(self.train_loader))
-                print("Validation loss:", valid_loss / len(self.valid_loader))
+                print("Training loss:", running_loss / len(train_loader))
+                print("Validation loss:", valid_loss / len(valid_loader))
 
                 self.log_scalar(
-                    "loss/train", (running_loss / len(self.train_loader)), epoch
+                    writer,
+                    "loss/train",
+                    (running_loss / len(train_loader)),
+                    epoch,
                 )
                 self.log_scalar(
-                    "loss/validation", (valid_loss / len(self.valid_loader)), epoch
+                    writer,
+                    "loss/validation",
+                    (valid_loss / len(valid_loader)),
+                    epoch,
                 )
 
-            self.write_log()
+            self.write_log(model)
 
-        # Perform model evaluation using invariance tests
-        if self.model_eval:
-            eval_test = create_eval_scheme(
-                self.model_name,
-                self.model,
-                self.train_loader,
-                self.valid_loader,
-                self.eval_loader,
-                self.x_data[0].size,
-                self.y_data.shape[1],
-            )
+            # Perform model evaluation using invariance tests
+            if self.model_eval:
+                eval_test = create_eval_scheme(
+                    self.model_name,
+                    model,
+                    train_loader,
+                    valid_loader,
+                    eval_loader,
+                    x_data.shape[1],
+                    y_data[0].size,
+                )
+                eval_results = eval_test.eval()
 
-            eval_results = eval_test.eval()
+                # Log results
+                for k, v in eval_results.items():
+                    mlflow.log_dict(v, f"{k}.yaml")
 
-            # Log results
-            for k, v in eval_results.items():
-                mlflow.log_dict(v, f"{k}.yaml")
-
-        summary(self.model)
         self.writer.close()
-        self.score = running_loss / len(self.train_loader)
+        score = running_loss / len(train_loader)
 
-        return self.model
+        return model, score
 
-    def train_kfold(self):
+    def train_std(self):
+        x_data = self.x_data
+        y_data = self.y_data
+
+        model = self.setup_model(x_data, y_data)
+        model = self.setup_weight(model, self.weight_seed)
+        model, _ = self.train(model, x_data, y_data)
+
+        summary(model, (1, x_data.shape[1]))
+
+        return model
+
+    def train_kfold(self, x_data=None, y_data=None):
         # K-fold Cross Validation model evaluation
+        device = self.device
+
+        if x_data is None:
+            x_data = self.x_data
+        if y_data is None:
+            y_data = self.y_data
+
         prev_score = 1e6
         fit_time = []
         train_score = []
@@ -199,26 +210,26 @@ class NNLearn(Learn):
         kfold_spooler = RepeatedKFold(
             n_splits=self.n_splits,
             n_repeats=self.n_repeats,
-            random_state=self.seed_kfold,
+            random_state=RandomState(seed=self.seed_kfold),
         )
 
         criterion = LossSwitch().fn(self.loss_fn, self.loss_args)
 
-        for fold, (train_index, test_index) in enumerate(
-            kfold_spooler.split(self.x_data)
-        ):
-            print(">> fitting neural net...")
+        for fold, (train_index, test_index) in enumerate(kfold_spooler.split(x_data)):
             start = time.time()
+            # Training
+            model = self.setup_model(x_data[train_index], y_data[train_index])
+            model = self.setup_weight(model, self.weight_seed)
+            model, score = self.train(model, x_data[train_index], y_data[train_index])
 
-            model = self.train()
-            train_score.append(self.score)
+            train_score.append(score)
             fit_time.append(time.time() - start)
             # Testing
             model.eval()
-            x_test = torch.from_numpy(self.x_data[test_index]).float().to(self.device)
+            x_test = torch.from_numpy(x_data[test_index]).float().to(device)
             pred_xanes = model(x_test)
             pred_score = criterion(
-                torch.tensor(self.y_data[test_index]).to(self.device), pred_xanes
+                torch.tensor(y_data[test_index]).to(device), pred_xanes
             ).item()
             test_score.append(pred_score)
 
@@ -233,30 +244,36 @@ class NNLearn(Learn):
         }
 
         self._print_kfold_result(result)
+        summary(best_model, (1, x_data.shape[1]))
 
         return best_model
 
     def train_bootstrap(self):
         model_list = []
+        x_data = self.x_data
+        y_data = self.y_data
+
         for i in range(self.n_boot):
-            self.weight_seed = self.weight_seed_boot[i]
-            random.seed(self.weight_seed)
+            weight_seed = self.weight_seed_boot[i]
+            random.seed(weight_seed)
 
-            new_x = []
-            new_y = []
+            boot_x = []
+            boot_y = []
 
-            for _ in range(int(self.x_data.shape[0] * self.n_size)):
-                idx = random.randint(0, self.x_data.shape[0] - 1)
-                new_x.append(self.x_data[idx])
-                new_y.append(self.y_data[idx])
+            for _ in range(int(x_data.shape[0] * self.n_size)):
+                idx = random.randint(0, x_data.shape[0] - 1)
+                boot_x.append(x_data[idx])
+                boot_y.append(y_data[idx])
 
-                self.x_data = np.asarray(new_x)
-                self.y_data = np.asarray(new_y)
+            boot_x = np.asarray(boot_x)
+            boot_y = np.asarray(boot_y)
 
             if self.kfold:
-                model = self.train_kfold()
+                model = self.train_kfold(boot_x, boot_y)
             else:
-                model = self.train()
+                model = self.setup_model(boot_x, boot_y)
+                model = self.setup_weight(model, weight_seed)
+                model, _ = self.train(model, boot_x, boot_y)
 
             model_list.append(model)
 
@@ -264,13 +281,16 @@ class NNLearn(Learn):
 
     def train_ensemble(self):
         model_list = []
-        for i in range(self.n_ens):
-            self.weight_seed = self.weight_seed_ens[i]
+        x_data = self.x_data
+        y_data = self.y_data
 
+        for i in range(self.n_ens):
             if self.kfold:
                 model = self.train_kfold()
             else:
-                model = self.train()
+                model = self.setup_model(x_data, y_data)
+                model = self.setup_weight(model, self.weight_seed_ens[i])
+                model, _ = self.train(model, x_data, y_data)
 
             model_list.append(model)
 
@@ -309,36 +329,5 @@ class NNLearn(Learn):
             for score in ("fit_time", "train_score", "test_score")
         )
         print(fmt.format("std. dev.", *stdevs_))
-
         print("*" * 16 * 3)
-
         print("")
-
-    def log_scalar(self, name, value, epoch):
-        """Log a scalar value to both MLflow and TensorBoard"""
-        self.writer.add_scalar(name, value, epoch)
-        mlflow.log_metric(name, value)
-
-    def write_log(self):
-        # # Create a SummaryWriter to write TensorBoard events locally
-        output_dir = tempfile.mkdtemp()
-
-        # Upload the TensorBoard event logs as a run artifact
-        print("Uploading TensorBoard events as a run artifact...")
-        mlflow.log_artifacts(output_dir, artifact_path="events")
-        print(
-            "\nLaunch TensorBoard with:\n\ntensorboard --logdir=%s"
-            % os.path.join(mlflow.get_artifact_uri(), "events")
-        )
-
-        # Log the model as an artifact of the MLflow run.
-        print("\nLogging the trained model as a run artifact...")
-        mlflow.pytorch.log_model(
-            self.model, artifact_path="pytorch-model", pickle_module=pickle
-        )
-        print(
-            "\nThe model is logged at:\n%s"
-            % os.path.join(mlflow.get_artifact_uri(), "pytorch-model")
-        )
-
-        mlflow.pytorch.load_model(mlflow.get_artifact_uri("pytorch-model"))

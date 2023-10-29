@@ -22,8 +22,8 @@ import numpy as np
 def data_augment(data_params, xyz_data, xanes_data, index, n_x_features, n_y_features):
     n_samples = len(index)
     n_aug_samples = np.multiply(n_samples, data_params["augment_mult"]) - n_samples
-    print(">> ...AUGMENTING DATA...\n")
-    if data_params["augment_type"].lower() == "random_noise":
+
+    if data_params["type"].lower() == "random_noise":
         # augment data as random data point + noise
 
         rand = random.choices(range(n_samples), k=n_aug_samples)
@@ -41,7 +41,7 @@ def data_augment(data_params, xyz_data, xanes_data, index, n_x_features, n_y_fea
         data1 = xyz_data[rand, :] + noise1
         data2 = xanes_data[rand, :] + noise2
 
-    elif data_params["augment_type"].lower() == "random_combination":
+    elif data_params["type"].lower() == "random_combination":
         rand1 = random.choices(range(n_samples), k=n_aug_samples)
         rand2 = random.choices(range(n_samples), k=n_aug_samples)
 
@@ -49,10 +49,9 @@ def data_augment(data_params, xyz_data, xanes_data, index, n_x_features, n_y_fea
         data2 = 0.5 * (xanes_data[rand1, :] + xanes_data[rand2, :])
 
     else:
-        raise ValueError("augment_type not found")
+        raise ValueError("augment type not found")
 
     xyz_data = np.vstack((xyz_data, data1))
     xanes_data = np.vstack((xanes_data, data2))
 
-    print(">> ...FINISHED AUGMENTING DATA...\n")
     return xyz_data, xanes_data

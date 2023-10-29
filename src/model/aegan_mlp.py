@@ -245,7 +245,7 @@ class AEGAN_MLP(nn.Module):
         loss_total.backward()
         self.gen_opt.step()
 
-    def dis_update(self, x_a, x_b):
+    def dis_update(self, x_a, x_b, device):
         # encode
         self.dis_opt.zero_grad()
         y_a = self.gen_a.encode(x_a)
@@ -266,8 +266,8 @@ class AEGAN_MLP(nn.Module):
         x_b_recon = self.gen_b.decode(shared_dec_b)
 
         # Discriminator loss for real inputs
-        loss_dis_adv_a = self.dis_a.calc_gen_loss(x_a)
-        loss_dis_adv_b = self.dis_b.calc_gen_loss(x_b)
+        loss_dis_adv_a = self.dis_a.calc_gen_loss(x_a, device)
+        loss_dis_adv_b = self.dis_b.calc_gen_loss(x_b, device)
 
         loss_gen_adv_a = self.dis_a.calc_dis_loss(x_ba, x_a)
         loss_gen_adv_b = self.dis_b.calc_dis_loss(x_ab, x_b)
@@ -439,9 +439,9 @@ class Dis(nn.Module):
         loss = self.loss_fn(out0, out1)
         return loss
 
-    def calc_gen_loss(self, input_fake):
+    def calc_gen_loss(self, input_fake, device):
         # Calculate the loss to train G
         out0 = self.forward(input_fake)
-        ones = torch.ones((input_fake.size(0), 1))
+        ones = torch.ones((input_fake.size(0), 1), device=device)
         loss = self.loss_fn(out0, ones)
         return loss

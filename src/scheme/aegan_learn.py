@@ -34,54 +34,41 @@ from src.creator import create_eval_scheme
 class AEGANLearn(Learn):
     def __init__(
         self,
-        model,
         x_data,
         y_data,
-        hyperparams,
+        model_params,
+        hyper_params,
         kfold,
-        kfoldparams,
+        kfold_params,
         bootstrap_params,
         ensemble_params,
-        label=None,
-        schedular=None,
+        schedular,
+        scheduler_params,
     ):
         # Call the constructor of the parent class
         super().__init__(
-            model,
             x_data,
             y_data,
-            hyperparams,
+            model_params,
+            hyper_params,
             kfold,
-            kfoldparams,
+            kfold_params,
             bootstrap_params,
             ensemble_params,
-            label,
             schedular,
+            scheduler_params,
         )
 
-        # hyperparameter set
-        self.batch_size = hyperparams["batch_size"]
-        self.weight_seed_hyper = hyperparams["weight_seed"]
-        self.kernel = hyperparams["kernel_init"]
-        self.bias = hyperparams["bias_init"]
-        self.n_epoch = hyperparams["epochs"]
-        self.model_eval = hyperparams["model_eval"]
-        self.seed = hyperparams["seed"]
-        self.loss_fn = hyperparams["loss_gen"]["loss_fn"]
-        self.loss_args = hyperparams["loss_gen"]["loss_args"]
-
         # Regularisation of gen loss function
-        self.loss_gen_reg_type = self.hyperparams["loss_gen"]["loss_reg_type"]
-        self.loss_gen_reg = True if self.loss_gen_reg_type is not None else False
-        self.lambda_gen_reg = self.hyperparams["loss_gen"]["loss_reg_param"]
+        self.loss_fn = model_params["params"]["loss_gen"]["loss_fn"]
+        self.loss_args = model_params["params"]["loss_gen"]["loss_args"]
+        self.loss_gen_reg_type = model_params["params"]["loss_gen"]["loss_reg_type"]
+        self.lambda_gen_reg = model_params["params"]["loss_gen"]["loss_reg_param"]
 
         # Regularisation of dis loss function
-        self.loss_dis_reg_type = self.hyperparams["loss_dis"]["loss_reg_type"]
-        self.loss_dis_reg = True if self.loss_gen_reg_type is not None else False
-        self.lambda_dis_reg = self.hyperparams["loss_dis"]["loss_reg_param"]
+        self.loss_dis_reg_type = model_params["params"]["loss_dis"]["loss_reg_type"]
+        self.lambda_dis_reg = model_params["params"]["loss_dis"]["loss_reg_param"]
 
-    def setup_writer(self):
-        # setup tensorboard stuff
         layout = {
             "Multi": {
                 "total_loss": ["multiline", ["total_loss"]],
@@ -89,34 +76,41 @@ class AEGANLearn(Learn):
                 "pred_loss": ["Multiline", ["loss_p/x", "loss_p/y"]],
             },
         }
-        self.writer = SummaryWriter(f"/tmp/tensorboard/{int(time.time())}")
-        self.writer.add_custom_scalars(layout)
+
+        self.writer = self.setup_writer(layout)
 
     def setup_scheduler(self, gen_opt, dis_opt):
+        scheduler_type = self.scheduler_params["type"]
+        params = {
+            key: value for key, value in self.scheduler_params.items() if key != "type"
+        }
+
         scheduler_gen = LRScheduler(
             gen_opt,
-            scheduler_type=self.scheduler_param["scheduler_type"],
-            params=self.scheduler_param["scheduler_param"],
+            scheduler_type=scheduler_type,
+            params=params,
         )
         scheduler_dis = LRScheduler(
             dis_opt,
-            scheduler_type=self.scheduler_param["scheduler_type"],
-            params=self.scheduler_param["scheduler_param"],
+            scheduler_type=scheduler_type,
+            params=params,
         )
         return scheduler_gen, scheduler_dis
 
-    def train(self):
-        # Move model to the available device
-        self.model.to(self.device)
-        self.setup_dataloader()
-        self.setup_weight
+    def train(self, model, x_data, y_data):
+        device = self.device
+        writer = self.writer
 
-        gen_opt, dis_opt = self.model.get_optimizer()
+        # initialise dataloader
+        train_loader, valid_loader, eval_loader = self.setup_dataloader(x_data, y_data)
+
+        gen_opt, dis_opt = model.get_optimizer()
+
         # setup learning rate scheduler
-        if self.schedular is not None:
+        if self.lr_scheduler:
             scheduler_gen, scheduler_dis = self.setup_scheduler(gen_opt, dis_opt)
 
-        self.model.train()
+        model.train()
 
         # Select loss function
         # Select running loss function as generative loss function
@@ -129,11 +123,11 @@ class AEGANLearn(Learn):
         train_loss_y_pred = [None] * self.n_epoch
 
         with mlflow.start_run(experiment_id=self.exp_id, run_name=self.exp_time):
-            mlflow.log_params(self.hyperparams)
+            mlflow.log_params(self.hyper_params)
             mlflow.log_param("n_epoch", self.n_epoch)
 
             for epoch in range(self.n_epoch):
-                self.model.train()
+                print(f">>> epoch = {epoch}")
                 running_loss_recon_x = 0
                 running_loss_recon_y = 0
                 running_loss_pred_x = 0
@@ -141,21 +135,21 @@ class AEGANLearn(Learn):
                 running_gen_loss = 0
                 running_dis_loss = 0
 
-                for inputs_x, inputs_y in self.train_loader:
-                    inputs_x, inputs_y = inputs_x.to(self.device), inputs_y.to(
-                        self.device
-                    )
+                model.train()
+
+                for inputs_x, inputs_y in train_loader:
+                    inputs_x, inputs_y = inputs_x.to(device), inputs_y.to(device)
                     inputs_x, inputs_y = inputs_x.float(), inputs_y.float()
 
-                    self.model.gen_update(inputs_x, inputs_y)
-                    self.model.dis_update(inputs_x, inputs_y)
+                    model.gen_update(inputs_x, inputs_y)
+                    model.dis_update(inputs_x, inputs_y, device)
 
                     (
                         recon_x,
                         recon_y,
                         pred_x,
                         pred_y,
-                    ) = self.model.reconstruct_all_predict_all(inputs_x, inputs_y)
+                    ) = model.reconstruct_all_predict_all(inputs_x, inputs_y)
 
                     # Track running losses
                     running_loss_recon_x += criterion(recon_x, inputs_x)
@@ -169,27 +163,27 @@ class AEGANLearn(Learn):
                         + running_loss_pred_x
                         + running_loss_pred_y
                     )
-                    loss_dis_total = self.model.loss_dis_total
+                    loss_dis_total = model.loss_dis_total
 
                     # Regularisation of gen loss
-                    if self.loss_gen_reg:
+                    if self.loss_gen_reg_type is not None:
                         gen_a_l_reg = loss_reg_fn(
-                            self.model.gen_a, self.loss_gen_reg_type, self.device
+                            model.gen_a, self.loss_gen_reg_type, device
                         )
                         gen_b_l_reg = loss_reg_fn(
-                            self.model.gen_b, self.loss_gen_reg_type, self.device
+                            model.gen_b, self.loss_gen_reg_type, device
                         )
                         loss_gen_total += self.lambda_gen_reg * (
                             gen_a_l_reg + gen_b_l_reg
                         )
 
                     # Regularisation of dis loss
-                    if self.loss_dis_reg:
+                    if self.loss_dis_reg_type is not None:
                         dis_a_l_reg = loss_reg_fn(
-                            self.model.dis_a, self.loss_dis_reg_type, self.device
+                            model.dis_a, self.loss_dis_reg_type, device
                         )
                         dis_b_l_reg = loss_reg_fn(
-                            self.model.dis_b, self.loss_dis_reg_type, self.device
+                            model.dis_b, self.loss_dis_reg_type, device
                         )
                         loss_dis_total += self.lambda_dis_reg * (
                             dis_a_l_reg + dis_b_l_reg
@@ -198,7 +192,7 @@ class AEGANLearn(Learn):
                     running_gen_loss += loss_gen_total.item()
                     running_dis_loss += loss_dis_total.item()
 
-                if self.schedular is not None:
+                if self.lr_scheduler:
                     before_lr_gen = gen_opt.param_groups[0]["lr"]
                     scheduler_gen.step()
                     after_lr_gen = gen_opt.param_groups[0]["lr"]
@@ -215,28 +209,20 @@ class AEGANLearn(Learn):
                         % (epoch, before_lr_dis, after_lr_dis)
                     )
 
-                running_gen_loss = running_gen_loss / len(self.train_loader)
-                running_dis_loss = running_dis_loss / len(self.train_loader)
+                running_gen_loss = running_gen_loss / len(train_loader)
+                running_dis_loss = running_dis_loss / len(train_loader)
 
-                running_loss_recon_x = running_loss_recon_x.item() / len(
-                    self.train_loader
-                )
-                running_loss_recon_y = running_loss_recon_y.item() / len(
-                    self.train_loader
-                )
-                running_loss_pred_x = running_loss_pred_x.item() / len(
-                    self.train_loader
-                )
-                running_loss_pred_y = running_loss_pred_y.item() / len(
-                    self.train_loader
-                )
+                running_loss_recon_x = running_loss_recon_x.item() / len(train_loader)
+                running_loss_recon_y = running_loss_recon_y.item() / len(train_loader)
+                running_loss_pred_x = running_loss_pred_x.item() / len(train_loader)
+                running_loss_pred_y = running_loss_pred_y.item() / len(train_loader)
 
-                self.log_scalar("gen_loss", running_gen_loss, epoch)
-                self.log_scalar("dis_loss", running_dis_loss, epoch)
-                self.log_scalar("recon_x_loss", running_loss_recon_x, epoch)
-                self.log_scalar("recon_y_loss", running_loss_recon_y, epoch)
-                self.log_scalar("pred_x_loss", running_loss_pred_x, epoch)
-                self.log_scalar("pred_y_loss", running_loss_pred_y, epoch)
+                self.log_scalar(writer, "gen_loss", running_gen_loss, epoch)
+                self.log_scalar(writer, "dis_loss", running_dis_loss, epoch)
+                self.log_scalar(writer, "recon_x_loss", running_loss_recon_x, epoch)
+                self.log_scalar(writer, "recon_y_loss", running_loss_recon_y, epoch)
+                self.log_scalar(writer, "pred_x_loss", running_loss_pred_x, epoch)
+                self.log_scalar(writer, "pred_y_loss", running_loss_pred_y, epoch)
 
                 train_loss_x_recon[epoch] = running_loss_recon_x
                 train_loss_y_recon[epoch] = running_loss_recon_y
@@ -251,12 +237,10 @@ class AEGANLearn(Learn):
                 valid_loss_pred_y = 0
                 valid_loss_total = 0
 
-                self.model.eval()
+                model.eval()
 
-                for inputs_x, inputs_y in self.valid_loader:
-                    inputs_x, inputs_y = inputs_x.to(self.device), inputs_y.to(
-                        self.device
-                    )
+                for inputs_x, inputs_y in valid_loader:
+                    inputs_x, inputs_y = inputs_x.to(device), inputs_y.to(device)
                     inputs_x, inputs_y = inputs_x.float(), inputs_y.float()
 
                     (
@@ -264,7 +248,7 @@ class AEGANLearn(Learn):
                         recon_y,
                         pred_x,
                         pred_y,
-                    ) = self.model.reconstruct_all_predict_all(inputs_x, inputs_y)
+                    ) = model.reconstruct_all_predict_all(inputs_x, inputs_y)
 
                     valid_loss_recon_x += criterion(recon_x, inputs_x)
                     valid_loss_recon_y += criterion(recon_y, inputs_y)
@@ -280,15 +264,15 @@ class AEGANLearn(Learn):
 
                     valid_loss_total += valid_loss.item()
 
-                valid_loss_recon_x = valid_loss_recon_x.item() / len(self.valid_loader)
-                valid_loss_recon_y = valid_loss_recon_y.item() / len(self.valid_loader)
-                valid_loss_pred_x = valid_loss_pred_x.item() / len(self.valid_loader)
-                valid_loss_pred_y = valid_loss_pred_y.item() / len(self.valid_loader)
+                valid_loss_recon_x = valid_loss_recon_x.item() / len(valid_loader)
+                valid_loss_recon_y = valid_loss_recon_y.item() / len(valid_loader)
+                valid_loss_pred_x = valid_loss_pred_x.item() / len(valid_loader)
+                valid_loss_pred_y = valid_loss_pred_y.item() / len(valid_loader)
 
-                self.log_scalar("valid_recon_x_loss", valid_loss_recon_x, epoch)
-                self.log_scalar("valid_recon_y_loss", valid_loss_recon_y, epoch)
-                self.log_scalar("valid_pred_x_loss", valid_loss_pred_x, epoch)
-                self.log_scalar("valid_pred_y_loss", valid_loss_pred_y, epoch)
+                self.log_scalar(writer, "valid_recon_x_loss", valid_loss_recon_x, epoch)
+                self.log_scalar(writer, "valid_recon_y_loss", valid_loss_recon_y, epoch)
+                self.log_scalar(writer, "valid_pred_x_loss", valid_loss_pred_x, epoch)
+                self.log_scalar(writer, "valid_pred_y_loss", valid_loss_pred_y, epoch)
 
                 print(f">>> Epoch {epoch}...")
 
@@ -314,12 +298,12 @@ class AEGANLearn(Learn):
             if self.model_eval:
                 eval_test = create_eval_scheme(
                     self.model_name,
-                    self.model,
-                    self.train_loader,
-                    self.valid_loader,
-                    self.eval_loader,
-                    self.x_data[0].size,
-                    self.y_data.shape[1],
+                    model,
+                    train_loader,
+                    valid_loader,
+                    eval_loader,
+                    x_data.shape[1],
+                    y_data.shape[1],
                 )
 
                 eval_results = eval_test.eval()
@@ -328,14 +312,31 @@ class AEGANLearn(Learn):
                 for k, v in eval_results.items():
                     mlflow.log_dict(v, f"{k}.yaml")
 
-        summary(self.model)
-        self.writer.close()
-        self.score = losses
+        score = losses
 
-        return self.model
+        return model, score
 
-    def train_kfold(self):
+    def train_std(self):
+        x_data = self.x_data
+        y_data = self.y_data
+
+        model = self.setup_model(x_data, y_data)
+        model = self.setup_weight(model, self.weight_seed)
+        model, _ = self.train(model, x_data, y_data)
+
+        summary(model)
+
+        return model
+
+    def train_kfold(self, x_data=None, y_data=None):
         # K-fold Cross Validation model evaluation
+        device = self.device
+
+        if x_data is None:
+            x_data = self.x_data
+        if y_data is None:
+            y_data = self.y_data
+
         prev_score = 1e6
         fit_time = []
         train_score = []
@@ -352,21 +353,19 @@ class AEGANLearn(Learn):
 
         criterion = LossSwitch().fn(self.loss_fn, self.loss_args)
 
-        for fold, (train_index, test_index) in enumerate(
-            kfold_spooler.split(self.x_data)
-        ):
-            print(">> fitting neural net...")
-            # Training
+        for fold, (train_index, test_index) in enumerate(kfold_spooler.split(x_data)):
             start = time.time()
             # Training
-            model = self.train()
+            model = self.setup_model(x_data[train_index], y_data[train_index])
+            model = self.setup_weight(model, self.weight_seed)
+            model, score = self.train(model, x_data[train_index], y_data[train_index])
 
-            train_score.append(self.score["train_loss"][-1])
+            train_score.append(score["train_loss"][-1])
             fit_time.append(time.time() - start)
             # Testing
             model.eval()
-            xyz_test = torch.from_numpy(self.x_data[test_index]).float()
-            xanes_test = torch.from_numpy(self.y_data[test_index]).float()
+            xyz_test = torch.from_numpy(x_data[test_index]).float().to(device)
+            xanes_test = torch.from_numpy(y_data[test_index]).float().to(device)
             (
                 recon_xyz,
                 recon_xanes,
@@ -410,25 +409,30 @@ class AEGANLearn(Learn):
 
     def train_bootstrap(self):
         model_list = []
+        x_data = self.x_data
+        y_data = self.y_data
+
         for i in range(self.n_boot):
-            self.weight_seed = self.weight_seed_boot[i]
-            random.seed(self.weight_seed)
+            weight_seed = self.weight_seed_boot[i]
+            random.seed(weight_seed)
 
-            new_x = []
-            new_y = []
+            boot_x = []
+            boot_y = []
 
-            for _ in range(int(self.x_data.shape[0] * self.n_size)):
-                idx = random.randint(0, self.x_data.shape[0] - 1)
-                new_x.append(self.x_data[idx])
-                new_y.append(self.y_data[idx])
+            for _ in range(int(x_data.shape[0] * self.n_size)):
+                idx = random.randint(0, x_data.shape[0] - 1)
+                boot_x.append(x_data[idx])
+                boot_y.append(y_data[idx])
 
-                self.x_data = np.asarray(new_x)
-                self.y_data = np.asarray(new_y)
+            boot_x = np.asarray(boot_x)
+            boot_y = np.asarray(boot_y)
 
             if self.kfold:
-                model = self.train_kfold()
+                model = self.train_kfold(boot_x, boot_y)
             else:
-                model = self.train()
+                model = self.setup_model(boot_x, boot_y)
+                model = self.setup_weight(model, weight_seed)
+                model, _ = self.train(model, boot_x, boot_y)
 
             model_list.append(model)
 
@@ -436,13 +440,16 @@ class AEGANLearn(Learn):
 
     def train_ensemble(self):
         model_list = []
-        for i in range(self.n_ens):
-            self.weight_seed = self.weight_seed_ens[i]
+        x_data = self.x_data
+        y_data = self.y_data
 
+        for i in range(self.n_ens):
             if self.kfold:
                 model = self.train_kfold()
             else:
-                model = self.train()
+                model = self.setup_model(x_data, y_data)
+                model = self.setup_weight(model, self.weight_seed_ens[i])
+                model, _ = self.train(model, x_data, y_data)
 
             model_list.append(model)
 
@@ -515,10 +522,4 @@ class AEGANLearn(Learn):
         )
         print(fmt.format("std. dev.", *stdevs_))
         print("*" * (16 + 18 * 5))
-
         print("")
-
-    def log_scalar(self, name, value, epoch):
-        """Log a scalar value to both MLflow and TensorBoard"""
-        self.writer.add_scalar(name, value, epoch)
-        mlflow.log_metric(name, value)

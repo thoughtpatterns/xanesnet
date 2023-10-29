@@ -14,6 +14,7 @@ You should have received a copy of the GNU General Public License along with
 this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
+import random
 import mlflow
 import time
 import torch
@@ -22,61 +23,46 @@ import numpy as np
 
 from sklearn.model_selection import RepeatedKFold
 from torchinfo import summary
-from torch.utils.tensorboard import SummaryWriter
 
-from .nn_learn import NNLearn
+from .base_learn import Learn
 from src.creator import create_eval_scheme
 from src.model_utils import OptimSwitch, LossSwitch
 
 
-class AELearn(NNLearn):
+class AELearn(Learn):
     def __init__(
         self,
-        model,
         x_data,
         y_data,
-        hyperparams,
+        model_params,
+        hyper_params,
         kfold,
-        kfoldparams,
+        kfold_params,
         bootstrap_params,
         ensemble_params,
-        label=None,
-        schedular=None,
+        schedular,
+        scheduler_params,
     ):
         # Call the constructor of the parent class
         super().__init__(
-            model,
             x_data,
             y_data,
-            hyperparams,
+            model_params,
+            hyper_params,
             kfold,
-            kfoldparams,
+            kfold_params,
             bootstrap_params,
             ensemble_params,
-            label,
             schedular,
+            scheduler_params,
         )
 
         # hyperparameter set
-        self.loss_fn = hyperparams["loss"]["loss_fn"]
-        self.loss_args = hyperparams["loss"]["loss_args"]
-        self.loss_reg_type = hyperparams["loss"]["loss_reg_type"]
-        self.lambda_reg = hyperparams["loss"]["loss_reg_param"]
+        self.lr = hyper_params["lr"]
+        self.optim_fn = hyper_params["optim_fn"]
+        self.loss_fn = hyper_params["loss"]["loss_fn"]
+        self.loss_args = hyper_params["loss"]["loss_args"]
 
-        self.n_epoch = hyperparams["epochs"]
-        self.kernel = hyperparams["kernel_init"]
-        self.bias = hyperparams["bias_init"]
-        self.optim_fn = hyperparams["optim_fn"]
-        self.batch_size = hyperparams["batch_size"]
-        self.lr = hyperparams["lr"]
-        self.model_eval = hyperparams["model_eval"]
-        self.weight_seed_hyper = hyperparams["weight_seed"]
-        self.seed = hyperparams["seed"]
-
-        self.weight_seed = self.weight_seed_hyper
-
-    def setup_writer(self):
-        # setup tensorboard stuff
         layout = {
             "Multi": {
                 "recon_loss": [
@@ -86,46 +72,45 @@ class AELearn(NNLearn):
                 "pred_loss": ["Multiline", ["pred_loss/train", "pred_loss/validation"]],
             },
         }
-        self.writer = SummaryWriter(f"/tmp/tensorboard/{int(time.time())}")
-        self.writer.add_custom_scalars(layout)
 
-    def train(self):
-        # Move model to the available device
-        self.model.to(self.device)
-        self.setup_dataloader()
-        self.setup_weight
+        self.writer = self.setup_writer(layout)
+
+    def train(self, model, x_data, y_data):
+        device = self.device
+        writer = self.writer
+
+        # initialise dataloader
+        train_loader, valid_loader, eval_loader = self.setup_dataloader(x_data, y_data)
 
         # Initialise optimizer using specified optimization function and learning rate
         optim_fn = OptimSwitch().fn(self.optim_fn)
-        optimizer = optim_fn(self.model.parameters(), lr=self.lr)
-
+        optimizer = optim_fn(model.parameters(), lr=self.lr)
         criterion = LossSwitch().fn(self.loss_fn, self.loss_args)
 
+        # initialise schedular
+        if self.lr_scheduler:
+            scheduler = self.setup_scheduler(optimizer)
+
         with mlflow.start_run(experiment_id=self.exp_id, run_name=self.exp_time):
-            mlflow.log_params(self.hyperparams)
+            mlflow.log_params(self.hyper_params)
             mlflow.log_param("n_epoch", self.n_epoch)
 
             for epoch in range(self.n_epoch):
                 print(f">>> epoch = {epoch}")
-                self.model.train()
+                model.train()
+
                 running_loss = 0
                 loss_r = 0
                 loss_p = 0
-
                 total_step_train = 0
-                for inputs, labels in self.train_loader:
-                    inputs, labels = (
-                        inputs.to(self.device),
-                        labels.to(self.device),
-                    )
-                    inputs, labels = (
-                        inputs.float(),
-                        labels.float(),
-                    )
+
+                for inputs, labels in train_loader:
+                    inputs, labels = inputs.to(device), labels.to(device)
+                    inputs, labels = inputs.float(), labels.float()
 
                     optimizer.zero_grad()
 
-                    recon_input, outputs = self.model(inputs)
+                    recon_input, outputs = model(inputs)
 
                     loss_recon = criterion(recon_input, inputs)
                     loss_pred = criterion(outputs, labels)
@@ -143,14 +128,15 @@ class AELearn(NNLearn):
                 valid_loss = 0
                 valid_loss_r = 0
                 valid_loss_p = 0
-                self.model.eval()
                 total_step_valid = 0
 
-                for inputs, labels in self.valid_loader:
-                    inputs, labels = inputs.to(self.device), labels.to(self.device)
+                model.eval()
+
+                for inputs, labels in valid_loader:
+                    inputs, labels = inputs.to(device), labels.to(device)
                     inputs, labels = inputs.float(), labels.float()
 
-                    recon_input, outputs = self.model(inputs)
+                    recon_input, outputs = model(inputs)
 
                     loss_recon = criterion(recon_input, inputs)
                     loss_pred = criterion(outputs, labels)
@@ -163,71 +149,96 @@ class AELearn(NNLearn):
 
                     total_step_valid += 1
 
-                if self.schedular is not None:
+                if self.lr_scheduler:
                     before_lr = optimizer.param_groups[0]["lr"]
-                    self.schedular.step()
+                    scheduler.step()
                     after_lr = optimizer.param_groups[0]["lr"]
                     print(
                         "Epoch %d: Adam lr %.5f -> %.5f" % (epoch, before_lr, after_lr)
                     )
 
-                print("Training loss:", running_loss / len(self.train_loader))
-                print("Validation loss:", valid_loss / len(self.valid_loader))
+                print("Training loss:", running_loss / len(train_loader))
+                print("Validation loss:", valid_loss / len(valid_loader))
 
                 self.log_scalar(
-                    "total_loss/train", (running_loss / len(self.train_loader)), epoch
+                    writer,
+                    "total_loss/train",
+                    (running_loss / len(train_loader)),
+                    epoch,
                 )
                 self.log_scalar(
+                    writer,
                     "total_loss/validation",
-                    (valid_loss / len(self.valid_loader)),
+                    (valid_loss / len(valid_loader)),
                     epoch,
                 )
 
                 self.log_scalar(
-                    "recon_loss/train", (loss_r / len(self.train_loader)), epoch
+                    writer, "recon_loss/train", (loss_r / len(train_loader)), epoch
                 )
                 self.log_scalar(
+                    writer,
                     "recon_loss/validation",
-                    (valid_loss_r / len(self.train_loader)),
+                    (valid_loss_r / len(train_loader)),
                     epoch,
                 )
 
                 self.log_scalar(
-                    "pred_loss/train", (loss_p / len(self.train_loader)), epoch
+                    writer, "pred_loss/train", (loss_p / len(train_loader)), epoch
                 )
                 self.log_scalar(
+                    writer,
                     "pred_loss/validation",
-                    (valid_loss_p / len(self.valid_loader)),
+                    (valid_loss_p / len(valid_loader)),
                     epoch,
                 )
-            self.write_log()
 
-        # Perform model evaluation using invariance tests
-        if self.model_eval:
-            eval_test = create_eval_scheme(
-                self.model_name,
-                self.model,
-                self.train_loader,
-                self.valid_loader,
-                self.eval_loader,
-                self.x_data[0].size,
-                self.y_data.shape[1],
-            )
+            self.write_log(model)
 
-            eval_results = eval_test.eval()
+            # Perform model evaluation using invariance tests
+            if self.model_eval:
+                eval_test = create_eval_scheme(
+                    self.model_name,
+                    model,
+                    train_loader,
+                    valid_loader,
+                    eval_loader,
+                    x_data.shape[1],
+                    y_data[0].size,
+                )
 
-            # Log results
-            for k, v in eval_results.items():
-                mlflow.log_dict(v, f"{k}.yaml")
+                eval_results = eval_test.eval()
 
-        summary(self.model)
+                # Log results
+                for k, v in eval_results.items():
+                    mlflow.log_dict(v, f"{k}.yaml")
+
         self.writer.close()
-        self.score = running_loss / len(self.train_loader)
+        score = running_loss / len(train_loader)
 
-        return self.model
+        return model, score
 
-    def train_kfold(self):
+    def train_std(self):
+        x_data = self.x_data
+        y_data = self.y_data
+
+        model = self.setup_model(x_data, y_data)
+        model = self.setup_weight(model, self.weight_seed)
+        model, _ = self.train(model, x_data, y_data)
+
+        summary(model, (1, x_data.shape[1]))
+
+        return model
+
+    def train_kfold(self, x_data=None, y_data=None):
         # K-fold Cross Validation model evaluation
+        device = self.device
+
+        if x_data is None:
+            x_data = self.x_data
+        if y_data is None:
+            y_data = self.y_data
+
         prev_score = 1e6
         fit_time = []
         train_score = []
@@ -242,20 +253,19 @@ class AELearn(NNLearn):
 
         criterion = LossSwitch().fn(self.loss_fn, self.loss_args)
 
-        for fold, (train_index, test_index) in enumerate(
-            kfold_spooler.split(self.x_data)
-        ):
-            print(">> fitting neural net...")
-            # Training
+        for fold, (train_index, test_index) in enumerate(kfold_spooler.split(x_data)):
             start = time.time()
-            # Training
-            model = self.train()
-            train_score.append(self.score)
+
+            model = self.setup_model(x_data[train_index], y_data[train_index])
+            model = self.setup_weight(model, self.weight_seed)
+            model, score = self.train(model, x_data[train_index], y_data[train_index])
+
+            train_score.append(score)
             fit_time.append(time.time() - start)
             # Testing
             model.eval()
-            x_test = torch.from_numpy(self.x_data[test_index]).float().to(self.device)
-            y_test = torch.from_numpy(self.y_data[test_index]).float().to(self.device)
+            x_test = torch.from_numpy(x_data[test_index]).float().to(device)
+            y_test = torch.from_numpy(y_data[test_index]).float().to(device)
             recon_x, pred_y = model(x_test)
             recon_score = criterion(x_test, recon_x).item()
             pred_score = criterion(y_test, pred_y).item()
@@ -273,9 +283,58 @@ class AELearn(NNLearn):
             "test_recon_score": test_recon_score,
             "test_pred_score": test_pred_score,
         }
+
         self._print_kfold_result(result)
 
         return best_model
+
+    def train_bootstrap(self):
+        model_list = []
+        x_data = self.x_data
+        y_data = self.y_data
+
+        for i in range(self.n_boot):
+            weight_seed = self.weight_seed_boot[i]
+            random.seed(weight_seed)
+
+            boot_x = []
+            boot_y = []
+
+            for _ in range(int(x_data.shape[0] * self.n_size)):
+                idx = random.randint(0, x_data.shape[0] - 1)
+                boot_x.append(x_data[idx])
+                boot_y.append(y_data[idx])
+
+            boot_x = np.asarray(boot_x)
+            boot_y = np.asarray(boot_y)
+
+            if self.kfold:
+                model = self.train_kfold(boot_x, boot_y)
+            else:
+                model = self.setup_model(boot_x, boot_y)
+                model = self.setup_weight(model, weight_seed)
+                model, _ = self.train(model, boot_x, boot_y)
+
+            model_list.append(model)
+
+        return model_list
+
+    def train_ensemble(self):
+        model_list = []
+        x_data = self.x_data
+        y_data = self.y_data
+
+        for i in range(self.n_ens):
+            if self.kfold:
+                model = self.train_kfold()
+            else:
+                model = self.setup_model(x_data, y_data)
+                model = self.setup_weight(model, self.weight_seed_ens[i])
+                model, _ = self.train(model, x_data, y_data)
+
+            model_list.append(model)
+
+        return model_list
 
     def _print_kfold_result(self, scores: dict):
         # prints a summary table of the scores from k-fold cross validation;
@@ -329,7 +388,5 @@ class AELearn(NNLearn):
             )
         )
         print(fmt.format("std. dev.", *stdevs_))
-
         print("*" * 16 * 4)
-
         print("")

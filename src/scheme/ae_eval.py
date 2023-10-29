@@ -189,13 +189,15 @@ class AEEval(Eval):
     def get_loss_input_mean_sd_train(self):
         other_recon_loss = []
         other_pred_loss = []
+        device = self.device
 
         for inputs, labels in self.eval_loader:
-            inputs, labels = inputs.to(self.device), labels.to(self.device)
+            inputs, labels = inputs.to(device), labels.to(device)
             inputs, labels = inputs.float(), labels.float()
 
             mean_sd_input = self.mean_input.repeat(labels.shape[0], 1) + torch.normal(
-                torch.zeros([labels.shape[0], self.n_in]), self.std_input
+                torch.zeros([labels.shape[0], self.input_size], device=device),
+                self.std_input,
             )
 
             recon_target, pred_target = self.model(mean_sd_input)
@@ -211,16 +213,19 @@ class AEEval(Eval):
     def get_loss_output_mean_sd_train(self):
         other_recon_loss = []
         other_pred_loss = []
+        device = self.device
 
         for inputs, labels in self.eval_loader:
-            inputs, labels = inputs.to(self.device), labels.to(self.device)
+            inputs, labels = inputs.to(device), labels.to(device)
             inputs, labels = inputs.float(), labels.float()
 
             recon_target = self.mean_input.repeat(labels.shape[0], 1) + torch.normal(
-                torch.zeros([labels.shape[0], self.n_in]), self.std_input
+                torch.zeros([labels.shape[0], self.input_size], device=device),
+                self.std_input,
             )
             pred_target = self.mean_output.repeat(labels.shape[0], 1) + torch.normal(
-                torch.zeros([labels.shape[0], self.out_dim]), self.std_output
+                torch.zeros([labels.shape[0], self.output_size], device=device),
+                self.std_output,
             )
 
             recon_loss = Eval.functional_mse(recon_target, inputs)
@@ -234,17 +239,18 @@ class AEEval(Eval):
     def get_loss_input_random_valid(self):
         other_recon_loss = []
         other_pred_loss = []
+        device = self.device
 
         it = iter(self.valid_loader)
 
         for inputs, labels in self.eval_loader:
-            inputs, labels = inputs.to(self.device), labels.to(self.device)
+            inputs, labels = inputs.to(device), labels.to(device)
             inputs, labels = inputs.float(), labels.float()
 
             alt_inputs, alt_labels = next(it)
 
-            alt_inputs = alt_inputs.to(self.device).float()
-            alt_labels = alt_labels.to(self.device).float()
+            alt_inputs = alt_inputs.to(device).float()
+            alt_labels = alt_labels.to(device).float()
 
             if labels.shape[0] < alt_inputs.shape[0]:
                 alt_inputs = alt_inputs[: labels.shape[0], :]
@@ -263,17 +269,18 @@ class AEEval(Eval):
     def get_loss_output_random_valid(self):
         other_recon_loss = []
         other_pred_loss = []
+        device = self.device
 
         it = iter(self.valid_loader)
 
         for inputs, labels in self.eval_loader:
-            inputs, labels = inputs.to(self.device), labels.to(self.device)
+            inputs, labels = inputs.to(device), labels.to(device)
             inputs, labels = inputs.float(), labels.float()
 
             alt_inputs, alt_labels = next(it)
 
-            alt_inputs = alt_inputs.to(self.device).float()
-            alt_labels = alt_labels.to(self.device).float()
+            alt_inputs = alt_inputs.to(device).float()
+            alt_labels = alt_labels.to(device).float()
 
             if labels.shape[0] < alt_inputs.shape[0]:
                 alt_inputs = alt_inputs[: labels.shape[0], :]
