@@ -25,7 +25,7 @@ from pathlib import Path
 from xanesnet.creator import create_predict_scheme
 from xanesnet.data_descriptor import encode_predict
 from xanesnet.plot import plot_predict, plot_aegan_predict
-from xanesnet.utils import save_prediction, save_prediction_mul, mkdir_output
+from xanesnet.utils import mkdir_output, save_predict, save_recon
 
 
 def predict_data(config, args):
@@ -103,32 +103,30 @@ def predict_data(config, args):
 
     # Save prediction result
     if config["result_save"]:
-        if mode == "predict_xanes":
-            save_path = mkdir_output("outputs/" + args.in_model + "/xanes")
-        else:
-            save_path = mkdir_output("outputs/" + args.in_model + "/xyz")
-        save_prediction(save_path, mode, result.xyz_pred, result.xanes_pred, index, e)
+        save_predict(args.in_model, mode, result, index, e)
+        if scheme.recon_flag:
+            save_recon(args.in_model, mode, result, index, e)
 
     # Plot prediction result
     if config["plot_save"]:
         save_path = mkdir_output("outputs/" + args.in_model + "/plot")
-        if model_name.startswith("ae"):
+        if scheme.recon_flag:
             plot_aegan_predict(
                 index,
                 xyz,
                 xanes,
-                result.xyz_recon,
-                result.xanes_recon,
-                result.xyz_pred,
-                result.xanes_pred,
+                result.xyz_recon[0],
+                result.xanes_recon[0],
+                result.xyz_pred[0],
+                result.xanes_pred[0],
                 save_path,
                 mode,
             )
         else:
             if mode == "predict_xyz":
-                plot_predict(index, xyz, result.xyz_pred, save_path)
+                plot_predict(index, xyz, result.xyz_pred[0], save_path)
             elif mode == "predict_xanes":
-                plot_predict(index, xanes, result.xanes_pred, save_path)
+                plot_predict(index, xanes, result.xanes_pred[0], save_path)
 
 
 def load_model_list(model_dir):

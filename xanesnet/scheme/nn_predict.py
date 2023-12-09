@@ -28,14 +28,17 @@ from xanesnet.data_transform import (
 
 @dataclass
 class Result:
-    xyz_pred: torch.Tensor
-    xanes_pred: torch.Tensor
+    xyz_pred: (torch.Tensor, torch.Tensor)
+    xanes_pred: (torch.Tensor, torch.Tensor)
 
 
 class NNPredict(Predict):
     def predict(self, model):
-        xyz_pred = None
-        xanes_pred = None
+        xyz_mean = None
+        xanes_mean = None
+        xyz_std = None
+        xanes_std = None
+
         model.eval()
         if self.pred_mode == "predict_xyz":
             if self.fourier:
@@ -45,28 +48,30 @@ class NNPredict(Predict):
                 xanes = torch.from_numpy(self.xanes_data)
 
             xanes = xanes.float()
-            xyz_pred = model(xanes)
+            xyz_mean = model(xanes)
+            xyz_std = torch.zeros_like(xyz_mean)
 
             # print MSE if evaluation data is provided
             if self.pred_eval:
-                Predict.print_mse("xyz", "xyz prediction", self.xyz_data, xyz_pred)
+                Predict.print_mse("xyz", "xyz prediction", self.xyz_data, xyz_mean)
 
         elif self.pred_mode == "predict_xanes":
             xyz = torch.from_numpy(self.xyz_data)
             xyz = xyz.float()
 
-            xanes_pred = model(xyz)
+            xanes_mean = model(xyz)
+            xanes_std = torch.zeros_like(xanes_mean)
 
             if self.fourier:
-                xanes_pred = inverse_fourier_transform_data(xanes_pred)
+                xanes_mean = inverse_fourier_transform_data(xanes_mean)
 
             # print MSE if evaluation data is provided
             if self.pred_eval:
                 Predict.print_mse(
-                    "xanes", "xanes prediction", self.xanes_data, xanes_pred
+                    "xanes", "xanes prediction", self.xanes_data, xanes_mean
                 )
 
-        return Result(xyz_pred, xanes_pred)
+        return Result(xyz_pred=(xyz_mean, xyz_std), xanes_pred=(xanes_mean, xanes_std))
 
     def predict_bootstrap(self, model_list):
         predict_score = []
@@ -79,21 +84,21 @@ class NNPredict(Predict):
                 result = self.predict(model)
                 if self.pred_eval:
                     mse = mean_squared_error(
-                        self.xyz_data, result.xyz_pred.detach().numpy()
+                        self.xyz_data, result.xyz_pred[0].detach().numpy()
                     )
                     predict_score.append(mse)
 
-                xyz_pred_list.append(result.xyz_pred.detach().numpy())
+                xyz_pred_list.append(result.xyz_pred[0].detach().numpy())
 
             elif self.pred_mode == "predict_xanes":
                 result = self.predict(model)
                 if self.pred_eval:
                     mse = mean_squared_error(
-                        self.xanes_data, result.xanes_pred.detach().numpy()
+                        self.xanes_data, result.xanes_pred[0].detach().numpy()
                     )
                     predict_score.append(mse)
 
-                xanes_pred_list.append(result.xanes_pred.detach().numpy())
+                xanes_pred_list.append(result.xanes_pred[0].detach().numpy())
 
         if self.pred_eval:
             mean_score = torch.mean(torch.tensor(predict_score))
@@ -101,12 +106,14 @@ class NNPredict(Predict):
             print(f"Mean score prediction: {mean_score:.4f}, Std: {std_score:.4f}")
 
         xyz_pred_list = torch.tensor(np.asarray(xyz_pred_list)).float()
-        xyz_pred = torch.mean(xyz_pred_list, dim=0)
+        xyz_mean = torch.mean(xyz_pred_list, dim=0)
+        xyz_std = torch.std(xyz_pred_list, dim=0)
 
         xanes_pred_list = torch.tensor(np.asarray(xanes_pred_list)).float()
-        xanes_pred = torch.mean(xanes_pred_list, dim=0)
+        xanes_mean = torch.mean(xanes_pred_list, dim=0)
+        xanes_std = torch.std(xanes_pred_list, dim=0)
 
-        return Result(xyz_pred, xanes_pred)
+        return Result(xyz_pred=(xyz_mean, xyz_std), xanes_pred=(xanes_mean, xanes_std))
 
     def predict_ensemble(self, model_list):
         xyz_pred_list = []
@@ -116,11 +123,11 @@ class NNPredict(Predict):
             print(f">> Predict model {i}")
             if self.pred_mode == "predict_xyz":
                 result = self.predict(model)
-                xyz_pred_list.append(result.xyz_pred.detach().numpy())
+                xyz_pred_list.append(result.xyz_pred[0].detach().numpy())
 
             elif self.pred_mode == "predict_xanes":
                 result = self.predict(model)
-                xanes_pred_list.append(result.xanes_pred.detach().numpy())
+                xanes_pred_list.append(result.xanes_pred[0].detach().numpy())
 
         print(f"{'='*30}Summary{'='*30}")
         if len(xyz_pred_list) > 0:
@@ -134,9 +141,11 @@ class NNPredict(Predict):
             )
 
         xyz_pred_list = torch.tensor(np.asarray(xyz_pred_list)).float()
-        xyz_pred = torch.mean(xyz_pred_list, dim=0)
+        xyz_mean = torch.mean(xyz_pred_list, dim=0)
+        xyz_std = torch.std(xyz_pred_list, dim=0)
 
         xanes_pred_list = torch.tensor(np.asarray(xanes_pred_list)).float()
-        xanes_pred = torch.mean(xanes_pred_list, dim=0)
+        xanes_mean = torch.mean(xanes_pred_list, dim=0)
+        xanes_std = torch.std(xanes_pred_list, dim=0)
 
-        return Result(xyz_pred, xanes_pred)
+        return Result(xyz_pred=(xyz_mean, xyz_std), xanes_pred=(xanes_mean, xanes_std))

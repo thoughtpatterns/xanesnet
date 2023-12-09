@@ -96,6 +96,8 @@ class Learn(ABC):
         except:
             self.exp_id = mlflow.create_experiment(exp_name)
 
+        self.recon_flag = 0
+
     @abstractmethod
     def train(self, model, x_data, y_data):
         pass
