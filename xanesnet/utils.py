@@ -160,20 +160,55 @@ def save_model_list(path, models, descriptor, data_compress, metadata, config):
         yaml.dump_all([metadata], f)
 
 
-def save_prediction(save_path, mode, xyz_pred, xanes_pred, index, e):
+def save_predict(model_type, mode, result, index, e):
+    prefix = "outputs/" + model_type
     if mode == "predict_xanes" or mode == "predict_all":
+        save_path = mkdir_output(prefix + "/xanes_pred")
         if e is None:
-            e = np.arange(xanes_pred.shape[1])
-        for id_, y_predict_ in tqdm.tqdm(zip(index, xanes_pred)):
+            e = np.arange(result.xanes_pred[0].shape[1])
+        # save mean result to file
+        for id_, predict_, std_ in tqdm.tqdm(
+            zip(index, result.xanes_pred[0], result.xanes_pred[1])
+        ):
             with open(save_path / f"{id_}.txt", "w") as f:
-                save_xanes(f, XANES(e, y_predict_.detach().numpy()))
+                save_xanes_mean(
+                    f, XANES(e, predict_.detach().numpy()), std_.detach().numpy()
+                )
 
-    elif mode == "predict_xyz" or mode == "predict_all":
-        for id_, y_predict_ in tqdm.tqdm(zip(index, xyz_pred)):
+    if mode == "predict_xyz" or mode == "predict_all":
+        save_path = mkdir_output(prefix + "/xyz_pred")
+        for id_, predict_, std_ in tqdm.tqdm(
+            zip(index, result.xyz_pred[0], result.xyz_pred[1])
+        ):
             with open(save_path / f"{id_}.txt", "w") as f:
-                f.write("\n".join(map(str, y_predict_.detach().numpy())))
+                save_xyz_mean(f, predict_.detach().numpy(), std_.detach().numpy())
 
     print(f"Saved prediction result to disk {save_path}")
+
+
+def save_recon(model_type, mode, result, index, e):
+    prefix = "outputs/" + model_type
+    if mode == "predict_xanes" or mode == "predict_all":
+        save_path = mkdir_output(prefix + "/xyz_recon")
+        for id_, recon_, std_ in tqdm.tqdm(
+            zip(index, result.xyz_recon[0], result.xyz_recon[1])
+        ):
+            with open(save_path / f"{id_}.txt", "w") as f:
+                save_xyz_mean(f, recon_.detach().numpy(), std_.detach().numpy())
+
+    if mode == "predict_xyz" or mode == "predict_all":
+        if e is None:
+            e = np.arange(result.xanes_recon[0].shape[1])
+        save_path = mkdir_output(prefix + "/xanes_recon")
+        for id_, recon_, std_ in tqdm.tqdm(
+            zip(index, result.xanes_recon[0], result.xanes_recon[1])
+        ):
+            with open(save_path / f"{id_}.txt", "w") as f:
+                save_xanes_mean(
+                    f, XANES(e, recon_.detach().numpy()), std_.detach().numpy()
+                )
+
+    print(f"Saved reconstruct result to disk {save_path}")
 
 
 def mkdir_output(save_path: str):
@@ -194,7 +229,7 @@ def save_prediction_mul(
             with open(save_path / f"{id_}.txt", "w") as f:
                 save_xyz_mean(f, mean_y_predict_, std_y_predict_)
 
-    elif mode == "predict_xanes" or mode == "predict_all":
+    if mode == "predict_xanes" or mode == "predict_all":
         for id_, mean_y_predict_, std_y_predict_ in tqdm.tqdm(
             zip(index, xanes_mean, xanes_std)
         ):
@@ -295,11 +330,9 @@ def save_xanes(xanes_f: TextIO, xanes: XANES):
 
 def save_xanes_mean(xanes_f: TextIO, xanes: XANES, std):
     # saves a mean and sandard deviation of XANES object in FDMNES (.txt) output format
-    xanes_f.write(
-        f'{"FDMNES":>10}\n{"energy":>10}{"<mean_xanes>":>12}{"<std_xanes>":>12}\n'
-    )
+    xanes_f.write(f'{"FDMNES"}\n{"energy <xanes> <std>"}\n')
     for e_, m_, std_ in zip(*xanes.spectrum, std):
-        fmt = f"{e_:>10.2f}{m_:>15.7E}{std_:>15.7E}\n"
+        fmt = f"{e_:<10.2f}{m_:<15.7E}{std_:<15.7E}\n"
         xanes_f.write(fmt.format(e_, m_, std_))
 
     return 0
@@ -307,9 +340,9 @@ def save_xanes_mean(xanes_f: TextIO, xanes: XANES, std):
 
 def save_xyz_mean(xyz_f: TextIO, mean, std):
     # saves a mean and sandard deviation of XANES object in FDMNES (.txt) output format
-    xyz_f.write(f'{"<mean_xyz>":>12}{"<std_xyz>":>12}\n')
+    xyz_f.write(f'{"<xyz> <std>"}\n')
     for m_, std_ in zip(mean, std):
-        fmt = f"{m_:>15.7E}{std_:>15.7E}\n"
+        fmt = f"{m_:<15.7E}{std_:<15.7E}\n"
         xyz_f.write(fmt.format(m_, std_))
 
     return 0

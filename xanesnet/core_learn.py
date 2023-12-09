@@ -97,7 +97,7 @@ def train_model(config, args):
     )
 
     # Train the model using selected training strategy
-    print(">> Training model...")
+    print(">> Training %s model..." % config["model"]["type"])
     if config["bootstrap"]:
         train_scheme = "bootstrap"
         model_list = scheme.train_bootstrap()

@@ -39,6 +39,8 @@ class Predict(ABC):
         self.recon_xyz = None
         self.recon_xanes = None
 
+        self.recon_flag = 0
+
     @staticmethod
     def print_mse(name, name2, data, result):
         if isinstance(result, torch.Tensor):
