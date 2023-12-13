@@ -17,10 +17,11 @@ this program.  If not, see <https://www.gnu.org/licenses/>.
 import torch
 from torch import nn
 
-from xanesnet.model_utils import get_conv_layers_output_size, ActivationSwitch
+from xanesnet.model.base_model import Model
+from xanesnet.utils_model import get_conv_layers_output_size, ActivationSwitch
 
 
-class CNN(nn.Module):
+class CNN(Model):
     def __init__(
         self,
         hidden_size,
@@ -36,6 +37,7 @@ class CNN(nn.Module):
     ):
         super().__init__()
 
+        self.nn_flag = 1
         self.hidden_size = hidden_size
         self.dropout = dropout
         self.activation = activation

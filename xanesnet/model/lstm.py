@@ -17,10 +17,11 @@ this program.  If not, see <https://www.gnu.org/licenses/>.
 import torch
 from torch import nn
 
-from xanesnet.model_utils import ActivationSwitch
+from xanesnet.model.base_model import Model
+from xanesnet.utils_model import ActivationSwitch
 
 
-class LSTM(nn.Module):
+class LSTM(Model):
     def __init__(
         self,
         hidden_size,
@@ -31,8 +32,9 @@ class LSTM(nn.Module):
         x_data,
         y_data,
     ):
-        super(LSTM, self).__init__()
+        super().__init__()
 
+        self.nn_flag = 1
         input_size = x_data.shape[1]
         output_size = y_data[0].size
 

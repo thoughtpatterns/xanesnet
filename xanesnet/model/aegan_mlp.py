@@ -18,14 +18,15 @@ import torch
 
 from torch import nn
 
-from xanesnet.model_utils import (
+from xanesnet.model.base_model import Model
+from xanesnet.utils_model import (
     ActivationSwitch,
     LossSwitch,
     OptimSwitch,
 )
 
 
-class AEGAN_MLP(nn.Module):
+class AEGAN_MLP(Model):
     def __init__(
         self,
         hidden_size,
@@ -45,6 +46,7 @@ class AEGAN_MLP(nn.Module):
     ):
         super().__init__()
 
+        self.aegan_flag = 1
         self.hidden_size = hidden_size
         self.dropout = dropout
 

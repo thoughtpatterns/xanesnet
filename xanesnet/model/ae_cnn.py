@@ -16,10 +16,11 @@ this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from torch import nn
 
-from xanesnet.model_utils import ActivationSwitch
+from xanesnet.model.base_model import Model
+from xanesnet.utils_model import ActivationSwitch
 
 
-class AE_CNN(nn.Module):
+class AE_CNN(Model):
     def __init__(
         self,
         out_channel,
@@ -35,6 +36,7 @@ class AE_CNN(nn.Module):
     ):
         super().__init__()
 
+        self.ae_flag = 1
         self.out_channel = out_channel
         self.channel_mul = channel_mul
         self.hidden_size = hidden_size

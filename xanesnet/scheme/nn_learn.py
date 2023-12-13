@@ -27,7 +27,7 @@ from sklearn.model_selection import RepeatedKFold
 
 from xanesnet.scheme.base_learn import Learn
 from xanesnet.creator import create_eval_scheme
-from xanesnet.model_utils import (
+from xanesnet.utils_model import (
     loss_reg_fn,
     OptimSwitch,
     LossSwitch,

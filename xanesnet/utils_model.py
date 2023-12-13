@@ -375,57 +375,6 @@ def montecarlo_dropout_ae(model, input_data, n_mc):
     return mean_output, var_output, mean_recon, var_recon
 
 
-def run_shap_analysis(
-    model, predict_dir, data, ids, n_samples=100, shap_mode="predict"
-):
-    """
-    Get SHAP values for predictions using random sample of data
-    as background samples
-    """
-    shaps_dir = Path(f"{predict_dir}/shaps-{shap_mode}")
-    shaps_dir.mkdir(exist_ok=True)
-
-    n_features = data.shape[1]
-
-    background = data[random.sample(range(data.shape[0]), n_samples)]
-
-    # SHAP analysis
-    explainer = shap.DeepExplainer(model, background)
-    shap_values = explainer.shap_values(data)
-    shap_values = np.reshape(shap_values, (len(shap_values), data.shape[0], n_features))
-
-    # Print SHAP as a function of features and molecules
-    importances = np.mean(np.abs(shap_values), axis=0)
-    importances_nonabs = np.mean(shap_values, axis=0)
-
-    overall_imp = np.mean(importances, axis=0)
-    energy_imp = np.mean(shap_values, axis=1)
-
-    # SHAP as a function of features and molecules
-    for i, id_ in enumerate(ids):
-        with open(shaps_dir / f"{id_}.shap", "w") as f:
-            f.writelines(
-                map(
-                    "{} {} {}\n".format,
-                    np.arange(n_features),
-                    importances[i, :],
-                    importances_nonabs[i, :],
-                )
-            )
-
-    # SHAP as a function of features, averaged over all molecules
-    with open(shaps_dir / f"overall.shap", "w") as f:
-        f.writelines(map("{} {}\n".format, np.arange(n_features), overall_imp))
-
-    # SHAP as a function of features and energy grid points
-    energ_dir = shaps_dir / "energy"
-    energ_dir.mkdir(exist_ok=True)
-
-    for i in range(shap_values.shape[0]):
-        with open(energ_dir / f"energy{i}.shap", "w") as f:
-            f.writelines(map("{} {}\n".format, np.arange(n_features), energy_imp[i, :]))
-
-
 def loss_reg_fn(model, loss_reg_type, device):
     """Computes L1 or L2 norm of model parameters for use in regularisation of loss function
 

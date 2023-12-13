@@ -7,3 +7,6 @@ xanes_path: data/datasets/fe/preconv/xanes_test
 plot_save: True
 result_save: True
 
+shap: False
+shap_params:
+  nsamples: 5

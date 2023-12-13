@@ -30,7 +30,7 @@ from sklearn.model_selection import train_test_split
 from torch.utils.tensorboard import SummaryWriter
 
 from xanesnet.creator import create_model
-from xanesnet.model_utils import LRScheduler, WeightInitSwitch, weight_bias_init
+from xanesnet.utils_model import LRScheduler, WeightInitSwitch, weight_bias_init
 from xanesnet.param_optuna import ParamOptuna
 
 
