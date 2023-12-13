@@ -24,7 +24,8 @@ from pathlib import Path
 
 from xanesnet.creator import create_predict_scheme
 from xanesnet.data_descriptor import encode_predict
-from xanesnet.plot import plot_predict, plot_aegan_predict
+from xanesnet.post_plot import plot_predict, plot_aegan_predict
+from xanesnet.post_shap import shap_analysis
 from xanesnet.utils import mkdir_output, save_predict, save_recon
 
 
@@ -97,36 +98,31 @@ def predict_data(config, args):
         model_list = load_model_list(model_dir)
         result = scheme.predict_ensemble(model_list)
 
-    else:
+    elif predict_scheme == "nn":
         model = torch.load(model_dir / "model.pt", map_location=torch.device("cpu"))
         result = scheme.predict(model)
 
+    else:
+        raise ValueError("Unsupported prediction scheme.")
+
+    save_path = "outputs/" + args.in_model
     # Save prediction result
     if config["result_save"]:
-        save_predict(args.in_model, mode, result, index, e)
+        save_predict(save_path, mode, result, index, e)
         if scheme.recon_flag:
-            save_recon(args.in_model, mode, result, index, e)
+            save_recon(save_path, mode, result, index, e)
 
     # Plot prediction result
     if config["plot_save"]:
-        save_path = mkdir_output("outputs/" + args.in_model + "/plot")
         if scheme.recon_flag:
-            plot_aegan_predict(
-                index,
-                xyz,
-                xanes,
-                result.xyz_recon[0],
-                result.xanes_recon[0],
-                result.xyz_pred[0],
-                result.xanes_pred[0],
-                save_path,
-                mode,
-            )
+            plot_aegan_predict(save_path, mode, result, index, xyz, xanes)
         else:
-            if mode == "predict_xyz":
-                plot_predict(index, xyz, result.xyz_pred[0], save_path)
-            elif mode == "predict_xanes":
-                plot_predict(index, xanes, result.xanes_pred[0], save_path)
+            plot_predict(save_path, mode, result, index, xyz, xanes)
+
+    # SHAP analysis
+    if config["shap"]:
+        nsamples = config["shap_params"]["nsamples"]
+        shap_analysis(save_path, mode, model, index, xyz, xanes, nsamples)
 
 
 def load_model_list(model_dir):

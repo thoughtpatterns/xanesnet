@@ -160,10 +160,9 @@ def save_model_list(path, models, descriptor, data_compress, metadata, config):
         yaml.dump_all([metadata], f)
 
 
-def save_predict(model_type, mode, result, index, e):
-    prefix = "outputs/" + model_type
+def save_predict(save_path, mode, result, index, e):
     if mode == "predict_xanes" or mode == "predict_all":
-        save_path = mkdir_output(prefix + "/xanes_pred")
+        save_path = mkdir_output(save_path + "/xanes_pred")
         if e is None:
             e = np.arange(result.xanes_pred[0].shape[1])
         # save mean result to file
@@ -176,7 +175,7 @@ def save_predict(model_type, mode, result, index, e):
                 )
 
     if mode == "predict_xyz" or mode == "predict_all":
-        save_path = mkdir_output(prefix + "/xyz_pred")
+        save_path = mkdir_output(save_path + "/xyz_pred")
         for id_, predict_, std_ in tqdm.tqdm(
             zip(index, result.xyz_pred[0], result.xyz_pred[1])
         ):

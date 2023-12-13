@@ -17,10 +17,11 @@ this program.  If not, see <https://www.gnu.org/licenses/>.
 import torch
 from torch import nn
 
-from xanesnet.model_utils import ActivationSwitch
+from xanesnet.model.base_model import Model
+from xanesnet.utils_model import ActivationSwitch
 
 
-class AE_MLP(nn.Module):
+class AE_MLP(Model):
     def __init__(
         self,
         hidden_size,
@@ -33,6 +34,7 @@ class AE_MLP(nn.Module):
     ):
         super().__init__()
 
+        self.ae_flag = 1
         self.hidden_size = hidden_size
         self.dropout = dropout
         self.num_hidden_layers = num_hidden_layers

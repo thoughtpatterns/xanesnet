@@ -27,7 +27,7 @@ from torchinfo import summary
 from xanesnet.param_optuna import ParamOptuna
 from xanesnet.scheme.base_learn import Learn
 from xanesnet.creator import create_eval_scheme
-from xanesnet.model_utils import OptimSwitch, LossSwitch
+from xanesnet.utils_model import OptimSwitch, LossSwitch
 
 
 class AELearn(Learn):

@@ -27,7 +27,7 @@ from torchinfo import summary
 
 from xanesnet.param_optuna import ParamOptuna
 from xanesnet.scheme.base_learn import Learn
-from xanesnet.model_utils import LRScheduler, LossSwitch, loss_reg_fn, OptimSwitch
+from xanesnet.utils_model import LRScheduler, LossSwitch, loss_reg_fn, OptimSwitch
 from xanesnet.creator import create_eval_scheme
 
 

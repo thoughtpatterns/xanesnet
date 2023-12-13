@@ -16,10 +16,11 @@ this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from torch import nn
 
-from xanesnet.model_utils import ActivationSwitch
+from xanesnet.model.base_model import Model
+from xanesnet.utils_model import ActivationSwitch
 
 
-class MLP(nn.Module):
+class MLP(Model):
     def __init__(
         self,
         hidden_size,
@@ -30,8 +31,9 @@ class MLP(nn.Module):
         x_data,
         y_data,
     ):
-        super(MLP, self).__init__()
+        super().__init__()
 
+        self.nn_flag = 1
         self.hidden_size = hidden_size
         self.dropout = dropout
         self.num_hidden_layers = num_hidden_layers

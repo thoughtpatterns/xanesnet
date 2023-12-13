@@ -21,15 +21,27 @@ import numpy as np
 
 from sklearn.metrics.pairwise import cosine_similarity
 
-from xanesnet.utils import save_xanes
+from xanesnet.utils import save_xanes, mkdir_output
 from xanesnet.spectrum.xanes import XANES
 
 
-def plot_predict(ids, y, y_predict, predict_dir):
+def plot_predict(save_path, mode, result, index, xyz, xanes):
+    save_path = mkdir_output(save_path + "/plot")
+
+    if mode == "predict_xyz":
+        predict = result.xyz_pred[0]
+        data = xyz
+    elif mode == "predict_xanes":
+        predict = result.xanes_pred[0]
+        data = xanes
+    else:
+        raise ValueError("Unsupported prediction mode.")
+
     total_y = []
     total_y_pred = []
-    if y is not None:
-        for id_, y_predict_, y_ in tqdm.tqdm(zip(ids, y_predict, y)):
+
+    if data is not None:
+        for id_, y_predict_, y_ in tqdm.tqdm(zip(index, predict, data)):
             sns.set()
             plt.figure()
             plt.plot(y_predict_.detach().numpy(), label="prediction")
@@ -38,20 +50,20 @@ def plot_predict(ids, y, y_predict, predict_dir):
             total_y.append(y_)
             total_y_pred.append(y_predict_.detach().numpy())
 
-            plt.savefig(predict_dir / f"{id_}.pdf")
+            plt.savefig(save_path / f"{id_}.pdf")
             plt.close()
     else:
         for (
             id_,
             y_predict_,
-        ) in tqdm.tqdm(zip(ids, y_predict)):
+        ) in tqdm.tqdm(zip(index, predict)):
             sns.set()
             plt.figure()
             plt.plot(y_predict_.detach().numpy(), label="prediction")
             plt.legend(loc="upper right")
             total_y_pred.append(y_predict_.detach().numpy())
 
-            plt.savefig(predict_dir / f"{id_}.pdf")
+            plt.savefig(save_path / f"{id_}.pdf")
             plt.close()
 
     print(">> saving Y data predictions...")
@@ -63,7 +75,7 @@ def plot_predict(ids, y, y_predict, predict_dir):
     sns.set_style("dark")
     plt.figure()
 
-    if y is not None:
+    if data is not None:
         mean_y = np.mean(total_y, axis=0)
         stddev_y = np.std(total_y, axis=0)
         plt.plot(mean_y, label="target")
@@ -89,9 +101,9 @@ def plot_predict(ids, y, y_predict, predict_dir):
 
     plt.legend(loc="best")
     plt.grid()
-    plt.savefig(predict_dir / "avg_plot.pdf")
+    plt.savefig(save_path / "avg_plot.pdf")
 
-    plt.show()
+    # plt.show()
 
 
 def plot_ae_predict(ids, y, y_predict, x, x_recon, predict_dir):
@@ -226,7 +238,14 @@ def plot_ae_predict(ids, y, y_predict, x, x_recon, predict_dir):
     plt.close(fig)
 
 
-def plot_aegan_predict(ids, x, y, x_recon, y_recon, x_pred, y_pred, predict_dir, mode):
+def plot_aegan_predict(save_path, mode, result, ids, x, y):
+    save_path = mkdir_output(save_path + "/plot")
+
+    x_recon = result.xyz_recon[0]
+    y_recon = result.xanes_recon[0]
+    x_pred = result.xyz_pred[0]
+    y_pred = result.xanes_pred[0]
+
     x_recon = x_recon.detach().numpy() if x_recon is not None else None
     y_recon = y_recon.detach().numpy() if y_recon is not None else None
 
@@ -248,7 +267,7 @@ def plot_aegan_predict(ids, x, y, x_recon, y_recon, x_pred, y_pred, predict_dir,
                 ax2.set_title(f"Structure Prediction")
                 ax2.legend(loc="upper left")
 
-                plt.savefig(predict_dir / f"{id_}.pdf")
+                plt.savefig(save_path / f"{id_}.pdf")
                 fig.clf()
                 plt.close(fig)
 
@@ -269,7 +288,7 @@ def plot_aegan_predict(ids, x, y, x_recon, y_recon, x_pred, y_pred, predict_dir,
                 ax2.plot(x_, label="target")
                 ax2.legend(loc="upper left")
 
-                plt.savefig(predict_dir / f"{id_}.pdf")
+                plt.savefig(save_path / f"{id_}.pdf")
                 fig.clf()
                 plt.close(fig)
 
@@ -288,7 +307,7 @@ def plot_aegan_predict(ids, x, y, x_recon, y_recon, x_pred, y_pred, predict_dir,
                 ax2.set_title(f"Spectrum Prediction")
                 ax2.legend(loc="upper left")
 
-                plt.savefig(predict_dir / f"{id_}.pdf")
+                plt.savefig(save_path / f"{id_}.pdf")
                 fig.clf()
                 plt.close(fig)
 
@@ -309,7 +328,7 @@ def plot_aegan_predict(ids, x, y, x_recon, y_recon, x_pred, y_pred, predict_dir,
                 ax2.plot(y_, label="target")
                 ax2.legend(loc="upper left")
 
-                plt.savefig(predict_dir / f"{id_}.pdf")
+                plt.savefig(save_path / f"{id_}.pdf")
                 fig.clf()
                 plt.close(fig)
 
@@ -341,7 +360,7 @@ def plot_aegan_predict(ids, x, y, x_recon, y_recon, x_pred, y_pred, predict_dir,
                 ax4.plot(x_, label="target")
                 ax4.legend(loc="upper left")
 
-                plt.savefig(predict_dir / f"{id_}.pdf")
+                plt.savefig(save_path / f"{id_}.pdf")
                 fig.clf()
                 plt.close(fig)
 
