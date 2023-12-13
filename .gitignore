@@ -13,4 +13,3 @@ model/*
 *.egg-info
 build/
 models/
-/xanesnet/model
