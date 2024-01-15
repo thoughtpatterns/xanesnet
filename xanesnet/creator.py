@@ -72,6 +72,8 @@ def create_learn_scheme(
     schedular_param,
     optuna,
     optuna_params,
+    freeze,
+    freeze_params,
 ):
     from xanesnet.scheme import NNLearn, AELearn, AEGANLearn
 
@@ -100,6 +102,8 @@ def create_learn_scheme(
             schedular_param,
             optuna,
             optuna_params,
+            freeze,
+            freeze_params,
         )
     else:
         raise ValueError(f"Unsupported learn scheme name: {name}")
