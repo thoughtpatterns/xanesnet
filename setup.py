@@ -35,5 +35,6 @@ setup(
         "optuna==3.1.1",
         "sphinx",
         "sphinx_rtd_theme",
+        'pyscf'
     ],
 )
