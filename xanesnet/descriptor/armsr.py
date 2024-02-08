@@ -145,9 +145,6 @@ class ARMSR(VectorDescriptor):
     def get_number_of_features(self) -> int:
         return int(self.n_s2 + (self.n_s3 * 18) + self.use_charge + self.use_spin)
 
-    def process(self, atoms: Atoms):
-        return self.transform(atoms)
-
 
 class SymmetryFunctionTransformer(ABC):
     """

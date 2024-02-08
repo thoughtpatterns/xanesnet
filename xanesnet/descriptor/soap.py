@@ -16,8 +16,10 @@ from dscribe.descriptors import Descriptor
 from dscribe.core import System
 from dscribe.utils.dimensionality import is1d
 
+from xanesnet.descriptor.base_descriptor import BaseDescriptor
 
-class SOAP(Descriptor):
+
+class SOAP(Descriptor, BaseDescriptor):
     """Class for generating a partial power spectrum from Smooth Overlap of
     Atomic Orbitals (SOAP). This implementation uses real (tesseral) spherical
     harmonics as the angular basis set and provides two orthonormalized
@@ -1260,5 +1262,5 @@ class SOAP(Descriptor):
 
         return rx, gss
 
-    def process(self, atoms: Atoms):
+    def transform(self, atoms: Atoms):
         return self.create_single(atoms, positions=[0])

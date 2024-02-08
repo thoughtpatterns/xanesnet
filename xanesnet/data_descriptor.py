@@ -18,7 +18,13 @@ import tqdm as tqdm
 
 from pathlib import Path
 
-from xanesnet.utils import load_xyz, load_xanes, linecount, list_filestems, load_descriptor_direct
+from xanesnet.utils import (
+    load_xyz,
+    load_xanes,
+    linecount,
+    list_filestems,
+    load_descriptor_direct,
+)
 
 
 def encode_train(xyz_path, xanes_path, descriptor):
@@ -35,8 +41,8 @@ def encode_train(xyz_path, xanes_path, descriptor):
         index.sort()
 
         n_samples = len(index)
-        
-        if descriptor.__class__.__name__ == 'DIRECT':
+
+        if descriptor.__class__.__name__ == "DIRECT":
             n_x_features = linecount(xyz_path / f"{index[0]}.dsc")
         else:
             n_x_features = descriptor.get_number_of_features()
@@ -49,13 +55,13 @@ def encode_train(xyz_path, xanes_path, descriptor):
 
         print(">> loading data into array(s)...")
         for i, id_ in enumerate(tqdm.tqdm(index)):
-            if descriptor.__class__.__name__ == 'DIRECT':
-               with open(xyz_path / f"{id_}.dsc", "r") as f:
-                   xyz_data[i, :] = load_descriptor_direct(f)
+            if descriptor.__class__.__name__ == "DIRECT":
+                with open(xyz_path / f"{id_}.dsc", "r") as f:
+                    xyz_data[i, :] = load_descriptor_direct(f)
             else:
-               with open(xyz_path / f"{id_}.xyz", "r") as f:
-                   atoms = load_xyz(f)
-               xyz_data[i, :] = descriptor.process(atoms)
+                with open(xyz_path / f"{id_}.xyz", "r") as f:
+                    atoms = load_xyz(f)
+                xyz_data[i, :] = descriptor.transform(atoms)
             with open(xanes_path / f"{id_}.txt", "r") as f:
                 xanes = load_xanes(f)
             e, xanes_data[i, :] = xanes.spectrum

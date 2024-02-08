@@ -122,6 +122,3 @@ class RDC(VectorDescriptor):
 
     def get_number_of_features(self) -> int:
         return len(self.r_aux) + self.use_charge + self.use_spin
-
-    def process(self, atoms: Atoms):
-        return self.transform(atoms)

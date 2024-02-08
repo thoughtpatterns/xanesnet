@@ -41,7 +41,18 @@ def create_model(name, **kwargs):
 
 
 def create_descriptor(name, **kwargs):
-    from xanesnet.descriptor import RDC, WACSF, SOAP, MBTR, LMBTR, MSR, ARMSR, PDOS, DIRECT
+    from xanesnet.descriptor import (
+        RDC,
+        WACSF,
+        SOAP,
+        MBTR,
+        LMBTR,
+        MSR,
+        ARMSR,
+        PDOS,
+        DIRECT,
+        XTB,
+    )
 
     descriptors = {
         "rdc": RDC,
@@ -53,6 +64,7 @@ def create_descriptor(name, **kwargs):
         "armsr": ARMSR,
         "pdos": PDOS,
         "direct": DIRECT,
+        "xtb": XTB,
     }
 
     if name in descriptors:

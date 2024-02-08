@@ -179,9 +179,6 @@ class WACSF(VectorDescriptor):
     def get_number_of_features(self) -> int:
         return int(1 + self.n_g2 + self.n_g4 + self.use_charge + self.use_spin)
 
-    def process(self, atoms: Atoms):
-        return self.transform(atoms)
-
 
 class SymmetryFunctionTransformer(ABC):
     """
