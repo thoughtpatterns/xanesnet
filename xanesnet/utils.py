@@ -346,6 +346,7 @@ def save_xyz_mean(xyz_f: TextIO, mean, std):
 
     return 0
 
+
 def load_descriptor_direct(direct_f: TextIO):
     # loads a descriptor directly from a (.dsc) input file
 

@@ -21,8 +21,10 @@ from dscribe.core import System
 from dscribe.descriptors import Descriptor
 from dscribe.ext import MBTRWrapper
 
+from xanesnet.descriptor.base_descriptor import BaseDescriptor
 
-class MBTR(Descriptor):
+
+class MBTR(Descriptor, BaseDescriptor):
     """Implementation of the Many-body tensor representation up to :math:`k=3`.
     You can choose which terms to include by providing a dictionary in the
     k1, k2 or k3 arguments. This dictionary should contain information
@@ -1062,5 +1064,5 @@ class MBTR(Descriptor):
 
         return k3
 
-    def process(self, atoms: Atoms):
+    def transform(self, atoms: Atoms):
         return self.create(atoms)

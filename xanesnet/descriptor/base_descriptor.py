@@ -1,5 +1,6 @@
 """
 XANESNET
+Copyright (C) 2021  Conor D. Rankine
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -18,23 +19,36 @@ this program.  If not, see <https://www.gnu.org/licenses/>.
 ############################### LIBRARY IMPORTS ###############################
 ###############################################################################
 
-from ase import Atoms
+import numpy as np
 
-from xanesnet.descriptor.base_descriptor import BaseDescriptor
+from ase import Atoms
+from abc import ABC, abstractmethod
 
 ###############################################################################
 ################################## CLASSES ####################################
 ###############################################################################
 
 
-class DIRECT(BaseDescriptor):
-    """
-    A class for reading the descriptor straight from a file. It tries to avoid
-    doing any of the fancy stuff the other descriptors do. Only reads the file
-    """
+class BaseDescriptor(ABC):
+    """An abstract base class for all xanesnet descriptors."""
 
-    def transform(self, system: Atoms) -> int:
-        return 0
+    @abstractmethod
+    def transform(self, system: Atoms) -> np.ndarray:
+        """
+        Args:
+            system (Atoms): A molecular system.
 
+        Returns:
+            np.ndarray: A fingerprint feature vector for the molecular system.
+        """
+
+        pass
+
+    @abstractmethod
     def get_number_of_features(self) -> int:
-        return 0
+        """
+        Returns:
+            int: Number of features for this descriptor.
+        """
+
+        pass

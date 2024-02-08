@@ -903,5 +903,5 @@ class LMBTR(MBTR):
         self.max_atomic_number = max(self._atomic_numbers)
         self.min_atomic_number = min(self._atomic_numbers)
 
-    def process(self, atoms: Atoms):
+    def transform(self, atoms: Atoms):
         return self.create(atoms, positions=[0])

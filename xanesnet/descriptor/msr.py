@@ -233,9 +233,6 @@ class MSR(VectorDescriptor):
             + self.use_spin
         )
 
-    def process(self, atoms: Atoms):
-        return self.transform(atoms)
-
 
 class SymmetryFunctionTransformer(ABC):
     """

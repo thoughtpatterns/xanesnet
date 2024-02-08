@@ -21,15 +21,17 @@ this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
 
-from ase import Atoms
-from abc import ABC, abstractmethod
+from abc import ABC
+
+from xanesnet.descriptor.base_descriptor import BaseDescriptor
+
 
 ###############################################################################
 ################################## CLASSES ####################################
 ###############################################################################
 
 
-class VectorDescriptor(ABC):
+class VectorDescriptor(BaseDescriptor, ABC):
     """
     An abstract base class for transforming a molecular system into a
     fingerprint feature vector, or 'descriptor', that encodes the local
@@ -70,29 +72,3 @@ class VectorDescriptor(ABC):
             self.use_spin = use_spin
         else:
             raise ValueError(f"expected use_spin: bool; got {use_spin}")
-
-    @abstractmethod
-    def transform(self, system: Atoms) -> np.ndarray:
-        """
-        Transforms a molecular system into a fingerprint feature vector, or
-        'descriptor', that encodes the local environment around an absorption
-        site as a vector; the absorption site has to be the first atom defined
-        for the molecular system.
-
-        Args:
-            system (Atoms): A molecular system.
-
-        Returns:
-            np.ndarray: A fingerprint feature vector for the molecular system.
-        """
-
-        pass
-
-    @abstractmethod
-    def get_number_of_features(self) -> int:
-        """
-        Returns:
-            int: Number of features for this descriptor.
-        """
-
-        pass
