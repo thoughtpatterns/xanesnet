@@ -1,5 +1,5 @@
-xyz_path:  /home/bowen/Workspace/xray-spectroscopy-ml/data/datasets/fe/preconv/xyz_train
-xanes_path:  /home/bowen/Workspace/xray-spectroscopy-ml/data/datasets/fe/preconv/xanes_train
+xyz_path:  .github/workflows/data/datasets/fe/preconv/xyz_train
+xanes_path:  .github/workflows/data/datasets/fe/preconv/xanes_train
 
 descriptor:
   type: wacsf
