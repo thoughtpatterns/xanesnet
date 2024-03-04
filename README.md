@@ -10,7 +10,7 @@
 </p>
 
 <p>
-    <a href="xanesnet.readthedocs.io">User Manual</a> • <a href="#setup">Setup</a> • <a href="#getting">Quickstart</a> • <a href="#publications">Publications</a>
+    <a href="https://xanesnet.readthedocs.io">User Manual</a> • <a href="#setup">Setup</a> • <a href="#getting">Quickstart</a> • <a href="#publications">Publications</a>
 </p>
 
 </td></tr></table>
@@ -23,15 +23,13 @@ The popularity of XS is on a steep upward trajectory globally, driven by advance
 
 This is a tall order - but we're using deep neural networks to make this a reality. 
 
-Our XANESNET code employs machine learning methods to address two fundamental challenges: the so-called forward (property/structure-to-spectrum) and reverse (spectrum-to-property/structure) mapping problems. The forward mapping appraoch is similar to the appraoch used by computational researchers in the sense that an input structure is used to generate a spectral observable. In this area the objective of XANESNET is to supplement and support analysis provided by first principles quantum mechnanical simulations. The reverse mapping problem is perhaps the more natural of the two, as it has a clear connection to the problem that X-ray spectroscopists face day-to-day in their work: how can a measurement/observable be interpreted? Here we are seeking to provide methodologies in allow the direct extraction of properties from a recorded spectrum. 
+Our XANESNET code address two fundamental challenges: the so-called forward (property/structure-to-spectrum) and reverse (spectrum-to-property/structure) mapping problems. The forward mapping appraoch is similar to the appraoch used by computational researchers in the sense that an input structure is used to generate a spectral observable. In this area the objective of XANESNET is to supplement and support analysis provided by first principles quantum mechnanical simulations. The reverse mapping problem is perhaps the more natural of the two, as it has a clear connection to the problem that X-ray spectroscopists face day-to-day in their work: how can a measurement/observable be interpreted? Here we are seeking to provide methodologies in allow the direct extraction of properties from a recorded spectrum. 
 
 XANESNET is under continuous development, so feel free to flag up any issues/make pull requests - we appreciate your input!
 
-The original version of XANESNET, which was implemented using Keras, can be obtained from <a href="https://gitlab.com/team-xnet/xanesnet_keras">here.</a>
+The original version of XANESNET, which was implemented using Keras, can be obtained from <a href="https://gitlab.com/team-xnet/xanesnet_keras">here.</a>. The <a href="https://xanesnet.readthedocs.io">XANESNET User Manual</a> has more information about the code and its uses.
 
-The <a href="xanesnet.readthedocs.io">XANESNET User Manual</a> has more information about the code and its uses.
-
-## FEATURES
+## Features
 
 * GPLv3 licensed open-source distribution
 * Automated data processing: data augmentation, Fourier transform
@@ -46,7 +44,7 @@ The <a href="xanesnet.readthedocs.io">XANESNET User Manual</a> has more informat
 * Web interface
 
 
-## SETUP
+## Setup
 
 The quickest way to get started with XANESNET is to clone this repository:
 
@@ -71,7 +69,7 @@ git clone https://gitlab.com/team-xnet/training-sets.git
 
 Now you're good to go!
 
-## GETTING STARTING 
+## Getting Started
 
 The code has been designed to support python 3. The dependencies and version requirements are installed using:
 
@@ -79,30 +77,32 @@ The code has been designed to support python 3. The dependencies and version req
 python -m pip install .
 ```
 
-### TRAINING 
+### Training 
 
 To train a model, the following command is used:  
-```python3 -m xanesnet.cli --mode MODE --in_file path/to/input/file.yaml```
+
+```python3 -m xanesnet.cli --mode MODE --in_file <path/to/file.yaml>```
 
 The implemented training MODE include:  
 - `train_xanes`: The xanes spectra are used the input data and the featurised structures are the target of the model   
 - `train_xyz`: The featurised structures are used the input data and the xanes spectra are the target of the model   
 - `train_aegan`: This mode trains featurised structures and xanes spectra simultaneously   
 
-Replace "path/to/input/file.yaml" by the actual path to the input file. 
-Input files for training should be given in yaml format. 
+Replace <path/to/file.yaml> by the actual path to a YAML input file.
 Examples of commented input files for training and hyperparameter 
 options can be found in the 'inputs/' folder
 
 Below is an example command for training a model using MLP architecture, and featurised structures as input data:  
+
 ```python3 -m xanesnet.cli --mode train_xyz --in_file inputs/in_mlp.yaml```
 
 The resulting trained model and its metadata will be automatically saved in the 'models/' directory. 
 
-### PREDICTION
+### Prediction
 
 To use a previously developed model for predictions, the following command is used:  
-```    python3 -m xanesnet.cli --mode MODE --in_model <path/to/model> --in_file <path/to/file.yaml>```
+
+```python3 -m xanesnet.cli --mode MODE --in_model <path/to/model> --in_file <path/to/file.yaml>```
 
 The implemented prediction modes include:  
 - `predict_xyz`: The featurised structure is predicted from an input xanes spectrum   
@@ -111,17 +111,18 @@ The implemented prediction modes include:
 
 The [-\-in_model] option specifies a directory containing pre-trained model and its metadata.
 The [-\-in_file] specifies a path to input file for prediction. As an example, execute the following command to make spectrum predictions using the previously trained MLP model:   
+
 ```python3 -m xanesnet.cli --mode predict_xanes --in_model models/model_mlp_001 --in_file inputs/in_predict.yaml```
 
 
-## CONTACT
+## Contact
 
-### PROJECT TEAM
+### Project Team
 
 <a href="https://ncl.ac.uk/nes/people/profile/tompenfold.html">Prof. Thomas Penfold </a>, Newcastle University, (tom.penfold@newcastle.ac.uk)\
 <a href="https://pure.york.ac.uk/portal/en/persons/conor-rankine">Dr. Conor Rankine </a>, York University (conor.rankine@york.ac.uk)
 
-### RSE CONTACT
+### RSE Contact
 <a href="https://rse.ncldata.dev/team/bowen-li">Dr. Bowen Li </a>, Newcastle University (bowen.li2@newcastle.ac.uk)\
 <a href="https://rse.ncldata.dev/team/alex-surtees">Alex Surtees </a>,  Newcastle University (alex.surtees@newcastle.ac.uk)
 
@@ -150,11 +151,11 @@ Tuning uses [Optuna](https://optuna.org), an open source hyperparameter optimiza
 The user should specify the number of trials they wish to run during tuning. After tuning the optimal values found will be used to train the model.
 -->
 
-## LICENSE
+## License
 
 This project is licensed under the GPL-3.0 License - see the LICENSE.md file for details.
 
-## PUBLICATIONS
+## Publications
 
 ### The Program:
 *[A Deep Neural Network for the Rapid Prediction of X-ray Absorption Spectra](https://doi.org/10.1021/acs.jpca.0c03723)* - C. D. Rankine, M. M. M. Madkhali, and T. J. Penfold, *J. Phys. Chem. A*, 2020, **124**, 4263-4270.
