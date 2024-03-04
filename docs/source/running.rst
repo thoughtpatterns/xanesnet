@@ -1,5 +1,5 @@
 ================
-Running the Code
+Running XANESNET
 ================
 
 
@@ -7,69 +7,45 @@ Running the Code
 
 
 ----------------
-Training a Model
+Training a model
 ----------------
 
-To train a model, the following command is used: 
+To train a model, use the following command:
 
 .. code-block::
 
-	python3 src/cli.py --mode MODE --model_mode MODEL_MODE --inp_f <inputs/in.yaml>
+    python3 -m xanesnet.cli --mode MODE --in_file <path/to/file.yaml>
 
+[-\-mode] is the additional settings to specify the training mode,
+with three available options:
 
-* **-\ \-mode**
+* ``train_xanes`` Xanes spectra are used as input data, with the featurised structures are the target of the model.
+* ``train_xyz`` Featurised structures are used as input data, with the xanes spectra are the target of the model.
+* ``train_aegan`` Trains featurised structures and xanes spectra simultaneously.
 
-	* ``train_xanes`` Xanes spectra are used the input data and the featurised structures are the target of the model.   
-	* ``train_xyz`` Featurised structures are used the input data and the xanes spectra are the target of the model.
-	* ``train_aegan`` Trains featurised structures and xanes spectra simultaneously.
+The [-\-in_file] option specifies a file containing training and hyperparameter settings.
+This file must be provided in YAML format.
+More details can be found in :doc:`input`.
 
-* **-\ \-model_mode**
-
-	* ``mlp`` Feed-foward deep multilayer perceptron model  
-	* ``cnn`` Feed-foward deep convolution neural network model  
-	* ``ae_mlp`` Autoencoder deep multilayer perceptron model 
-	* ``ae_cnn`` Autoencoder deep convolution neural network model  
-	* ``aegan_mlp``: Autoencoder Generative Adversarial Network model using a deep multilayer perceptron network   
-	* ``lstm`` Long Short Term Memory network model
-
-* **-\ \-inp_f**
-
-	Model architecture and training hyperparameters are specified in the input file. The input file should be given in yaml format. Details can be found in :doc:`input_file_training`.
-
-
-.. toctree::
-	:caption: Input YAML Files
-	:hidden:
-
-	input_file_training
-
-
-------------------------------
-Addtional Command Line Options
-------------------------------
-
-* **-\ \-no-save** 
-	Toggle model directory creation and population to off.
-
-* **-\ \-fourier_transform** 
-	Train or predict using Fourier transformed spectra. Options are ``True`` or ``False``. Default is ``False``.
-
-* **-\ \-run_shap** 
-	SHAP analysis for prediction. Options are ``True`` or ``False``. Default is ``False``.
-
-* **-\ \-shap_nsamples** 
-	Number of background samples for SHAP analysis for prediction. Default is integer value ``50``.
-
-
--------------------------------------
-Experiment Tracking & Logging Results
--------------------------------------
-
-`MLFlow <https://mlflow.org>`_ is used to track hyperparameters, training and validation losses for each training run. Results are automatically logged and users can compare across model runs and track experiments. To open the user interface run the following on the command line and click on the hyperlink:
+Below is an example command for training a model using MLP architecture
+with featurised structures as input data:
 
 .. code-block::
 
-	mlflow ui
+    python3 -m xanesnet.cli --mode train_xyz --in_file inputs/in_mlp.yaml
+
+By default, the resulting trained model and its metadata are automatically saved in the 'models/' directory.
+If you prefer not to save, use optional [-\-save] setting and toggling it to "no".
+
+.. -------------------------------------
+.. Experiment Tracking & Logging Results
+.. -------------------------------------
+
+.. `MLFlow <https://mlflow.org>`_ is used to track hyperparameters, training and validation losses for each training run. Results are automatically logged and users can compare across model runs and track experiments. To open the user interface run the following on the command line and click on the hyperlink:
+
+.. .. code-block::
+
+..     mlflow ui
 
 
 .. Tensorboard
@@ -81,46 +57,30 @@ Experiment Tracking & Logging Results
 
 
 ------------------------
-Inference and Prediction
+Prediction
 ------------------------
 
-A trained model can be used for inference, in which only the input data is given, or prediction, in which matching input and output data are both given. Inference or prediction will be inferred by the number of data paths provided in the input file. If input and output data paths are provided then the mean squared error between the predicted and actual result will be reported. The following command is used for inference/prediction using a trained model: 
+To use a previously developed model for predictions, the following command is used:
 
 .. code-block::
-	
-	python3 src/cli.py --mode MODE --model_mode MODEL_MODE --mdl_dir <model/model_dir> --inp_f <inputs/in_predict.yaml>
 
-* **-\ \-mode**
+    python3 -m xanesnet.cli --mode MODE --in_model <path/to/model> --in_file <path/to/file.yaml>
 
-	* ``predict_xyz`` The featurised structure is predicted from an input xanes spectrum   
-	* ``predict_xanes`` The xanes spectrum is predicted from a featurised structural input  
-	* ``predict_all`` Simultaneous prediction of a featurised structure and xanes spectrum from corresponding input as well as reconstruction of inputs. Only for AEGAN model type.
+The prediction mode can be specified with the [-\-mode] option:
 
-
-* **-\ \-model_mode** 
-
-	* ``mlp``
-	* ``cnn``  
-	* ``ae_mlp`` 
-	* ``ae_cnn``  
-	* ``aegan_mlp``
-	* ``lstm``
-
-* **-\ \-mdl_dir**
-
-	Path to trained model directory.
-
-* **-\ \-inp_f**
-	
-	Input YAML file that specifies path to input data for inference/prediction as well as additional options. Details can be found in :doc:`input_file_predict`.
+* ``predict_xyz`` Predicts the featurised structure from an input XANES spectrum.
+* ``predict_xanes`` Predicts the XANES spectrum from a featurised structural input.
+* ``predict_all`` Simultaneously predicts a featurised structure and XANES spectrum from the corresponding input as well as reconstructs inputs. This mode is for AEGAN model type only.
 
 
 
-.. toctree::
-	:caption: Input YAML Files
-	:hidden:
+The [-\-in_model] option specifies a directory containing pre-trained model and its metadata.
+The [-\-in_file] specifies a path to input file for prediction, see :doc:`input` for more details.
 
-	input_file_predict
+As an example, the following command makes spectrum predictions using the previously trained MLP model:
 
+.. code-block::
 
+    python3 -m xanesnet.cli --mode predict_xanes --in_model models/model_mlp_001 --in_file inputs/in_predict.yaml
 
+The prediction results, including raw and plot data, are automatically saved in the 'outputs/' directory.
