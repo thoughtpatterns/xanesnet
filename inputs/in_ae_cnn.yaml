@@ -90,3 +90,5 @@ freeze_params:
   n_decoder: 2
   n_dense: 1
   n_conv: 4
+
+fourier_transform: False
