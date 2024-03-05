@@ -94,3 +94,5 @@ freeze_params:
   n_shared_decoder: 1
   n_discrim1: 1
   n_discrim2: 1
+
+fourier_transform: False
