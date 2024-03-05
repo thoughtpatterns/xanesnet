@@ -85,3 +85,5 @@ freeze_params:
   model_path: ./models/model_lstm_001
   n_lstm: 1
   n_dense: 2
+
+fourier_transform: False
