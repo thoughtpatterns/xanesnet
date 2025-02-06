@@ -43,7 +43,6 @@ class AEGANPredict(Predict):
         xanes_data,
         pred_mode,
         pred_eval,
-        index,
         scaler,
         fourier,
         fourier_param,
@@ -53,7 +52,6 @@ class AEGANPredict(Predict):
             xanes_data,
             pred_mode,
             pred_eval,
-            index,
             scaler,
             fourier,
             fourier_param,
@@ -178,11 +176,8 @@ class AEGANPredict(Predict):
             Predict.print_mse(
                 "xanes", "xanes reconstruction", self.xanes_data, xanes_recon
             )
-
             Predict.print_mse("xyz", "xyz prediction", self.xyz_data, xyz_pred)
-
             Predict.print_mse("xyz", "xyz reconstruction", self.xyz_data, xyz_recon)
-
             Predict.print_mse("xanes", "xanes prediction", self.xanes_data, xanes_pred)
 
         return xyz_pred, xanes_pred, xyz_recon, xanes_recon

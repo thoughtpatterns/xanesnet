@@ -14,17 +14,20 @@ You should have received a copy of the GNU General Public License along with
 this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
+import os
+
 ###############################################################################
 ############################### LIBRARY IMPORTS ###############################
 ###############################################################################
 
 import sys
+from pathlib import Path
+
 import yaml
 
 from argparse import ArgumentParser
-from tblite.interface import Calculator
-from xanesnet.core_learn import train_model
-from xanesnet.core_predict import predict_data
+from xanesnet.core_learn import train_model, train_model_gnn
+from xanesnet.core_predict import predict_data, predict_data_gnn
 
 
 ###############################################################################
@@ -35,10 +38,9 @@ from xanesnet.core_predict import predict_data
 def parse_args(args: list):
     parser = ArgumentParser()
 
-    # mode
-    # train_xanes, train_xyz, train_aegan, predict_xyz,
-    # predict_xanes, predict_aegan, predict_aegan_xanes, predict_aegan_xyz,
-    # eval_pred_xanes, eval_pred_xyz, eval_recon_xanes, eval_recon_xyz
+    # available modes:
+    # train: train_xanes, train_xyz, train_aegan
+    # predict: predict_xyz, predict_xanes, predict_all
     parser.add_argument(
         "--mode",
         type=str,
@@ -49,19 +51,26 @@ def parse_args(args: list):
     parser.add_argument(
         "--in_model",
         type=str,
-        help="path to populated model directory during prediction",
+        help="path to pre-trained model directory",
     )
     parser.add_argument(
         "--in_file",
         type=str,
-        help="path to .json input file w/ variable definitions",
+        help="path to .json input file",
         required=True,
     )
     parser.add_argument(
         "--save",
         type=str,
         default="yes",
-        help="toggles model directory creation and population to <on>",
+        help="save result to disk",
+    )
+
+    parser.add_argument(
+        "--mlflow",
+        type=str,
+        default="no",
+        help="toggle mlflow on and save logs to disk",
     )
 
     args = parser.parse_args()
@@ -86,10 +95,23 @@ def main(args: list):
         config = yaml.safe_load(f)
 
     if "train" in args.mode:
-        train_model(config, args)
+        if config["model"]["type"] == "gnn":
+            train_model_gnn(config, args)
+        else:
+            train_model(config, args)
 
     elif "predict" in args.mode:
-        predict_data(config, args)
+        metadata_file = Path(f"{args.in_model}/metadata.yaml")
+        if os.path.isfile(metadata_file):
+            with open(metadata_file, "r") as f:
+                metadata = yaml.safe_load(f)
+        else:
+            raise ValueError(f"Cannot find metadata file.")
+
+        if metadata["model_type"] == "gnn":
+            predict_data_gnn(config, args, metadata)
+        else:
+            predict_data(config, args, metadata)
 
     else:
         print(">>> Incorrect mode. Please try again.")

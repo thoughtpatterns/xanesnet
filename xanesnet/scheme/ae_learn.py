@@ -31,48 +31,15 @@ from xanesnet.utils_model import OptimSwitch, LossSwitch
 
 
 class AELearn(Learn):
-    def __init__(
-        self,
-        x_data,
-        y_data,
-        model_params,
-        hyper_params,
-        kfold,
-        kfold_params,
-        bootstrap_params,
-        ensemble_params,
-        schedular,
-        scheduler_params,
-        optuna,
-        optuna_params,
-        freeze,
-        freeze_params,
-        scaler,
-    ):
+    def __init__(self, x_data, y_data, **kwargs):
         # Call the constructor of the parent class
-        super().__init__(
-            x_data,
-            y_data,
-            model_params,
-            hyper_params,
-            kfold,
-            kfold_params,
-            bootstrap_params,
-            ensemble_params,
-            schedular,
-            scheduler_params,
-            optuna,
-            optuna_params,
-            freeze,
-            freeze_params,
-            scaler,
-        )
+        super().__init__(x_data, y_data, **kwargs)
 
         # hyperparameter set
-        self.lr = hyper_params["lr"]
-        self.optim_fn = hyper_params["optim_fn"]
-        self.loss_fn = hyper_params["loss"]["loss_fn"]
-        self.loss_args = hyper_params["loss"]["loss_args"]
+        self.lr = self.hyper_params["lr"]
+        self.optim_fn = self.hyper_params["optim_fn"]
+        self.loss_fn = self.hyper_params["loss"]["loss_fn"]
+        self.loss_args = self.hyper_params["loss"]["loss_args"]
 
         layout = {
             "Multi": {
@@ -118,7 +85,6 @@ class AELearn(Learn):
                 running_loss = 0
                 loss_r = 0
                 loss_p = 0
-                total_step_train = 0
 
                 for inputs, labels in train_loader:
                     inputs, labels = inputs.to(device), labels.to(device)
@@ -139,12 +105,9 @@ class AELearn(Learn):
                     loss_r += loss_recon.item()
                     loss_p += loss_pred.item()
 
-                    total_step_train += 1
-
                 valid_loss = 0
                 valid_loss_r = 0
                 valid_loss_p = 0
-                total_step_valid = 0
 
                 model.eval()
 
@@ -162,8 +125,6 @@ class AELearn(Learn):
                     valid_loss = loss.item()
                     valid_loss_r += loss_recon.item()
                     valid_loss_p += loss_pred.item()
-
-                    total_step_valid += 1
 
                 if self.lr_scheduler:
                     before_lr = optimizer.param_groups[0]["lr"]
@@ -327,15 +288,12 @@ class AELearn(Learn):
             boot_x = np.asarray(boot_x)
             boot_y = np.asarray(boot_y)
 
-            if self.kfold:
-                model = self.train_kfold(boot_x, boot_y)
-            else:
-                if self.optuna:
-                    self.proc_optuna(x_data, y_data, weight_seed)
+            if self.optuna:
+                self.proc_optuna(x_data, y_data, weight_seed)
 
-                model = self.setup_model(boot_x, boot_y)
-                model = self.setup_weight(model, weight_seed)
-                model, _ = self.train(model, boot_x, boot_y)
+            model = self.setup_model(boot_x, boot_y)
+            model = self.setup_weight(model, weight_seed)
+            model, _ = self.train(model, boot_x, boot_y)
 
             model_list.append(model)
 
@@ -347,16 +305,13 @@ class AELearn(Learn):
         y_data = self.y_data
 
         for i in range(self.n_ens):
-            if self.kfold:
-                model = self.train_kfold()
-            else:
-                weight_seed = self.weight_seed_ens[i]
+            weight_seed = self.weight_seed_ens[i]
 
-                if self.optuna:
-                    self.proc_optuna(x_data, y_data, weight_seed)
-                model = self.setup_model(x_data, y_data)
-                model = self.setup_weight(model, weight_seed)
-                model, _ = self.train(model, x_data, y_data)
+            if self.optuna:
+                self.proc_optuna(x_data, y_data, weight_seed)
+            model = self.setup_model(x_data, y_data)
+            model = self.setup_weight(model, weight_seed)
+            model, _ = self.train(model, x_data, y_data)
 
             model_list.append(model)
 
