@@ -13,6 +13,7 @@ PARTICULAR PURPOSE. See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+
 from pathlib import Path
 
 import mlflow
@@ -40,64 +41,52 @@ from xanesnet.optuna import ParamOptuna
 class Learn(ABC):
     """Base class for model training procedures"""
 
-    def __init__(
-        self,
-        x_data,
-        y_data,
-        model_params,
-        hyper_params,
-        kfold,
-        kfold_params,
-        bootstrap_params,
-        ensemble_params,
-        scheduler,
-        scheduler_params,
-        optuna,
-        optuna_params,
-        freeze,
-        freeze_params,
-        scaler,
-    ):
+    def __init__(self, x_data, y_data, **kwargs):
         self.x_data = x_data
         self.y_data = y_data
-        self.hyper_params = hyper_params
-        self.kfold = kfold
-        self.lr_scheduler = scheduler
-        self.scheduler_params = scheduler_params
-        self.model_params = model_params["params"]
-        self.optuna = optuna
-        self.optuna_params = optuna_params
-        self.freeze = freeze
-        self.freeze_params = freeze_params
-        self.scaler = scaler
+
+        self.model = kwargs.get("model")
+        self.model_params = kwargs.get("model")["params"]
+        self.hyper_params = kwargs.get("hyper_params")
+        self.kfold = kwargs.get("kfold")
+        self.kfold_params = kwargs.get("kfold_params")
+        self.bootstrap_params = kwargs.get("bootstrap_params")
+        self.ensemble_params = kwargs.get("ensemble_params")
+        self.lr_scheduler = kwargs.get("scheduler")
+        self.scheduler_params = kwargs.get("scheduler_params")
+        self.optuna = kwargs.get("optuna")
+        self.optuna_params = kwargs.get("optuna_params")
+        self.freeze = kwargs.get("freeze")
+        self.freeze_params = kwargs.get("freeze_params")
+        self.scaler = kwargs.get("scaler")
 
         # kfold parameter set
-        self.n_splits = kfold_params["n_splits"]
-        self.n_repeats = kfold_params["n_repeats"]
-        self.seed_kfold = kfold_params["seed"]
+        self.n_splits = self.kfold_params["n_splits"]
+        self.n_repeats = self.kfold_params["n_repeats"]
+        self.seed_kfold = self.kfold_params["seed"]
 
         # hyperparameter set
-        self.batch_size = hyper_params["batch_size"]
-        self.n_epoch = hyper_params["epochs"]
-        self.kernel = hyper_params["kernel_init"]
-        self.bias = hyper_params["bias_init"]
-        self.model_eval = hyper_params["model_eval"]
-        self.weight_seed = hyper_params["weight_seed"]
-        self.seed = hyper_params["seed"]
+        self.batch_size = self.hyper_params["batch_size"]
+        self.n_epoch = self.hyper_params["epochs"]
+        self.kernel = self.hyper_params["kernel_init"]
+        self.bias = self.hyper_params["bias_init"]
+        self.model_eval = self.hyper_params["model_eval"]
+        self.weight_seed = self.hyper_params["weight_seed"]
+        self.seed = self.hyper_params["seed"]
 
         # bootstrap parameter set
-        self.n_boot = bootstrap_params["n_boot"]
-        self.weight_seed_boot = bootstrap_params["weight_seed"]
-        self.n_size = bootstrap_params["n_size"]
+        self.n_boot = self.bootstrap_params["n_boot"]
+        self.weight_seed_boot = self.bootstrap_params["weight_seed"]
+        self.n_size = self.bootstrap_params["n_size"]
 
         # ensemble parameter set
-        self.n_ens = ensemble_params["n_ens"]
-        self.weight_seed_ens = ensemble_params["weight_seed"]
+        self.n_ens = self.ensemble_params["n_ens"]
+        self.weight_seed_ens = self.ensemble_params["weight_seed"]
 
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         # mlflow experiment info
-        self.model_name = model_params["type"]
+        self.model_name = self.model["type"]
         exp_name = f"{self.model_name}"
         self.exp_time = f"run_{datetime.today()}"
         try:
@@ -116,7 +105,7 @@ class Learn(ABC):
         pass
 
     @abstractmethod
-    def train_kfold(self, x_data=None, y_data=None):
+    def train_kfold(self):
         pass
 
     @abstractmethod
@@ -189,6 +178,7 @@ class Learn(ABC):
         # split dataset and setup train/valid/test dataloader
         x_data = torch.from_numpy(x_data)
         y_data = torch.from_numpy(y_data)
+        eval_loader = None
 
         if self.model_eval:
             # Data split: train/valid/test
@@ -204,6 +194,7 @@ class Learn(ABC):
                 x_test, y_test, test_size=eval_ratio / (eval_ratio + test_ratio)
             )
         else:
+            # Data split: train/valid
             x_train, x_test, y_train, y_test = train_test_split(
                 x_data, y_data, test_size=0.2, random_state=42
             )
@@ -229,8 +220,6 @@ class Learn(ABC):
                 batch_size=self.batch_size,
                 shuffle=False,
             )
-        else:
-            eval_loader = None
 
         return [train_loader, valid_loader, eval_loader]
 
@@ -239,9 +228,10 @@ class Learn(ABC):
         kernel_init = WeightInitSwitch().fn(self.kernel)
         bias_init = WeightInitSwitch().fn(self.bias)
         # set seed
-        torch.cuda.manual_seed(
-            weight_seed
-        ) if torch.cuda.is_available() else torch.manual_seed(weight_seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed(weight_seed)
+        else:
+            torch.manual_seed(weight_seed)
 
         model.apply(
             lambda m: weight_bias_init(
