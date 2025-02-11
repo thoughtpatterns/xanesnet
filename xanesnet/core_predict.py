@@ -67,7 +67,7 @@ def predict_data(config, args, metadata):
         model_list = load_models(model_dir)
         result = scheme.predict_ensemble(model_list)
 
-    elif predict_scheme == "std":
+    elif predict_scheme == "std" or predict_scheme == "kfold":
         model = torch.load(model_dir / "model.pt", map_location=torch.device("cpu"))
         result = scheme.predict_std(model)
 
@@ -139,11 +139,11 @@ def predict_data_gnn(config, args, metadata):
     elif predict_scheme == "ensemble":
         if "ensemble" not in str(model_dir):
             raise ValueError("Invalid ensemble directory")
-        
+
         model_list = load_models(model_dir)
         result = scheme.predict_ensemble(model_list)
-        
-    elif predict_scheme == "std":
+
+    elif predict_scheme == "std" or predict_scheme == "kfold":
         model = torch.load(model_dir / "model.pt", map_location=torch.device("cpu"))
         result = scheme.predict_std(model)
 
