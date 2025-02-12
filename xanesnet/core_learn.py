@@ -104,7 +104,7 @@ def train_model(config, args):
         "freeze_params": config["freeze_params"],
         "scaler": config["standardscaler"],
     }
-    print(kwargs)
+
     scheme = create_learn_scheme(
         x_data,
         y_data,
@@ -163,6 +163,8 @@ def train_model_gnn(config, args):
         config["model"]["node_features"],
         config["model"]["edge_features"],
         descriptor_list,
+        config["fourier_transform"],
+        config["fourier_params"],
     )
 
     # Initialise learn scheme
