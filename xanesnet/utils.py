@@ -119,8 +119,11 @@ def save_models(
     metadata: dict,
     dataset: dict = None,
 ):
+    mode_suffix = metadata["mode"].replace("train_", "")
     path.mkdir(parents=True, exist_ok=True)
-    save_path = unique_path(path, metadata["model_type"] + "_" + metadata["scheme"])
+    save_path = unique_path(
+        path, metadata["model_type"] + "_" + metadata["scheme"] + "_" + mode_suffix
+    )
     save_path.mkdir()
 
     for idx, descriptor in enumerate(descriptors):
