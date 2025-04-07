@@ -244,7 +244,8 @@ class GNNLearn(Learn):
 
             # Training
             train_data = x_data[train_index]
-            self.model_params["x_data"] = train_data
+            self.model_params["in_size"] = train_data[0].x.shape[1]
+            self.model_params["out_size"] = train_data[0].y.shape[0]
             self.model_params["mlp_feat_size"] = train_data[0].graph_attr.shape[0]
 
             model = create_model(self.model_name, **self.model_params)
@@ -316,7 +317,8 @@ class GNNLearn(Learn):
             boot_x = x_data[boot_indices]
 
             # Train the model on the bootstrap sample
-            self.model_params["x_data"] = boot_x
+            self.model_params["in_size"] = boot_x[0].x.shape[1]
+            self.model_params["out_size"] = boot_x[0].y.shape[0]
             self.model_params["mlp_feat_size"] = boot_x[0].graph_attr.shape[0]
 
             model = create_model(self.model_name, **self.model_params)
@@ -336,7 +338,8 @@ class GNNLearn(Learn):
             weight_seed = self.weight_seed_ens[i]
 
             # Train the model
-            self.model_params["x_data"] = x_data
+            self.model_params["in_size"] = x_data[0].x.shape[1]
+            self.model_params["out_size"] = x_data[0].y.shape[0]
             self.model_params["mlp_feat_size"] = x_data[0].graph_attr.shape[0]
 
             model = create_model(self.model_name, **self.model_params)
