@@ -37,18 +37,18 @@ class GNN(Model):
 
     def __init__(
         self,
-        x_data: np.ndarray,
+        in_size: int,
+        out_size: int,
         layer_name: str,
         layer_params: dict,
         hidden_size: int,
         mlp_feat_size: int,
-        dropout: float = 0.2,
-        num_hidden_layers: int = 5,
-        activation: str = "prelu",
+        dropout: float,
+        num_hidden_layers: int,
+        activation: str,
     ):
         """
         Args:
-            x_data (NumPy array): Input data for the network
             layer_name (string): Name of GNN layer (GAT, GATv2, GCN, GraphConv)
             layer_params (dict): parameters pass to GNN layers
             hidden_size (integer): Size of the hidden layer.
@@ -60,13 +60,13 @@ class GNN(Model):
                 in the network.
             activation (string): Name of activation function applied
                 to the hidden layers.
+            in_size (integer): Size of input data
+            out_size (integer): Size of output data
         """
         super().__init__()
         gnn_layer = gnn_layer_by_name[layer_name]
 
         self.nn_flag = 1
-        input_size = x_data[0].x.shape[1]
-        output_size = x_data[0].y.shape[0]
         heads = 1
         if layer_params is None:
             layer_params = {}
@@ -82,18 +82,18 @@ class GNN(Model):
         for i in range(num_hidden_layers - 1):
             layers += [
                 gnn_layer(
-                    in_channels=input_size, out_channels=hidden_size, **layer_params
+                    in_channels=in_size, out_channels=hidden_size, **layer_params
                 ),
                 nn.BatchNorm1d(hidden_size * heads),
                 act_fn(),
                 nn.Dropout(dropout),
             ]
 
-            input_size = hidden_size * heads
+            in_size = hidden_size * heads
 
         # Construct output layer
         layers += [
-            gnn_layer(in_channels=input_size, out_channels=hidden_size, **layer_params)
+            gnn_layer(in_channels=in_size, out_channels=hidden_size, **layer_params)
         ]
         self.layers = nn.ModuleList(layers)
 
@@ -123,7 +123,7 @@ class GNN(Model):
             layers.append(layer)
 
         output_layer = nn.Sequential(
-            nn.Linear(mlp_hidden_size * 2, output_size),
+            nn.Linear(mlp_hidden_size * 2, out_size),
             nn.Dropout(dropout),
             act_fn(),
         )

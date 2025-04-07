@@ -33,13 +33,13 @@ class AE_MLP(Model):
 
     def __init__(
         self,
+        in_size: int,
+        out_size: int,
         hidden_size: int,
         dropout: float,
         num_hidden_layers: int,
         shrink_rate: float,
         activation: str,
-        x_data: np.ndarray,
-        y_data: np.ndarray,
     ):
         """
         Args:
@@ -52,20 +52,12 @@ class AE_MLP(Model):
                 size multiplicatively.
             activation (string): Name of activation function applied
                 to the hidden layers.
-            x_data (NumPy array): Input data for the network
-            y_data (Numpy array): Output data for the network
+            in_size (integer): Size of input data
+            out_size (integer): Size of output data
         """
         super().__init__()
 
         self.ae_flag = 1
-        self.hidden_size = hidden_size
-        self.dropout = dropout
-        self.num_hidden_layers = num_hidden_layers
-        self.shrink_rate = shrink_rate
-        self.activation = activation
-
-        self.input_size = x_data.shape[1]
-        self.output_size = y_data[0].size
 
         # Instantiate ActivationSwitch for dynamic activation selection
         activation_switch = ActivationSwitch()
@@ -73,7 +65,7 @@ class AE_MLP(Model):
 
         # Check if the last hidden layer size is at least 1 and not less than the output size
         last_hidden_layer_size = int(
-            self.hidden_size * self.shrink_rate ** (self.num_hidden_layers - 1)
+            hidden_size * shrink_rate ** (num_hidden_layers - 1)
         )
         if last_hidden_layer_size < 1:
             raise ValueError(
@@ -83,28 +75,28 @@ class AE_MLP(Model):
         # Construct encoder and decoder layers with shrink rate
         enc_layers = []
         dec_layers = []
-        for i in range(self.num_hidden_layers):
+        for i in range(num_hidden_layers):
             if i == 0:
                 enc_layer = nn.Sequential(
-                    nn.Linear(self.input_size, self.hidden_size),
+                    nn.Linear(in_size, hidden_size),
                     act_fn(),
                 )
                 dec_layer = nn.Sequential(
-                    nn.Linear(self.hidden_size, self.input_size),
+                    nn.Linear(hidden_size, in_size),
                     act_fn(),
                 )
             else:
                 enc_layer = nn.Sequential(
                     nn.Linear(
-                        int(self.hidden_size * self.shrink_rate ** (i - 1)),
-                        int(self.hidden_size * self.shrink_rate**i),
+                        int(hidden_size * shrink_rate ** (i - 1)),
+                        int(hidden_size * shrink_rate**i),
                     ),
                     act_fn(),
                 )
                 dec_layer = nn.Sequential(
                     nn.Linear(
-                        int(self.hidden_size * self.shrink_rate**i),
-                        int(self.hidden_size * self.shrink_rate ** (i - 1)),
+                        int(hidden_size * shrink_rate**i),
+                        int(hidden_size * shrink_rate ** (i - 1)),
                     ),
                     act_fn(),
                 )
@@ -119,18 +111,16 @@ class AE_MLP(Model):
         fc_layers = []
         fc_layer1 = nn.Sequential(
             nn.Linear(
-                int(
-                    self.hidden_size * self.shrink_rate ** (self.num_hidden_layers - 1)
-                ),
-                self.hidden_size,
+                int(hidden_size * shrink_rate ** (num_hidden_layers - 1)),
+                hidden_size,
             ),
             act_fn(),
-            nn.Dropout(self.dropout),
+            nn.Dropout(dropout),
         )
 
         # Construct the dense layers as a sequential module by
         # combining all the individual layers created earlier
-        fc_layer2 = nn.Sequential(nn.Linear(self.hidden_size, self.output_size))
+        fc_layer2 = nn.Sequential(nn.Linear(hidden_size, out_size))
         fc_layers.append(fc_layer1)
         fc_layers.append(fc_layer2)
 

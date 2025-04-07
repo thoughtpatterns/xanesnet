@@ -13,6 +13,7 @@ PARTICULAR PURPOSE. See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+
 import torch
 from torch import nn
 
@@ -31,16 +32,16 @@ class AE_CNN(Model):
 
     def __init__(
         self,
-        out_channel,
-        channel_mul,
-        hidden_size,
-        dropout,
-        kernel_size,
-        stride,
-        activation,
-        num_conv_layers,
-        x_data,
-        y_data,
+        in_size: int,
+        out_size: int,
+        out_channel: int,
+        channel_mul: int,
+        hidden_size: int,
+        dropout: float,
+        kernel_size: int,
+        stride: int,
+        activation: str,
+        num_conv_layers: int,
     ):
         """
         Args:
@@ -58,46 +59,35 @@ class AE_CNN(Model):
                 convolutional layers.
             kernel_size (integer): Size of the convolutional kernel (filter).
             stride (integer): Stride of the convolution operation.
-            x_data (NumPy array): Input data for the network
-            y_data (Numpy array): Output data for the network
+            in_size (integer): Size of input data
+            out_size (integer): Size of output data
         """
         super().__init__()
 
         self.ae_flag = 1
-        self.out_channel = out_channel
-        self.channel_mul = channel_mul
-        self.hidden_size = hidden_size
-        self.dropout = dropout
-        self.kernel_size = kernel_size
-        self.stride = stride
-        self.activation = activation
-        self.num_conv_layers = num_conv_layers
-
-        input_size = x_data.shape[1]
-        output_size = y_data[0].size
 
         # Instantiate ActivationSwitch for dynamic activation selection
         activation_switch = ActivationSwitch()
         act_fn = activation_switch.fn(activation)
 
         # Start collecting shape of convolutional layers for calculating padding
-        all_conv_shapes = [input_size]
+        all_conv_shapes = [in_size]
 
         # Starting shape
-        conv_shape = input_size
+        conv_shape = in_size
 
         # Construct encoder convolutional layers
         enc_layers = []
         enc_in_channel = 1
-        enc_out_channel = self.out_channel
-        for block in range(self.num_conv_layers):
+        enc_out_channel = out_channel
+        for block in range(num_conv_layers):
             # Create conv layer
             conv_layer = nn.Sequential(
                 nn.Conv1d(
                     in_channels=enc_in_channel,
                     out_channels=enc_out_channel,
-                    kernel_size=self.kernel_size,
-                    stride=self.stride,
+                    kernel_size=kernel_size,
+                    stride=stride,
                 ),
                 act_fn(),
             )
@@ -106,31 +96,29 @@ class AE_CNN(Model):
 
             # Update in and out channels
             enc_in_channel = enc_out_channel
-            enc_out_channel = enc_out_channel * self.channel_mul
+            enc_out_channel = enc_out_channel * channel_mul
 
             # Update output shape for conv layer
-            conv_shape = int(((conv_shape - self.kernel_size) / self.stride) + 1)
+            conv_shape = int(((conv_shape - kernel_size) / stride) + 1)
             all_conv_shapes.append(conv_shape)
 
         self.encoder_layers = nn.Sequential(*enc_layers)
 
         # Construct predictor dense layers
         dense_in_shape = (
-            self.out_channel
-            * self.channel_mul ** (self.num_conv_layers - 1)
-            * all_conv_shapes[-1]
+            out_channel * channel_mul ** (num_conv_layers - 1) * all_conv_shapes[-1]
         )
 
         dense_layers = []
 
         dense_layer1 = nn.Sequential(
-            nn.Linear(dense_in_shape, self.hidden_size),
+            nn.Linear(dense_in_shape, hidden_size),
             act_fn(),
-            nn.Dropout(self.dropout),
+            nn.Dropout(dropout),
         )
 
         dense_layer2 = nn.Sequential(
-            nn.Linear(self.hidden_size, output_size),
+            nn.Linear(hidden_size, out_size),
         )
 
         dense_layers.append(dense_layer1)
@@ -139,20 +127,16 @@ class AE_CNN(Model):
         self.dense_layers = nn.Sequential(*dense_layers)
 
         # Construct decoder transpose convolutional layers
-        dec_in_channel = self.out_channel * self.channel_mul ** (
-            self.num_conv_layers - 1
-        )
-        dec_out_channel = self.out_channel * self.channel_mul ** (
-            self.num_conv_layers - 2
-        )
+        dec_in_channel = out_channel * channel_mul ** (num_conv_layers - 1)
+        dec_out_channel = out_channel * channel_mul ** (num_conv_layers - 2)
 
         dec_layers = []
 
-        for block in range(self.num_conv_layers):
-            tconv_out_shape = all_conv_shapes[self.num_conv_layers - block - 1]
-            tconv_in_shape = all_conv_shapes[self.num_conv_layers - block]
+        for block in range(num_conv_layers):
+            tconv_out_shape = all_conv_shapes[num_conv_layers - block - 1]
+            tconv_in_shape = all_conv_shapes[num_conv_layers - block]
 
-            tconv_shape = int(((tconv_in_shape - 1) * self.stride) + self.kernel_size)
+            tconv_shape = int(((tconv_in_shape - 1) * stride) + kernel_size)
 
             # Calculate padding to input or output of transpose conv layer
             if tconv_shape != tconv_out_shape:
@@ -168,15 +152,15 @@ class AE_CNN(Model):
                 padding = 0
                 output_padding = 0
 
-            if block == self.num_conv_layers - 1:
+            if block == num_conv_layers - 1:
                 dec_out_channel = 1
 
             tconv_layer = nn.Sequential(
                 nn.ConvTranspose1d(
                     in_channels=dec_in_channel,
                     out_channels=dec_out_channel,
-                    kernel_size=self.kernel_size,
-                    stride=self.stride,
+                    kernel_size=kernel_size,
+                    stride=stride,
                     output_padding=output_padding,
                     padding=padding,
                 ),
@@ -185,9 +169,9 @@ class AE_CNN(Model):
             dec_layers.append(tconv_layer)
 
             # Update in/out channels
-            if block < self.num_conv_layers - 1:
+            if block < num_conv_layers - 1:
                 dec_in_channel = dec_out_channel
-                dec_out_channel = dec_out_channel // self.channel_mul
+                dec_out_channel = dec_out_channel // channel_mul
 
         self.decoder_layers = nn.Sequential(*dec_layers)
 

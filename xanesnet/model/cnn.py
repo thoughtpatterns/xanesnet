@@ -13,6 +13,7 @@ PARTICULAR PURPOSE. See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+
 import numpy as np
 import torch
 from torch import nn
@@ -34,6 +35,8 @@ class CNN(Model):
 
     def __init__(
         self,
+        in_size: int,
+        out_size: int,
         hidden_size: int,
         dropout: float,
         num_conv_layers: int,
@@ -42,8 +45,6 @@ class CNN(Model):
         channel_mul: int,
         kernel_size: int,
         stride: int,
-        x_data: np.ndarray,
-        y_data: np.ndarray,
     ):
         """
         Args:
@@ -61,23 +62,12 @@ class CNN(Model):
                 convolutional layers.
             kernel_size (integer): Size of the convolutional kernel (filter).
             stride (integer): Stride of the convolution operation.
-            x_data (NumPy array): Input data for the network
-            y_data (Numpy array): Output data for the network
+            in_size (integer): Size of input data
+            out_size (integer): Size of output data
         """
         super().__init__()
 
         self.nn_flag = 1
-        self.hidden_size = hidden_size
-        self.dropout = dropout
-        self.activation = activation
-        self.num_conv_layers = num_conv_layers
-        self.out_channel = out_channel
-        self.channel_mul = channel_mul
-        self.kernel_size = kernel_size
-        self.stride = stride
-
-        self.input_size = x_data.shape[1]
-        self.output_size = y_data[0].size
 
         # Instantiate ActivationSwitch for dynamic activation selection
         activation_switch = ActivationSwitch()
@@ -85,12 +75,12 @@ class CNN(Model):
 
         # Get the output size of convolutional layers
         out_conv_block_size = get_conv_layers_output_size(
-            self.input_size,
-            self.num_conv_layers,
-            self.channel_mul,
-            self.kernel_size,
-            self.stride,
-            self.out_channel,
+            in_size,
+            num_conv_layers,
+            channel_mul,
+            kernel_size,
+            stride,
+            out_channel,
             include_pooling=False,
         )
 
@@ -102,12 +92,12 @@ class CNN(Model):
                 nn.Conv1d(
                     in_channels=in_channel,
                     out_channels=out_channel,
-                    kernel_size=self.kernel_size,
-                    stride=self.stride,
+                    kernel_size=kernel_size,
+                    stride=stride,
                 ),
                 nn.BatchNorm1d(num_features=out_channel),
                 act_fn(),
-                nn.Dropout(p=self.dropout),
+                nn.Dropout(p=dropout),
             )
 
             conv_layers.append(conv_layer)
@@ -123,14 +113,14 @@ class CNN(Model):
         dense_layer1 = nn.Sequential(
             nn.Linear(
                 out_conv_block_size,
-                self.hidden_size,
+                hidden_size,
             ),
             act_fn(),
         )
 
         # Construct the dense layers as a sequential module by
         # combining all the individual layers created earlier
-        dense_layer2 = nn.Sequential(nn.Linear(self.hidden_size, self.output_size))
+        dense_layer2 = nn.Sequential(nn.Linear(hidden_size, out_size))
         dense_layers.append(dense_layer1)
         dense_layers.append(dense_layer2)
 

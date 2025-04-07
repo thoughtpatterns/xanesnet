@@ -205,7 +205,8 @@ class GNNLearn(Learn):
     def train_std(self):
         x_data = self.x_data
 
-        self.model_params["x_data"] = x_data
+        self.model_params["in_size"] = x_data[0].x.shape[1]
+        self.model_params["out_size"] = x_data[0].y.shape[0]
         self.model_params["mlp_feat_size"] = x_data[0].graph_attr.shape[0]
 
         model = create_model(self.model_name, **self.model_params)

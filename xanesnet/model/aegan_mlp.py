@@ -29,6 +29,8 @@ from xanesnet.utils_model import (
 class AEGAN_MLP(Model):
     def __init__(
         self,
+        in_size,
+        out_size,
         hidden_size,
         dropout,
         n_hl_gen,
@@ -41,22 +43,14 @@ class AEGAN_MLP(Model):
         optim_fn_dis,
         loss_gen,
         loss_dis,
-        x_data,
-        y_data,
     ):
         super().__init__()
 
         self.aegan_flag = 1
-        self.hidden_size = hidden_size
-        self.dropout = dropout
-
-        self.n_hl_gen = n_hl_gen
-        self.n_hl_shared = n_hl_shared
-        self.n_hl_dis = n_hl_dis
 
         # Select activation function
         activation_switch = ActivationSwitch()
-        self.activation = activation_switch.fn(activation)
+        activation = activation_switch.fn(activation)
 
         # Select loss functions
         loss_gen_fn = loss_gen["loss_fn"]
@@ -68,60 +62,56 @@ class AEGAN_MLP(Model):
         self.loss_fn_gen = LossSwitch().fn(loss_gen_fn, loss_gen_args)
         self.loss_fn_dis = LossSwitch().fn(loss_dis_fn, loss_dis_args)
 
-        self.input_size_a = x_data.shape[1]
-        self.input_size_b = y_data.shape[1]
+        input_size_a = in_size
+        input_size_b = out_size
 
         # Initialise the generative autoencoder networks
         self.gen_a = AEGen(
-            input_size=self.input_size_a,
-            num_hidden_layer=self.n_hl_gen,
-            hidden_size=self.hidden_size,
-            dropout=self.dropout,
-            activation=self.activation,
+            input_size=input_size_a,
+            num_hidden_layer=n_hl_gen,
+            hidden_size=hidden_size,
+            dropout=dropout,
+            activation=activation,
         )  # autoencoder for domain a
         self.gen_b = AEGen(
-            input_size=self.input_size_b,
-            num_hidden_layer=self.n_hl_gen,
-            hidden_size=self.hidden_size,
-            dropout=self.dropout,
-            activation=self.activation,
+            input_size=input_size_b,
+            num_hidden_layer=n_hl_gen,
+            hidden_size=hidden_size,
+            dropout=dropout,
+            activation=activation,
         )  # autoencoder for domain b
 
         # Initialise the shared autoencoder layers
         self.enc_shared = SharedLayer(
-            num_hidden_layer=self.n_hl_shared,
-            hidden_size=self.hidden_size,
-            dropout=self.dropout,
-            activation=self.activation,
+            num_hidden_layer=n_hl_shared,
+            hidden_size=hidden_size,
+            dropout=dropout,
+            activation=activation,
         )
         self.dec_shared = SharedLayer(
-            num_hidden_layer=self.n_hl_shared,
-            hidden_size=self.hidden_size,
-            dropout=self.dropout,
-            activation=self.activation,
+            num_hidden_layer=n_hl_shared,
+            hidden_size=hidden_size,
+            dropout=dropout,
+            activation=activation,
         )
 
         # Initialise the discriminator networks
         self.dis_a = Dis(
-            input_size=self.input_size_a,
-            num_hidden_layer=self.n_hl_dis,
-            hidden_size=self.hidden_size,
-            dropout=self.dropout,
-            activation=self.activation,
+            input_size=input_size_a,
+            num_hidden_layer=n_hl_dis,
+            hidden_size=hidden_size,
+            dropout=dropout,
+            activation=activation,
             loss_fn=self.loss_fn_dis,
         )  # discriminator for domain a
         self.dis_b = Dis(
-            input_size=self.input_size_b,
-            num_hidden_layer=self.n_hl_dis,
-            hidden_size=self.hidden_size,
-            dropout=self.dropout,
-            activation=self.activation,
+            input_size=input_size_b,
+            num_hidden_layer=n_hl_dis,
+            hidden_size=hidden_size,
+            dropout=dropout,
+            activation=activation,
             loss_fn=self.loss_fn_dis,
         )  # discriminator for domain b
-
-        # Learning rate
-        self.lr_gen = lr_gen
-        self.lr_dis = lr_dis
 
         params_gen = [
             param for name, param in self.named_parameters() if "dis" not in name
@@ -132,8 +122,8 @@ class AEGAN_MLP(Model):
         optim_fn_gen = OptimSwitch().fn(optim_fn_gen)
         optim_fn_dis = OptimSwitch().fn(optim_fn_dis)
 
-        self.gen_opt = optim_fn_gen(params_gen, lr=self.lr_gen, weight_decay=1e-5)
-        self.dis_opt = optim_fn_dis(params_dis, lr=self.lr_dis, weight_decay=1e-5)
+        self.gen_opt = optim_fn_gen(params_gen, lr=lr_gen, weight_decay=1e-5)
+        self.dis_opt = optim_fn_dis(params_dis, lr=lr_dis, weight_decay=1e-5)
 
     def get_optimizer(self):
         return self.gen_opt, self.dis_opt
@@ -292,23 +282,19 @@ class SharedLayer(nn.Module):
     # Autoencoder architecture
     def __init__(self, num_hidden_layer, hidden_size, dropout, activation):
         super().__init__()
-        self.num_hidden_layer = num_hidden_layer
-        self.hidden_size = hidden_size
-        self.activation = activation
-        self.dropout = dropout
 
         dense_layers = []
         for layer in range(num_hidden_layer):
             dense_layer = nn.Sequential(
-                nn.Linear(self.hidden_size, self.hidden_size),
-                nn.BatchNorm1d(self.hidden_size),
-                self.activation(),
+                nn.Linear(hidden_size, hidden_size),
+                nn.BatchNorm1d(hidden_size),
+                activation(),
             )
             dense_layers.append(dense_layer)
 
         output_layer = nn.Sequential(
-            nn.Linear(self.hidden_size, self.hidden_size),
-            nn.BatchNorm1d(self.hidden_size),
+            nn.Linear(hidden_size, hidden_size),
+            nn.BatchNorm1d(hidden_size),
         )
 
         dense_layers.append(output_layer)
@@ -324,49 +310,41 @@ class AEGen(nn.Module):
     # Autoencoder architecture
     def __init__(self, input_size, num_hidden_layer, hidden_size, dropout, activation):
         super().__init__()
-        self.input_size = input_size
-        self.output_size = input_size
-        self.num_hidden_layer = num_hidden_layer
-        self.activation = activation
-        self.hidden_size = hidden_size
-        self.dropout = dropout
 
         # Encoder input layer
         encoder_input = nn.Sequential(
-            nn.Linear(self.input_size, self.hidden_size),
-            nn.BatchNorm1d(self.hidden_size),
-            self.activation(),
+            nn.Linear(input_size, hidden_size),
+            nn.BatchNorm1d(hidden_size),
+            activation(),
         )
         # Encoder mid layers
         encoder_mid_layers = []
         for layer in range(num_hidden_layer - 1):
             mid_layer = nn.Sequential(
-                nn.Linear(self.hidden_size, self.hidden_size),
-                nn.BatchNorm1d(self.hidden_size),
-                self.activation(),
+                nn.Linear(hidden_size, hidden_size),
+                nn.BatchNorm1d(hidden_size),
+                activation(),
             )
             encoder_mid_layers.append(mid_layer)
         encoder_mid_layers = nn.Sequential(*encoder_mid_layers)
         # Encoder output layer
         encoder_output = nn.Sequential(
-            nn.Linear(self.hidden_size, self.hidden_size),
-            nn.BatchNorm1d(self.hidden_size),
+            nn.Linear(hidden_size, hidden_size),
+            nn.BatchNorm1d(hidden_size),
         )
 
         # Decoder input and mid layer
         decoder_mid_layers = []
         for layer in range(num_hidden_layer):
             mid_layer = nn.Sequential(
-                nn.Linear(self.hidden_size, self.hidden_size),
-                nn.BatchNorm1d(self.hidden_size),
-                self.activation(),
+                nn.Linear(hidden_size, hidden_size),
+                nn.BatchNorm1d(hidden_size),
+                activation(),
             )
             decoder_mid_layers.append(mid_layer)
         decoder_mid_layers = nn.Sequential(*decoder_mid_layers)
         # Decoder output layer
-        decoder_output = nn.Sequential(
-            nn.Linear(self.hidden_size, self.output_size), self.activation()
-        )
+        decoder_output = nn.Sequential(nn.Linear(hidden_size, input_size), activation())
 
         # Collect encoder layers
         encoder_layers = []
@@ -396,31 +374,27 @@ class Dis(nn.Module):
         self, input_size, num_hidden_layer, hidden_size, dropout, activation, loss_fn
     ):
         super().__init__()
-        self.input_size = input_size
-        self.num_hidden_layer = num_hidden_layer
-        self.hidden_size = hidden_size
-        self.dropout = dropout
-        self.activation = activation
+
         self.loss_fn = loss_fn
 
         mid_layers = []
         for layer in range(num_hidden_layer - 1):
             mid_layer = nn.Sequential(
-                nn.Linear(self.hidden_size, self.hidden_size),
-                nn.BatchNorm1d(self.hidden_size),
-                self.activation(),
+                nn.Linear(hidden_size, hidden_size),
+                nn.BatchNorm1d(hidden_size),
+                activation(),
             )
             mid_layers.append(mid_layer)
 
         mid_layers = nn.Sequential(*mid_layers)
 
         input_layer = nn.Sequential(
-            nn.Linear(self.input_size, self.hidden_size),
-            nn.BatchNorm1d(self.hidden_size),
-            self.activation(),
+            nn.Linear(input_size, hidden_size),
+            nn.BatchNorm1d(hidden_size),
+            activation(),
         )
 
-        output_layer = nn.Sequential(nn.Linear(self.hidden_size, 1), nn.Sigmoid())
+        output_layer = nn.Sequential(nn.Linear(hidden_size, 1), nn.Sigmoid())
 
         dense_layers = []
 

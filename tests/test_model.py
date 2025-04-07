@@ -12,7 +12,7 @@ from xanesnet.data_encoding import data_learn, data_gnn_learn
 from xanesnet.model import MLP, CNN, LSTM, GNN, AE_MLP, AE_CNN
 
 
-def init_model(config, train_xyz):
+def init_dataset(config, train_xyz):
     descriptor_list = []
     descriptors = config.get("descriptors")
 
@@ -31,9 +31,12 @@ def init_model(config, train_xyz):
         x_data = xanes
         y_data = xyz
 
-    # Setup model with specified parameters
-    config["model"]["params"]["x_data"] = x_data
-    config["model"]["params"]["y_data"] = y_data
+    return [x_data, y_data]
+
+
+def init_model(config, x_data, y_data):
+    config["model"]["params"]["in_size"] = x_data.shape[1]
+    config["model"]["params"]["out_size"] = y_data.shape[1]
 
     model = create_model(config.get("model")["type"], **config.get("model")["params"])
 
@@ -65,7 +68,8 @@ def init_dataset_gnn(config):
 
 
 def init_model_gnn(config, dataset):
-    config.get("model")["params"]["x_data"] = dataset
+    config.get("model")["params"]["in_size"] = dataset[0].x.shape[1]
+    config.get("model")["params"]["out_size"] = dataset[0].y.shape[0]
     config.get("model")["params"]["mlp_feat_size"] = dataset[0].graph_attr.shape[0]
     model = create_model(config.get("model")["type"], **config.get("model")["params"])
     # model = learn_scheme.setup_weight(model, config.get("hyperparams")["weight_seed"])
@@ -97,7 +101,8 @@ class TestModelMLP:
 
     def test_arch_xyz(self):
         # Test on train_xyz mode
-        model = init_model(self.config_mlp, train_xyz=True)
+        x_data, y_data = init_dataset(self.config_mlp, train_xyz=True)
+        model = init_model(self.config_mlp, x_data, y_data)
         # Check model type
         assert isinstance(model, MLP)
         # Check model input size
@@ -116,7 +121,6 @@ class TestModelMLP:
         # Check model output size
         assert model.dense_layers[2][0].out_features == 400
         # Check forward pass
-        x_data = self.config_mlp["model"]["params"]["x_data"]
         output = model(torch.from_numpy(x_data).float())
         assert output.shape == (8, 400)
         # Assert no NaNs or Infs in the output
@@ -124,13 +128,13 @@ class TestModelMLP:
 
     def test_arch_xanes(self):
         # test on train_xanes mode
-        model = init_model(self.config_mlp, train_xyz=False)
+        x_data, y_data = init_dataset(self.config_mlp, train_xyz=False)
+        model = init_model(self.config_mlp, x_data, y_data)
         # Check model input size
         assert model.dense_layers[0][0].in_features == 400
         # Check model output size
         assert model.dense_layers[2][0].out_features == 49
         # Check forward pass
-        x_data = self.config_mlp["model"]["params"]["x_data"]
         output = model(torch.from_numpy(x_data).float())
         assert output.shape == (8, 49)
         # Assert no NaNs or Infs in the output
@@ -165,7 +169,8 @@ class TestModelCNN:
 
     def test_arch_xyz(self):
         # Test on train_xyz mode
-        model = init_model(self.config_cnn, train_xyz=True)
+        x_data, y_data = init_dataset(self.config_cnn, train_xyz=True)
+        model = init_model(self.config_cnn, x_data, y_data)
         # Check model type
         assert isinstance(model, CNN)
         # Check param num_conv_layers
@@ -188,7 +193,6 @@ class TestModelCNN:
         # Check model output size
         assert model.dense_layers[1][0].out_features == 400
         # Check forward pass
-        x_data = self.config_cnn["model"]["params"]["x_data"]
         output = model(torch.from_numpy(x_data).float())
         assert output.shape == (8, 400)
         # Assert no NaNs or Infs in the output
@@ -196,13 +200,13 @@ class TestModelCNN:
 
     def test_arch_xanes(self):
         # test on train_xanes mode
-        model = init_model(self.config_cnn, train_xyz=False)
+        x_data, y_data = init_dataset(self.config_cnn, train_xyz=False)
+        model = init_model(self.config_cnn, x_data, y_data)
         # Check dense layer dimension
         assert model.dense_layers[0][0].in_features == 25344
         # Check model output size
         assert model.dense_layers[1][0].out_features == 49
         # Check forward pass
-        x_data = self.config_cnn["model"]["params"]["x_data"]
         output = model(torch.from_numpy(x_data).float())
         assert output.shape == (8, 49)
         # Assert no NaNs or Infs in the output
@@ -234,7 +238,8 @@ class TestModelLSTM:
 
     def test_arch_xyz(self):
         # Test on train_xyz mode
-        model = init_model(self.config_lstm, train_xyz=True)
+        x_data, y_data = init_dataset(self.config_lstm, train_xyz=True)
+        model = init_model(self.config_lstm, x_data, y_data)
         # Check model type
         assert isinstance(model, LSTM)
         # Check model input size
@@ -249,7 +254,6 @@ class TestModelLSTM:
         # Check model output size
         assert model.dense_layers[3].out_features == 400
         # Check forward pass
-        x_data = self.config_lstm["model"]["params"]["x_data"]
         output = model(torch.from_numpy(x_data).float())
         assert output.shape == (8, 400)
         # Assert no NaNs or Infs in the output
@@ -257,13 +261,13 @@ class TestModelLSTM:
 
     def test_arch_xanes(self):
         # test on train_xanes mode
-        model = init_model(self.config_lstm, train_xyz=False)
+        x_data, y_data = init_dataset(self.config_lstm, train_xyz=False)
+        model = init_model(self.config_lstm, x_data, y_data)
         # Check model input size
         assert model.lstm.input_size == 400
         # Check model output size
         assert model.dense_layers[3].out_features == 49
         # Check forward pass
-        x_data = self.config_lstm["model"]["params"]["x_data"]
         output = model(torch.from_numpy(x_data).float())
         assert output.shape == (8, 49)
         # Assert no NaNs or Infs in the output
@@ -358,7 +362,8 @@ class TestModelAEMLP:
 
     def test_arch_xyz(self):
         # Test on train_xyz mode
-        model = init_model(self.config_aemlp, train_xyz=True)
+        x_data, y_data = init_dataset(self.config_aemlp, train_xyz=True)
+        model = init_model(self.config_aemlp, x_data, y_data)
         # Check model type
         assert isinstance(model, AE_MLP)
         # Check encoder input size
@@ -380,7 +385,6 @@ class TestModelAEMLP:
         # Check model output size
         assert model.dense_layers[1][0].out_features == 400
         # Check forward pass
-        x_data = self.config_aemlp["model"]["params"]["x_data"]
         recon_input, output = model(torch.from_numpy(x_data).float())
         assert output.shape == (8, 400)
         assert recon_input.shape == (8, 49)
@@ -390,7 +394,8 @@ class TestModelAEMLP:
 
     def test_arch_xanes(self):
         # test on train_xanes mode
-        model = init_model(self.config_aemlp, train_xyz=False)
+        x_data, y_data = init_dataset(self.config_aemlp, train_xyz=False)
+        model = init_model(self.config_aemlp, x_data, y_data)
         # Check encoder input size
         assert model.encoder_layers[0][0].in_features == 400
         # Check decoder output size
@@ -398,7 +403,6 @@ class TestModelAEMLP:
         # Check model output size
         assert model.dense_layers[1][0].out_features == 49
         # Check forward pass
-        x_data = self.config_aemlp["model"]["params"]["x_data"]
         recon_input, output = model(torch.from_numpy(x_data).float())
         assert output.shape == (8, 49)
         assert recon_input.shape == (8, 400)
@@ -435,7 +439,8 @@ class TestModelAECNN:
 
     def test_arch_xyz(self):
         # Test on train_xyz mode
-        model = init_model(self.config_aecnn, train_xyz=True)
+        x_data, y_data = init_dataset(self.config_aecnn, train_xyz=True)
+        model = init_model(self.config_aecnn, x_data, y_data)
         # Check model type
         assert isinstance(model, AE_CNN)
         # Check encoder input size
@@ -447,7 +452,6 @@ class TestModelAECNN:
         # Check model output size
         assert model.dense_layers[1][0].out_features == 400
         # Check forward pass
-        x_data = self.config_aecnn["model"]["params"]["x_data"]
         recon_input, output = model(torch.from_numpy(x_data).float())
         assert output.shape == (8, 400)
         assert recon_input.shape == (8, 49)
@@ -457,7 +461,8 @@ class TestModelAECNN:
 
     def test_arch_xanes(self):
         # test on train_xanes mode
-        model = init_model(self.config_aecnn, train_xyz=False)
+        x_data, y_data = init_dataset(self.config_aecnn, train_xyz=False)
+        model = init_model(self.config_aecnn, x_data, y_data)
         # Check encoder input size
         assert model.encoder_layers[0][0].in_channels == 1
         assert model.encoder_layers[0][0].out_channels == 32
@@ -467,7 +472,6 @@ class TestModelAECNN:
         # Check model output size
         assert model.dense_layers[1][0].out_features == 49
         # Check forward pass
-        x_data = self.config_aecnn["model"]["params"]["x_data"]
         recon_input, output = model(torch.from_numpy(x_data).float())
         assert output.shape == (8, 49)
         assert recon_input.shape == (8, 400)
