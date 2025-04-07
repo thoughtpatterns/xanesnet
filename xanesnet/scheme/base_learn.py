@@ -153,8 +153,8 @@ class Learn(ABC):
 
         else:
             # Setup model with specified parameters
-            self.model_params["x_data"] = x_data
-            self.model_params["y_data"] = y_data
+            self.model_params["in_size"] = x_data.shape[1]
+            self.model_params["out_size"] = y_data.shape[1]
 
             model = create_model(self.model_name, **self.model_params)
 

@@ -36,13 +36,13 @@ class MLP(Model):
 
     def __init__(
         self,
+        in_size: int,
+        out_size: int,
         hidden_size: int,
         dropout: float,
         num_hidden_layers: int,
         shrink_rate: float,
         activation: str,
-        x_data: np.ndarray,
-        y_data: np.ndarray,
     ):
         """
         Args:
@@ -55,30 +55,18 @@ class MLP(Model):
                 size multiplicatively.
             activation (string): Name of activation function applied
                 to the hidden layers.
-            x_data (NumPy array): Input data for the network
-            y_data (Numpy array): Output data for the network
+            in_size (integer): Size of input data
+            out_size (integer): Size of output data
         """
 
         super().__init__()
 
         self.nn_flag = 1
-        self.hidden_size = hidden_size
-        self.dropout = dropout
-        self.num_hidden_layers = num_hidden_layers
-        self.shrink_rate = shrink_rate
-        self.activation = activation
 
-        input_size = x_data.shape[1]
-        output_size = y_data[0].size
-
-        # Instantiate ActivationSwitch for dynamic activation selection
         activation_switch = ActivationSwitch()
         act_fn = activation_switch.fn(activation)
 
-        # Check if the last hidden layer size is at least 1 and not less than the output size
-        last_size = int(
-            self.hidden_size * self.shrink_rate ** (self.num_hidden_layers - 1)
-        )
+        last_size = int(hidden_size * shrink_rate ** (num_hidden_layers - 1))
         if last_size < 1:
             raise ValueError(
                 "The size of the last hidden layer is less than 1, please adjust hyperparameters."
@@ -86,20 +74,20 @@ class MLP(Model):
 
         # Construct each hidden layer with shrink rate
         layers = []
-        for i in range(self.num_hidden_layers - 1):
+        for i in range(num_hidden_layers - 1):
             if i == 0:
                 layer = nn.Sequential(
-                    nn.Linear(input_size, self.hidden_size),
-                    nn.Dropout(self.dropout),
+                    nn.Linear(in_size, hidden_size),
+                    nn.Dropout(dropout),
                     act_fn(),
                 )
             else:
                 layer = nn.Sequential(
                     nn.Linear(
-                        int(self.hidden_size * self.shrink_rate ** (i - 1)),
-                        int(self.hidden_size * self.shrink_rate**i),
+                        int(hidden_size * shrink_rate ** (i - 1)),
+                        int(hidden_size * shrink_rate**i),
                     ),
-                    nn.Dropout(self.dropout),
+                    nn.Dropout(dropout),
                     act_fn(),
                 )
 
@@ -108,16 +96,11 @@ class MLP(Model):
         # Construct the output layer
         output_layer = nn.Sequential(
             nn.Linear(
-                int(
-                    self.hidden_size * self.shrink_rate ** (self.num_hidden_layers - 2)
-                ),
-                output_size,
+                int(hidden_size * shrink_rate ** (num_hidden_layers - 2)),
+                out_size,
             )
         )
         layers.append(output_layer)
-
-        # Construct the dense layers as a sequential module by
-        # combining all the individual layers created earlier
         self.dense_layers = nn.Sequential(*layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

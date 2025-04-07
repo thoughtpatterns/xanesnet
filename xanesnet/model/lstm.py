@@ -37,13 +37,13 @@ class LSTM(Model):
 
     def __init__(
         self,
+        in_size: int,
+        out_size: int,
         hidden_size: int,
         hidden_out_size: int,
         num_layers: int,
         dropout: float,
         activation: str,
-        x_data: np.ndarray,
-        y_data: np.ndarray,
     ):
         """
         Args:
@@ -57,14 +57,12 @@ class LSTM(Model):
                 of the dense layer, with dropout probability equal to dropout.
             activation (string): Name of activation function for
                 the dense layers.
-            x_data (NumPy array): Input data for the network
-            y_data (Numpy array): Output data for the network
+            in_size (integer): Size of input data
+            out_size (integer): Size of output data
         """
         super().__init__()
 
         self.nn_flag = 1
-        input_size = x_data.shape[1]
-        output_size = y_data[0].size
 
         # Instantiate ActivationSwitch for dynamic activation selection
         activation_switch = ActivationSwitch()
@@ -72,7 +70,7 @@ class LSTM(Model):
 
         # Define the LSTM layer
         self.lstm = nn.LSTM(
-            input_size=input_size,
+            input_size=in_size,
             hidden_size=hidden_size,
             num_layers=num_layers,
             bidirectional=True,
@@ -83,7 +81,7 @@ class LSTM(Model):
             nn.Linear(2 * hidden_size, hidden_out_size),
             act_fn(),
             nn.Dropout(p=dropout),
-            nn.Linear(hidden_out_size, output_size),
+            nn.Linear(hidden_out_size, out_size),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
