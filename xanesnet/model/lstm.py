@@ -39,14 +39,16 @@ class LSTM(Model):
         self,
         in_size: int,
         out_size: int,
-        hidden_size: int,
-        hidden_out_size: int,
-        num_layers: int,
-        dropout: float,
-        activation: str,
+        hidden_size: int = 256,
+        hidden_out_size: int = 128,
+        num_layers: int = 5,
+        dropout: float = 0.2,
+        activation: str = "prelu",
     ):
         """
         Args:
+            in_size (integer): Input size
+            out_size (integer): Output size
             hidden_size (integer): Number of features in the hidden state of
                 the LSTM layer.
             hidden_out_size (integer): Intermediate size of the two dense layers
@@ -57,18 +59,13 @@ class LSTM(Model):
                 of the dense layer, with dropout probability equal to dropout.
             activation (string): Name of activation function for
                 the dense layers.
-            in_size (integer): Size of input data
-            out_size (integer): Size of output data
         """
         super().__init__()
 
         self.nn_flag = 1
+        act_fn = ActivationSwitch().fn(activation)
 
-        # Instantiate ActivationSwitch for dynamic activation selection
-        activation_switch = ActivationSwitch()
-        act_fn = activation_switch.fn(activation)
-
-        # Define the LSTM layer
+        # LSTM layer
         self.lstm = nn.LSTM(
             input_size=in_size,
             hidden_size=hidden_size,
@@ -76,7 +73,7 @@ class LSTM(Model):
             bidirectional=True,
         )
 
-        # Define the dense layers
+        # Dense layers
         self.dense_layers = nn.Sequential(
             nn.Linear(2 * hidden_size, hidden_out_size),
             act_fn(),
@@ -85,9 +82,6 @@ class LSTM(Model):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Forward pass of the LSTM layer.
         x, _ = self.lstm(x)
-        # Forward pass through dense layers
         out = self.dense_layers(x)
-
         return out

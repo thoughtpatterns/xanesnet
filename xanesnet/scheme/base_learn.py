@@ -16,14 +16,10 @@ this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from pathlib import Path
 
-import mlflow
-import numpy as np
 import optuna
 import torch
 import time
-import os
 import pickle
-import tempfile
 
 from abc import ABC, abstractmethod
 from datetime import datetime

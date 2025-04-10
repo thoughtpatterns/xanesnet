@@ -164,17 +164,17 @@ def init_predict_scheme(model_dir, mode):
     xyz, xanes, e, index = data_predict(
         config["xyz_path"], config["xanes_path"], descriptor_list, mode, False
     )
-    # Initialise prediction scheme
-    scheme = create_predict_scheme(
-        model_name,
-        xyz,
-        xanes,
-        mode,
-        False,
-        metadata["standardscaler"],
-        metadata["fourier_transform"],
-        metadata["fourier_param"],
-    )
+
+    kwargs = {
+        "pred_mode": mode,
+        "pred_eval": False,
+        "scaler": metadata["standardscaler"],
+        "fourier": metadata["fourier_transform"],
+        "fourier_param": metadata["fourier_param"],
+    }
+
+    # Initialise prediction scheme using kwargs
+    scheme = create_predict_scheme(model_name, xyz, xanes, **kwargs)
 
     return scheme, index, e
 

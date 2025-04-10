@@ -87,7 +87,7 @@ def train_model(config, args):
     else:
         raise ValueError(f"Unsupported mode name: {args.mode}")
 
-    # Initialise learn scheme
+    # Initialise learning scheme
     print(">> Initialising learn scheme...")
     kwargs = {
         "model": config["model"],
@@ -106,12 +106,7 @@ def train_model(config, args):
         "mlflow": args.mlflow,
         "tensorboard": args.tensorboard,
     }
-
-    scheme = create_learn_scheme(
-        x_data,
-        y_data,
-        **kwargs,
-    )
+    scheme = create_learn_scheme(x_data, y_data, **kwargs)
 
     # Train the model using selected training strategy
     print(">> Training %s model..." % config["model"]["type"])

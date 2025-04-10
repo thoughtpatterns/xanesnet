@@ -37,17 +37,19 @@ class CNN(Model):
         self,
         in_size: int,
         out_size: int,
-        hidden_size: int,
-        dropout: float,
-        num_conv_layers: int,
-        activation: str,
-        out_channel: int,
-        channel_mul: int,
-        kernel_size: int,
-        stride: int,
+        hidden_size: int = 64,
+        dropout: float = 0.2,
+        num_conv_layers: int = 3,
+        activation: str = "prelu",
+        out_channel: int = 32,
+        channel_mul: int = 2,
+        kernel_size: int = 3,
+        stride: int = 1,
     ):
         """
         Args:
+            in_size (integer): Input size
+            out_size (integer): Output size
             hidden_size (integer): Size of hidden layers
                 in the dense (fully connected) layers.
             dropout (float): Dropout rate applied to
@@ -62,16 +64,11 @@ class CNN(Model):
                 convolutional layers.
             kernel_size (integer): Size of the convolutional kernel (filter).
             stride (integer): Stride of the convolution operation.
-            in_size (integer): Size of input data
-            out_size (integer): Size of output data
         """
         super().__init__()
 
         self.nn_flag = 1
-
-        # Instantiate ActivationSwitch for dynamic activation selection
-        activation_switch = ActivationSwitch()
-        act_fn = activation_switch.fn(activation)
+        act_fn = ActivationSwitch().fn(activation)
 
         # Get the output size of convolutional layers
         out_conv_block_size = get_conv_layers_output_size(

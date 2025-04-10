@@ -31,17 +31,16 @@ def init_scheme(model_dir: Path, mode):
     xyz, xanes, e, index = data_predict(
         config["xyz_path"], config["xanes_path"], descriptor_list, mode, False
     )
+
     # Initialise prediction scheme
-    scheme = create_predict_scheme(
-        model_name,
-        xyz,
-        xanes,
-        mode,
-        False,
-        metadata["standardscaler"],
-        metadata["fourier_transform"],
-        metadata["fourier_param"],
-    )
+    kwargs = {
+        "pred_mode": mode,
+        "pred_eval": False,
+        "scaler": metadata["standardscaler"],
+        "fourier": metadata["fourier_transform"],
+        "fourier_param": metadata["fourier_param"],
+    }
+    scheme = create_predict_scheme(model_name, xyz, xanes, **kwargs)
 
     return scheme
 
@@ -70,17 +69,16 @@ def init_scheme_gnn(model_dir: Path):
         False,
     )
 
+    kwargs = {
+        "pred_mode": "predict_xanes",
+        "pred_eval": False,
+        "scaler": metadata["standardscaler"],
+        "fourier": metadata["fourier_transform"],
+        "fourier_param": metadata["fourier_param"],
+    }
+
     # Initialise prediction scheme
-    scheme = create_predict_scheme(
-        "gnn",
-        graph_dataset,
-        xanes_data,
-        "predict_xanes",
-        False,
-        metadata["standardscaler"],
-        metadata["fourier_transform"],
-        metadata["fourier_param"],
-    )
+    scheme = create_predict_scheme("gnn", graph_dataset, xanes_data, **kwargs)
 
     return scheme
 

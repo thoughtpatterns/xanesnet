@@ -37,25 +37,8 @@ class Result:
 
 
 class AEPredict(Predict):
-    def __init__(
-        self,
-        xyz_data,
-        xanes_data,
-        pred_mode,
-        pred_eval,
-        scaler,
-        fourier,
-        fourier_param,
-    ):
-        super().__init__(
-            xyz_data,
-            xanes_data,
-            pred_mode,
-            pred_eval,
-            scaler,
-            fourier,
-            fourier_param,
-        )
+    def __init__(self, xyz_data, xanes_data, **kwargs):
+        super().__init__(xyz_data, xanes_data, **kwargs)
         self.recon_flag = 1
 
     def predict(self, model):

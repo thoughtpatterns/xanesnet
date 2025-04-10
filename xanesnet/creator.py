@@ -19,15 +19,21 @@ import numpy as np
 from xanesnet.model.base_model import Model
 from torch.utils.data import DataLoader
 
+
 """
-Factory methods to create instance of model, descriptor or scheme based on
-the specified name and parameters. To register a new class, add the label and class
-name to the corresponding dictionary. The class name also need to be registered in 
-the __init__.py file in the /scheme, /descriptor, or /model directory
+Factory functions to create instance of model, descriptor or scheme
 """
 
 
 def create_model(name: str, **kwargs):
+    """
+    Returns an instance of a registered model class based on the given name.
+
+    To register a new model, first import the model class (e.g, "MLP")
+    and then an entry to the `models` dictionary with:
+      - the model type as the key (e.g., "mlp")
+      - the corresponding class as the value (e.g., MLP)
+    """
     from xanesnet.model import MLP, CNN, LSTM, AE_CNN, AE_MLP, AEGAN_MLP, GNN
 
     models = {
@@ -43,10 +49,18 @@ def create_model(name: str, **kwargs):
     if name in models:
         return models[name](**kwargs)
     else:
-        raise ValueError(f"Unsupported module name: {name}")
+        raise ValueError(f"Unsupported model name: {name}")
 
 
 def create_descriptor(name: str, **kwargs):
+    """
+    Returns an instance of a registered descriptor class based on the given name.
+
+    To register a new descriptor, first import the descriptor class (e.g, "WACSF")
+    and then an entry to the `descriptorS` dictionary with:
+      - the descriptor name as the key (e.g., "wacsf")
+      - the corresponding class as the value (e.g., WACSF)
+    """
     from xanesnet.descriptor import (
         RDC,
         WACSF,
@@ -82,6 +96,14 @@ def create_descriptor(name: str, **kwargs):
 
 
 def create_learn_scheme(x_data: np.ndarray, y_data: np.ndarray, **kwargs):
+    """
+    Returns an instance of a learn scheme class based on the model type.
+
+    To register a new scheme, first import the scheme class (e.g, "NNLearn")
+    and then an entry to the `scheme` dictionary with:
+      - the model type as the key (e.g., "mlp")
+      - the corresponding class as the value (e.g., NNLearn)
+    """
     from xanesnet.scheme import NNLearn, AELearn, AEGANLearn, GNNLearn
 
     scheme = {
@@ -94,13 +116,12 @@ def create_learn_scheme(x_data: np.ndarray, y_data: np.ndarray, **kwargs):
         "gnn": GNNLearn,
     }
 
-    model_params = kwargs.get("model")
-    name = model_params["type"]
+    model_type = kwargs.get("model")["type"]
 
-    if name in scheme:
-        return scheme[name](x_data, y_data, **kwargs)
+    if model_type in scheme:
+        return scheme[model_type](x_data, y_data, **kwargs)
     else:
-        raise ValueError(f"Unsupported learn scheme name: {name}")
+        raise ValueError(f"Unsupported learn scheme for the model: {model_type}")
 
 
 def create_eval_scheme(
@@ -112,6 +133,14 @@ def create_eval_scheme(
     input_size: int,
     output_size: int,
 ):
+    """
+    Returns an instance of an evaluation scheme class based on the model type.
+
+    To register a new scheme, first import the scheme class (e.g, "NNEval")
+    and then an entry to the `scheme` dictionary with:
+      - the model type as the key (e.g., "mlp")
+      - the corresponding class as the value (e.g., NNEval)
+    """
     from xanesnet.scheme import NNEval, AEEval, AEGANEval
 
     scheme = {
@@ -133,19 +162,20 @@ def create_eval_scheme(
             output_size,
         )
     else:
-        raise ValueError(f"Unsupported eval scheme name: {name}")
+        raise ValueError(f"Unsupported eval scheme for the model: {name}")
 
 
 def create_predict_scheme(
-    name: str,
-    xyz_data: np.ndarray,
-    xanes_data: np.ndarray,
-    pred_mode: str,
-    pred_eval: bool,
-    scaler: bool,
-    fourier: bool,
-    fourier_param: dict,
+    name: str, xyz_data: np.ndarray, xanes_data: np.ndarray, **kwargs
 ):
+    """
+    Returns an instance of a prediction scheme class based on the model type.
+
+    To register a new scheme, first import the scheme class (e.g, "NNPredict")
+    and then an entry to the `scheme` dictionary with:
+      - the model type as the key (e.g., "mlp")
+      - the corresponding class as the value (e.g., NNPredict)
+    """
     from xanesnet.scheme import NNPredict, AEPredict, AEGANPredict, GNNPredict
 
     scheme = {
@@ -159,14 +189,6 @@ def create_predict_scheme(
     }
 
     if name in scheme:
-        return scheme[name](
-            xyz_data,
-            xanes_data,
-            pred_mode,
-            pred_eval,
-            scaler,
-            fourier,
-            fourier_param,
-        )
+        return scheme[name](xyz_data, xanes_data, **kwargs)
     else:
-        raise ValueError(f"Unsupported prediction scheme name: {name}")
+        raise ValueError(f"Unsupported prediction scheme for the model: {name}")
