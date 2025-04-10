@@ -45,16 +45,15 @@ def predict_data(config, args, metadata):
     )
 
     # Initialise prediction scheme
-    scheme = create_predict_scheme(
-        metadata["model_type"],
-        xyz,
-        xanes,
-        mode,
-        pred_eval,
-        metadata["standardscaler"],
-        metadata["fourier_transform"],
-        metadata["fourier_param"],
-    )
+    kwargs = {
+        "pred_mode": mode,
+        "pred_eval": pred_eval,
+        "scaler": metadata["standardscaler"],
+        "fourier": metadata["fourier_transform"],
+        "fourier_param": metadata["fourier_param"],
+    }
+
+    scheme = create_predict_scheme(metadata["model_type"], xgyz, xanes, **kwargs)
 
     # Predict with loaded models and scheme
     predict_scheme = metadata["scheme"]

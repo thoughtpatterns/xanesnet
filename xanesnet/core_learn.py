@@ -37,7 +37,7 @@ def train_model(config, args):
     descriptors = config.get("descriptors")
 
     if descriptors is None:
-        raise ValueError("No descriptors found in the configuration file!")
+        raise ValueError("No descriptors found in the configuration file.")
 
     for d in descriptors:
         print(f">> Initialising {d['type']} feature descriptor...")
