@@ -34,17 +34,19 @@ class AE_CNN(Model):
         self,
         in_size: int,
         out_size: int,
-        out_channel: int,
-        channel_mul: int,
-        hidden_size: int,
-        dropout: float,
-        kernel_size: int,
-        stride: int,
-        activation: str,
-        num_conv_layers: int,
+        out_channel: int = 32,
+        channel_mul: int = 2,
+        hidden_size: int = 64,
+        dropout: float = 0.2,
+        kernel_size: int = 3,
+        stride: int = 1,
+        activation: str = "prelu",
+        num_conv_layers: int = 3,
     ):
         """
         Args:
+            in_size (integer): Size of input data
+            out_size (integer): Size of output data
             hidden_size (integer): Size of hidden layers
                 in the dense (fully connected) layers.
             dropout (float): Dropout rate applied to
@@ -59,16 +61,11 @@ class AE_CNN(Model):
                 convolutional layers.
             kernel_size (integer): Size of the convolutional kernel (filter).
             stride (integer): Stride of the convolution operation.
-            in_size (integer): Size of input data
-            out_size (integer): Size of output data
         """
         super().__init__()
 
         self.ae_flag = 1
-
-        # Instantiate ActivationSwitch for dynamic activation selection
-        activation_switch = ActivationSwitch()
-        act_fn = activation_switch.fn(activation)
+        act_fn = ActivationSwitch().fn(activation)
 
         # Start collecting shape of convolutional layers for calculating padding
         all_conv_shapes = [in_size]

@@ -35,14 +35,16 @@ class AE_MLP(Model):
         self,
         in_size: int,
         out_size: int,
-        hidden_size: int,
-        dropout: float,
-        num_hidden_layers: int,
-        shrink_rate: float,
-        activation: str,
+        hidden_size: int = 256,
+        dropout: float = 0.2,
+        num_hidden_layers: int = 5,
+        shrink_rate: float = 0.5,
+        activation: str = "prelu",
     ):
         """
         Args:
+            in_size (integer): Size of input data
+            out_size (integer): Size of output data
             hidden_size (integer): Size of the initial hidden layer.
             dropout (float): If none-zero, add dropout layer on the outputs
                 of each hidden layer with dropout probability equal to dropout.
@@ -52,16 +54,11 @@ class AE_MLP(Model):
                 size multiplicatively.
             activation (string): Name of activation function applied
                 to the hidden layers.
-            in_size (integer): Size of input data
-            out_size (integer): Size of output data
         """
         super().__init__()
 
         self.ae_flag = 1
-
-        # Instantiate ActivationSwitch for dynamic activation selection
-        activation_switch = ActivationSwitch()
-        act_fn = activation_switch.fn(activation)
+        act_fn = ActivationSwitch().fn(activation)
 
         # Check if the last hidden layer size is at least 1 and not less than the output size
         last_hidden_layer_size = int(

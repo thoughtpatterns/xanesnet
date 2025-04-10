@@ -308,19 +308,19 @@ class TestModelGNN:
         # Check model type
         assert isinstance(model, GNN)
         # Check model input size
-        assert model.layers[0].in_channels == 20
+        assert model.gnn_layers[0].in_channels == 20
         # Check params num_hidden_layers, layer_name, hidden_size
-        assert len(model.layers) == 5
-        assert isinstance(model.layers[0], geom_nn.GATv2Conv)
-        assert model.layers[0].out_channels == 512
+        assert len(model.gnn_layers) == 5
+        assert isinstance(model.gnn_layers[0], geom_nn.GATv2Conv)
+        assert model.gnn_layers[0].out_channels == 512
         # Check param activation, dropout
-        assert isinstance(model.layers[2], nn.PReLU)
-        assert model.layers[3].p == 0.2
+        assert isinstance(model.gnn_layers[2], nn.PReLU)
+        assert model.gnn_layers[3].p == 0.2
         # Check layer_params
-        assert model.layers[0].heads == 2
-        assert model.layers[0].edge_dim == 16
+        assert model.gnn_layers[0].heads == 2
+        assert model.gnn_layers[0].edge_dim == 16
         # Check model output size
-        assert model.head[2][0].out_features == 400
+        assert model.mlp_layers[2][0].out_features == 400
         # Check forward pass
         graph = dataset[0]
         graph_attr = graph.graph_attr.reshape(1, 49)

@@ -13,6 +13,7 @@ PARTICULAR PURPOSE. See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+
 import numpy as np
 import torch
 
@@ -37,25 +38,8 @@ class Result:
 
 
 class AEGANPredict(Predict):
-    def __init__(
-        self,
-        xyz_data,
-        xanes_data,
-        pred_mode,
-        pred_eval,
-        scaler,
-        fourier,
-        fourier_param,
-    ):
-        super().__init__(
-            xyz_data,
-            xanes_data,
-            pred_mode,
-            pred_eval,
-            scaler,
-            fourier,
-            fourier_param,
-        )
+    def __init__(self, xyz_data, xanes_data, **kwargs):
+        super().__init__(xyz_data, xanes_data, **kwargs)
         self.recon_flag = 1
 
     def predict(self, model):

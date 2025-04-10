@@ -14,6 +14,8 @@ You should have received a copy of the GNU General Public License along with
 this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
+from typing import Optional
+
 import torch
 
 from torch import nn
@@ -29,28 +31,25 @@ from xanesnet.utils_model import (
 class AEGAN_MLP(Model):
     def __init__(
         self,
-        in_size,
-        out_size,
-        hidden_size,
-        dropout,
-        n_hl_gen,
-        n_hl_shared,
-        n_hl_dis,
-        activation,
-        lr_gen,
-        lr_dis,
-        optim_fn_gen,
-        optim_fn_dis,
-        loss_gen,
-        loss_dis,
+        in_size: int,
+        out_size: int,
+        hidden_size: int = 256,
+        dropout: float = 0.2,
+        n_hl_gen: int = 2,
+        n_hl_shared: int = 2,
+        n_hl_dis: int = 2,
+        activation: str = "str",
+        lr_gen: float = 0.01,
+        lr_dis: float = 0.0001,
+        optim_fn_gen: str = "Adam",
+        optim_fn_dis: str = "Adam",
+        loss_gen: Optional[dict] = None,
+        loss_dis: Optional[dict] = None,
     ):
         super().__init__()
 
         self.aegan_flag = 1
-
-        # Select activation function
-        activation_switch = ActivationSwitch()
-        activation = activation_switch.fn(activation)
+        activation = ActivationSwitch().fn(activation)
 
         # Select loss functions
         loss_gen_fn = loss_gen["loss_fn"]

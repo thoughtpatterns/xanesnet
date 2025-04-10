@@ -15,9 +15,8 @@ this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 import torch
-import numpy as np
-from torch import nn
 
+from torch import nn
 from xanesnet.model.base_model import Model
 from xanesnet.utils_model import ActivationSwitch
 
@@ -38,14 +37,16 @@ class MLP(Model):
         self,
         in_size: int,
         out_size: int,
-        hidden_size: int,
-        dropout: float,
-        num_hidden_layers: int,
-        shrink_rate: float,
-        activation: str,
-    ):
+        hidden_size: int = 256,
+        dropout: float = 0.2,
+        num_hidden_layers: int = 5,
+        shrink_rate: float = 0.5,
+        activation: str = "prelu",
+    ) -> None:
         """
         Args:
+            in_size (integer): Input size
+            out_size (integer): Output size
             hidden_size (integer): Size of the initial hidden layer.
             dropout (float): If none-zero, add dropout layer on the outputs
                 of each hidden layer with dropout probability equal to dropout.
@@ -55,56 +56,41 @@ class MLP(Model):
                 size multiplicatively.
             activation (string): Name of activation function applied
                 to the hidden layers.
-            in_size (integer): Size of input data
-            out_size (integer): Size of output data
         """
 
         super().__init__()
 
         self.nn_flag = 1
-
-        activation_switch = ActivationSwitch()
-        act_fn = activation_switch.fn(activation)
+        act_fn = ActivationSwitch().fn(activation)
 
         last_size = int(hidden_size * shrink_rate ** (num_hidden_layers - 1))
         if last_size < 1:
-            raise ValueError(
-                "The size of the last hidden layer is less than 1, please adjust hyperparameters."
-            )
+            raise ValueError("The size of the last hidden layer is less than 1.")
 
-        # Construct each hidden layer with shrink rate
         layers = []
-        for i in range(num_hidden_layers - 1):
+        for i in range(num_hidden_layers):
+            # First layer
             if i == 0:
-                layer = nn.Sequential(
-                    nn.Linear(in_size, hidden_size),
-                    nn.Dropout(dropout),
-                    act_fn(),
-                )
+                in_dim = in_size
+                out_dim = hidden_size
+            # Final layer
+            elif i == num_hidden_layers - 1:
+                in_dim = int(hidden_size * shrink_rate ** (i - 1))
+                out_dim = out_size
+            # Hidden layers
             else:
-                layer = nn.Sequential(
-                    nn.Linear(
-                        int(hidden_size * shrink_rate ** (i - 1)),
-                        int(hidden_size * shrink_rate**i),
-                    ),
-                    nn.Dropout(dropout),
-                    act_fn(),
-                )
+                in_dim = int(hidden_size * shrink_rate ** (i - 1))
+                out_dim = int(hidden_size * shrink_rate**i)
 
-            layers.append(layer)
+            layer = [nn.Linear(in_dim, out_dim)]
 
-        # Construct the output layer
-        output_layer = nn.Sequential(
-            nn.Linear(
-                int(hidden_size * shrink_rate ** (num_hidden_layers - 2)),
-                out_size,
-            )
-        )
-        layers.append(output_layer)
+            if i < num_hidden_layers - 1:
+                layer += [nn.Dropout(dropout), act_fn()]
+
+            layers.append(nn.Sequential(*layer))
+
         self.dense_layers = nn.Sequential(*layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Feed forward through dense layers
         out = self.dense_layers(x)
-
         return out
