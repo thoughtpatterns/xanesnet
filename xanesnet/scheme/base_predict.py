@@ -29,12 +29,12 @@ class Predict(ABC):
     def __init__(self, xyz_data, xanes_data, **kwargs):
         self.xyz_data = xyz_data
         self.xanes_data = xanes_data
+
         self.pred_mode = kwargs.get("pred_mode")
         self.pred_eval = kwargs.get("pred_eval")
         self.scaler = kwargs.get("scaler")
         self.fourier = kwargs.get("fourier")
-        fourier_param = kwargs.get("fourier_param", {})
-        self.fourier_concat = fourier_param.get("concat")
+        self.fourier_concat = kwargs.get("fourier_param").get("concat")
 
         self.pred_xyz = None
         self.pred_xanes = None
