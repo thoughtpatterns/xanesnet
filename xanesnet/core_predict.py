@@ -53,7 +53,7 @@ def predict_data(config, args, metadata):
         "fourier_param": metadata["fourier_param"],
     }
 
-    scheme = create_predict_scheme(metadata["model_type"], xgyz, xanes, **kwargs)
+    scheme = create_predict_scheme(metadata["model_type"], xyz, xanes, **kwargs)
 
     # Predict with loaded models and scheme
     predict_scheme = metadata["scheme"]
