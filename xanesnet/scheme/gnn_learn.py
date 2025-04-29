@@ -33,6 +33,10 @@ import time
 from sklearn.model_selection import RepeatedKFold
 import numpy as np
 import random
+from xanesnet.param_optuna import ParamOptuna
+from pathlib import Path
+import yaml
+from xanesnet.param_freeze import Freeze
 
 
 class GNNLearn(Learn):
@@ -59,7 +63,7 @@ class GNNLearn(Learn):
         if self.mlflow_flag:
             self.setup_mlflow()
 
-    def setup_dataloader(self, x_data, y_data):
+    def setup_dataloader(self, x_data, y_data=None):
         # split dataset and setup train/valid/test dataloader
         indices = list(range(len(x_data)))
 
@@ -107,11 +111,37 @@ class GNNLearn(Learn):
 
         return train_loader, valid_loader, eval_loader
 
-    def train(self, model, x_data, y_data):
+    def setup_model(self, x_data, y_data=None):
+        if self.freeze:
+            # Load existing model from the specified path
+            model_path = self.freeze_params["model_path"]
+            metadata_path = Path(f"{model_path}/metadata.yaml")
+            print(f"Loading model from {model_path}")
+
+            with open(metadata_path, "r") as file:
+                metadata = yaml.safe_load(file)
+            model_name = metadata["model_type"]
+
+            # Get model with frozen layers
+            fz = Freeze(model_path)
+            model = fz.get_fn(model_name, self.freeze_params)
+
+        else:
+            # Setup model with specified parameters
+            self.model_params["x_data"] = x_data
+            self.model_params["mlp_feat_size"] = x_data[0].graph_attr.shape[0]
+
+            model = create_model(self.model_name, **self.model_params)
+
+        model.to(self.device)
+
+        return model
+
+    def train(self, model, x_data, y_data=None):
         device = self.device
 
         # Initialise dataloaders
-        train_loader, valid_loader, eval_loader = self.setup_dataloader(x_data, y_data)
+        train_loader, valid_loader, eval_loader = self.setup_dataloader(x_data)
 
         # Initialise optimizer
         optim_fn = OptimSwitch().fn(self.optim_fn)
@@ -205,13 +235,13 @@ class GNNLearn(Learn):
     def train_std(self):
         x_data = self.x_data
 
-        self.model_params["x_data"] = x_data
-        self.model_params["mlp_feat_size"] = x_data[0].graph_attr.shape[0]
+        # Optuna optimisation if enabled
+        if self.optuna:
+            self.proc_optuna(x_data, None, self.weight_seed)
 
-        model = create_model(self.model_name, **self.model_params)
-        model.to(self.device)
+        model = self.setup_model(x_data)
         model = self.setup_weight(model, self.weight_seed)
-        model, _ = self.train(model, x_data, None)
+        model, _ = self.train(model, x_data)
 
         summary(model)
 
@@ -243,13 +273,9 @@ class GNNLearn(Learn):
 
             # Training
             train_data = x_data[train_index]
-            self.model_params["x_data"] = train_data
-            self.model_params["mlp_feat_size"] = train_data[0].graph_attr.shape[0]
-
-            model = create_model(self.model_name, **self.model_params)
-            model.to(device)
+            model = self.setup_model(train_data)
             model = self.setup_weight(model, self.weight_seed)
-            model, score = self.train(model, train_data, None)
+            model, score = self.train(model, train_data)
 
             train_score.append(score)
             fit_time.append(time.time() - start)
@@ -314,14 +340,14 @@ class GNNLearn(Learn):
             # Index the dataset with integer indices
             boot_x = x_data[boot_indices]
 
-            # Train the model on the bootstrap sample
-            self.model_params["x_data"] = boot_x
-            self.model_params["mlp_feat_size"] = boot_x[0].graph_attr.shape[0]
+            # Optuna optimisation if enabled
+            if self.optuna:
+                self.proc_optuna(x_data, None, weight_seed)
 
-            model = create_model(self.model_name, **self.model_params)
-            model.to(self.device)
+            # Train the model on the bootstrap sample
+            model = self.setup_model(boot_x)
             model = self.setup_weight(model, weight_seed)
-            model, _ = self.train(model, boot_x, None)
+            model, _ = self.train(model, boot_x)
 
             model_list.append(model)
 
@@ -333,15 +359,13 @@ class GNNLearn(Learn):
 
         for i in range(self.n_ens):
             weight_seed = self.weight_seed_ens[i]
+            if self.optuna:
+                self.proc_optuna(x_data, None, weight_seed)
 
             # Train the model
-            self.model_params["x_data"] = x_data
-            self.model_params["mlp_feat_size"] = x_data[0].graph_attr.shape[0]
-
-            model = create_model(self.model_name, **self.model_params)
-            model.to(self.device)
+            model = self.setup_model(x_data)
             model = self.setup_weight(model, weight_seed)
-            model, _ = self.train(model, x_data, None)
+            model, _ = self.train(model, x_data)
 
             model_list.append(model)
 
