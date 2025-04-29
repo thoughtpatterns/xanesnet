@@ -97,11 +97,12 @@ optuna_params:
   tune_loss_fn: True
   tune_lr: True
   tune_dropout: True
-  tune_mlp: True
+  tune_gnn: True
 
 freeze: False
 freeze_params:
-  model_path: ./models/model_mlp_001
+  model_path: ./models/gnn_std_001
+  n_gnn: 3
   n_dense: 2
 
 fourier_transform: False
