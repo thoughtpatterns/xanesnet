@@ -269,7 +269,7 @@ def freeze_layers_aegan_mlp(model, freeze_params):
     # Shared Encoder Layers
     if n_shared_encoder > 0:
         count = 0
-        for layer in model.enc_shared.dense_layers.children():
+        for layer in model.shared_encoder.dense_layers.children():
             if isinstance(layer, nn.Sequential):
                 count += 1
                 if count <= n_shared_encoder:
@@ -278,7 +278,7 @@ def freeze_layers_aegan_mlp(model, freeze_params):
 
     if n_shared_decoder > 0:
         count = 0
-        for layer in model.dec_shared.dense_layers.children():
+        for layer in model.shared_decoder.dense_layers.children():
             if isinstance(layer, nn.Sequential):
                 count += 1
                 if count <= n_shared_decoder:

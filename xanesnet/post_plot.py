@@ -74,8 +74,6 @@ def plot_predict(
             plt.savefig(save_path / f"{id_}.pdf")
             plt.close()
 
-    print(">> saving Y data predictions...")
-
     total_y = np.asarray(total_y)
     total_y_pred = np.asarray(total_y_pred)
 
@@ -115,10 +113,14 @@ def plot_predict(
 def plot_recon_predict(path: Path, mode, result, ids, x, y):
     save_path = mkdir_output(path, "plot")
 
-    x_recon = result.xyz_recon[0]
-    y_recon = result.xanes_recon[0]
-    x_pred = result.xyz_pred[0]
-    y_pred = result.xanes_pred[0]
+    if result.xyz_recon is not None:
+        x_recon = result.xyz_recon[0]
+    if result.xanes_recon is not None:
+        y_recon = result.xanes_recon[0]
+    if result.xyz_pred is not None:
+        x_pred = result.xyz_pred[0]
+    if result.xanes_pred is not None:
+        y_pred = result.xanes_pred[0]
 
     if mode == "predict_xyz":
         if x is None and y is not None:

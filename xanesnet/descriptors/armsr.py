@@ -25,19 +25,27 @@ from abc import ABC
 from abc import abstractmethod
 from abc import abstractproperty
 
-from xanesnet.descriptor.vector_descriptor import VectorDescriptor
+from xanesnet.descriptors.vector_descriptor import VectorDescriptor
+from xanesnet.registry import register_descriptor
+
 
 ###############################################################################
 ################################## CLASSES ####################################
 ###############################################################################
 
 
-class MSR(VectorDescriptor):
+@register_descriptor("armsr")
+class ARMSR(VectorDescriptor):
     """
     A class for transforming a molecular system into a multiple scattering
-    descriptor. MSRs encode the local geometry
+    descriptor. AR-MSRs encode the local geometry
     around an absorption site in a manner reminescent of the path expansion in
-    multiple scattering theory.
+    multiple scattering theory. Here, in contrast to the MSR vector, we have an
+    angular grid as well as radial grid so information is not overly compressed
+    In contrast to MSR, we have truncated the expansion to S3, so that the vector
+    does not explode in legnth, but these higher-order terms can easily be
+    included.
+
     """
 
     def __init__(
@@ -46,8 +54,6 @@ class MSR(VectorDescriptor):
         r_max: float = 8.0,
         n_s2: int = 0,
         n_s3: int = 0,
-        n_s4: int = 0,
-        n_s5: int = 0,
         use_charge=False,
         use_spin=False,
     ):
@@ -63,10 +69,6 @@ class MSR(VectorDescriptor):
                 Defaults to 0.
             n_s3 (int, optional): Three body terms to use for encoding.
                 Defaults to 0.
-            n_s4 (int, optional): Four body terms to use for encoding.
-                Defaults to 0.
-            n_s5 (int, optional): Five body terms to use for encoding.
-                Defaults to 0.
             use_charge (bool): If True, includes an additional element in the
                 vector descriptor for the charge state of the complex.
                 Defaults to False.
@@ -77,10 +79,18 @@ class MSR(VectorDescriptor):
 
         super().__init__(r_min, r_max, use_charge, use_spin)
 
+        self.config = {
+            "type": "armsr",
+            "r_min": r_min,
+            "r_max": r_max,
+            "n_s2": n_s2,
+            "n_s3": n_s3,
+            "use_charge": use_charge,
+            "use_spin": use_spin,
+        }
+
         self.n_s2 = n_s2
         self.n_s3 = n_s3
-        self.n_s4 = n_s4
-        self.n_s5 = n_s5
 
         if self.n_s2:
             self.s2_transformer = S2SymmetryFunctionTransformer(
@@ -92,20 +102,6 @@ class MSR(VectorDescriptor):
         if self.n_s3:
             self.s3_transformer = S3SymmetryFunctionTransformer(
                 self.n_s3,
-                r_min=self.r_min,
-                r_max=self.r_max,
-            )
-
-        if self.n_s4:
-            self.s4_transformer = S4SymmetryFunctionTransformer(
-                self.n_s4,
-                r_min=self.r_min,
-                r_max=self.r_max,
-            )
-
-        if self.n_s5:
-            self.s5_transformer = S5SymmetryFunctionTransformer(
-                self.n_s4,
                 r_min=self.r_min,
                 r_max=self.r_max,
             )
@@ -127,44 +123,16 @@ class MSR(VectorDescriptor):
                 dtype="uint16",
             )
 
-        if self.n_s4:
-            ijkl = np.array(
-                [
-                    [0, j, k, l]
-                    for j in range(1, len(system))
-                    for k in range(1, len(system))
-                    if k > j
-                    for l in range(1, len(system))
-                    if l > k
-                ],
-                dtype="uint16",
-            )
-
-        if self.n_s5:
-            ijklm = np.array(
-                [
-                    [0, j, k, l, m]
-                    for j in range(1, len(system))
-                    for k in range(1, len(system))
-                    if k > j
-                    for l in range(1, len(system))
-                    if l > k
-                    for m in range(1, len(system))
-                    if m > l
-                ],
-                dtype="uint16",
-            )
-
         rij = system.get_distances(ij[:, 0], ij[:, 1])
 
-        msr = []
+        armsr = []
 
         if self.n_s2:
             zj = system.get_atomic_numbers()[ij[:, 1]]
             zj = 0.1 * zj
             rij = system.get_distances(ij[:, 0], ij[:, 1])
             s2 = self.s2_transformer.transform(zj, rij)
-            msr = np.append(msr, s2)
+            armsr = np.append(armsr, s2)
 
         if self.n_s3:
             zj = system.get_atomic_numbers()[ijk[:, 1]]
@@ -177,69 +145,26 @@ class MSR(VectorDescriptor):
             rijk = rij + rik
             aijk = np.radians(system.get_angles(ijk))
             s3 = self.s3_transformer.transform(zj, zk, rijk, aijk)
-            msr = np.append(msr, s3)
-
-        if self.n_s4:
-            zj = system.get_atomic_numbers()[ijkl[:, 1]]
-            zk = system.get_atomic_numbers()[ijkl[:, 2]]
-            zl = system.get_atomic_numbers()[ijkl[:, 3]]
-            zj = 0.1 * zj
-            zk = 0.1 * zk
-            zl = 0.1 * zl
-            rij = system.get_distances(ijkl[:, 0], ijkl[:, 1])
-            rik = system.get_distances(ijkl[:, 1], ijkl[:, 2])
-            rkl = system.get_distances(ijkl[:, 2], ijkl[:, 3])
-            rijkl = rij + rik + rkl
-            aijk = np.radians(system.get_angles(ijkl[:, :3]))
-            ajkl = np.radians(system.get_angles(ijkl[:, 1:]))
-            s4 = self.s4_transformer.transform(zj, zk, zl, rijkl, aijk, ajkl)
-            msr = np.append(msr, s4)
-
-        if self.n_s5:
-            zj = system.get_atomic_numbers()[ijklm[:, 1]]
-            zk = system.get_atomic_numbers()[ijklm[:, 2]]
-            zl = system.get_atomic_numbers()[ijklm[:, 3]]
-            zm = system.get_atomic_numbers()[ijklm[:, 4]]
-            zj = 0.1 * zj
-            zk = 0.1 * zk
-            zl = 0.1 * zl
-            zm = 0.1 * zm
-            rij = system.get_distances(ijklm[:, 0], ijklm[:, 1])
-            rik = system.get_distances(ijklm[:, 1], ijklm[:, 2])
-            rkl = system.get_distances(ijklm[:, 2], ijklm[:, 3])
-            rlm = system.get_distances(ijklm[:, 3], ijklm[:, 4])
-            rijklm = rij + rik + rkl + rlm
-            aijk = np.radians(system.get_angles(ijklm[:, 0:3]))
-            ajkl = np.radians(system.get_angles(ijklm[:, 1:4]))
-            aklm = np.radians(system.get_angles(ijklm[:, 2:5]))
-            s5 = self.s5_transformer.transform(zj, zk, zl, zm, rijklm, aijk, ajkl, aklm)
-            msr = np.append(msr, s5)
+            armsr = np.append(armsr, s3)
 
         if self.use_spin:
-            msr = np.append(system.info["S"], msr)
+            armsr = np.append(system.info["S"], armsr)
 
         if self.use_charge:
-            msr = np.append(system.info["q"], msr)
+            armsr = np.append(system.info["q"], armsr)
 
-        return msr
+        return armsr
 
     def get_nfeatures(self) -> int:
-        return int(
-            self.n_s2
-            + self.n_s3
-            + self.n_s4
-            + self.n_s5
-            + self.use_charge
-            + self.use_spin
-        )
+        return int(self.n_s2 + (self.n_s3 * 18) + self.use_charge + self.use_spin)
 
     def get_type(self) -> str:
-        return "msr"
+        return "armsr"
 
 
 class SymmetryFunctionTransformer(ABC):
     """
-    An abstract base class for generating multiple scattering vector.
+    An abstract base class for generating angle resolved multiple scattering vector.
     """
 
     def __init__(self, n: int, r_min: float, r_max: float):
@@ -319,7 +244,7 @@ class S2SymmetryFunctionTransformer(SymmetryFunctionTransformer):
 
 class S3SymmetryFunctionTransformer(SymmetryFunctionTransformer):
     """
-    A class for generating three body (S3) terms.
+    A class for generating three body (S3) terms for encoding.
     """
 
     def __init__(
@@ -341,9 +266,13 @@ class S3SymmetryFunctionTransformer(SymmetryFunctionTransformer):
 
         super().__init__(n, r_min=r_min, r_max=r_max)
 
+        n = n * 18
+        self.n = self.n * 18
         n_ = self.n
         self.h = self.h[:n_]
         self.m = self.m[:n_]
+        self.th = self.th[:n_]
+        self.tm = self.tm[:n_]
 
     def transform(
         self,
@@ -358,130 +287,17 @@ class S3SymmetryFunctionTransformer(SymmetryFunctionTransformer):
 
         i = 0
         for h, m in zip(self.h, self.m):
-            s3[i] = np.sum(
-                zj * zk * (np.abs(np.cos(aijk))) * gaussian(rijk, h, m) * cutoff_ijk
-            )
-            i += 1
+            for th, tm in zip(self.th, self.tm):
+                s3[i] = np.sum(
+                    zj
+                    * zk
+                    * gaussian_angle(np.cos(aijk), th, tm)
+                    * gaussian(rijk, h, m)
+                    * cutoff_ijk
+                )
+                i += 1
 
         return s3
-
-
-class S4SymmetryFunctionTransformer(SymmetryFunctionTransformer):
-    """
-    A class for generating four body (S4) terms.
-    """
-
-    def __init__(
-        self,
-        n: int,
-        r_min: float = 0.0,
-        r_max: float = 8.0,
-    ):
-        """
-        Args:
-            n (int): The number of four body (S4) terms for encoding.
-            r_min (float, optional): The minimum radial cutoff distance (in A)
-                around the absorption site; should be 0.0.
-                Defaults to 0.0.
-            r_max (float, optional): The maximum radial cutoff distance (in A)
-                around the absorption site.
-                Defaults to 8.0.
-        """
-
-        super().__init__(n, r_min=r_min, r_max=r_max)
-
-        n_ = self.n
-        self.h = self.h[:n_]
-        self.m = self.m[:n_]
-
-    def transform(
-        self,
-        zj: np.ndarray,
-        zk: np.ndarray,
-        zl: np.ndarray,
-        rijkl: np.ndarray,
-        aijk: np.ndarray,
-        ajkl: np.ndarray,
-    ) -> np.ndarray:
-        s4 = np.full(self.n, np.nan)
-
-        cutoff_ijkl = cosine_cutoff(rijkl, self.r_max)
-
-        i = 0
-        for h, m in zip(self.h, self.m):
-            s4[i] = np.sum(
-                zj
-                * zk
-                * zl
-                * (np.abs(np.cos(aijk)))
-                * (np.abs(np.cos(ajkl)))
-                * gaussian(rijkl, h, m)
-                * cutoff_ijkl
-            )
-            i += 1
-
-        return s4
-
-
-class S5SymmetryFunctionTransformer(SymmetryFunctionTransformer):
-    """
-    A class for generating five body (S5) terms.
-    """
-
-    def __init__(
-        self,
-        n: int,
-        r_min: float = 0.0,
-        r_max: float = 8.0,
-    ):
-        """
-        Args:
-            n (int): The number of five body (S5) terms for encoding.
-            r_min (float, optional): The minimum radial cutoff distance (in A)
-                around the absorption site; should be 0.0.
-                Defaults to 0.0.
-            r_max (float, optional): The maximum radial cutoff distance (in A)
-                around the absorption site.
-                Defaults to 8.0.
-        """
-
-        super().__init__(n, r_min=r_min, r_max=r_max)
-
-        n_ = self.n
-        self.h = self.h[:n_]
-        self.m = self.m[:n_]
-
-    def transform(
-        self,
-        zj: np.ndarray,
-        zk: np.ndarray,
-        zl: np.ndarray,
-        zm: np.ndarray,
-        rijklm: np.ndarray,
-        aijk: np.ndarray,
-        ajkl: np.ndarray,
-        aklm: np.ndarray,
-    ) -> np.ndarray:
-        s5 = np.full(self.n, np.nan)
-
-        cutoff_ijklm = cosine_cutoff(rijklm, self.r_max)
-
-        i = 0
-        for h, m in zip(self.h, self.m):
-            s5[i] = np.sum(
-                zj
-                * zk
-                * zl
-                * zm
-                * (np.abs(np.cos(aijk)))
-                * (np.abs(np.cos(ajkl)))
-                * (np.abs(np.cos(aklm)))
-                * gaussian(rijklm, h, m)
-                * cutoff_ijklm
-            )
-            i += 1
-
-        return s5
 
 
 def cosine_cutoff(r: np.ndarray, r_max: float) -> np.ndarray:
