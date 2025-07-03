@@ -14,8 +14,11 @@ You should have received a copy of the GNU General Public License along with
 this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-import glob
+import logging
 import os
+import random
+
+import requests
 
 ###############################################################################
 ############################### LIBRARY IMPORTS ###############################
@@ -25,22 +28,23 @@ import torch
 import yaml
 import tqdm as tqdm
 import numpy as np
-import pickle as pickle
 
 from pathlib import Path
 from ase import Atoms
-from typing import TextIO
+from typing import TextIO, List, Any, Dict
 from dataclasses import dataclass
+from torch import nn
 
-from xanesnet.model.base_model import Model
 from xanesnet.spectrum.xanes import XANES
+from xanesnet.switch import KernelInitSwitch, BiasInitSwitch
+
 
 ###############################################################################
 ################################## FUNCTIONS ##################################
 ###############################################################################
 
 
-def unique_path(path: Path, base_name: str) -> Path:
+def _unique_path(path: Path, base_name: str) -> Path:
     # returns a unique path from `p`/`base_name`_001, `p`/`base_name`_002,
     # `p`/`base_name`_003, etc.
 
@@ -52,14 +56,7 @@ def unique_path(path: Path, base_name: str) -> Path:
             return unique_path
 
 
-def linecount(f: Path) -> int:
-    # returns the linecount for a file (`f`)
-
-    with open(f, "r") as f_:
-        return len([l for l in f_])
-
-
-def list_files(d: Path, with_ext: bool = True) -> list:
+def _list_files(d: Path, with_ext: bool = True) -> list:
     # returns a list of files (as POSIX paths) found in a directory (`d`);
     # 'hidden' files are always omitted and, if with_ext == False, file
     # extensions are also omitted
@@ -71,14 +68,7 @@ def list_files(d: Path, with_ext: bool = True) -> list:
     ]
 
 
-def list_filestems(d: Path) -> list:
-    # returns a list of file stems (as strings) found in a directory (`d`);
-    # 'hidden' files are always omitted
-
-    return [f.stem for f in list_files(d)]
-
-
-def str_to_numeric(str_: str):
+def _str_to_numeric(str_: str):
     # returns the numeric (floating-point or integer) cast of `str_` if
     # cast is allowed, otherwise returns `str_`
 
@@ -88,21 +78,24 @@ def str_to_numeric(str_: str):
         return str_
 
 
-def print_nested_dict(dict_: dict, nested_level: int = 0):
-    # prints the key:value pairs in a dictionary (`dict`) in the format
-    # '>> key :: value'; iterates recursively through any subdictionaries,
-    # indenting with two white spaces for each sublevel (`nested level`)
+def _weight_bias(m, kernel_init_fn, bias_init_fn):
+    if isinstance(m, (nn.Linear, nn.Conv1d, nn.ConvTranspose1d)):
+        kernel_init_fn(m.weight)
+        bias_init_fn(m.bias)
 
-    for key, val in dict_.items():
-        if not isinstance(val, dict):
-            if isinstance(val, list):
-                val = f"[{val[0]}, ..., {val[-1]}]"
-            print("  " * nested_level + f">> {key} :: {val}")
-        else:
-            print("  " * nested_level + f">> {key}")
-            print_nested_dict(val, nested_level=nested_level + 1)
 
-    return 0
+def linecount(f: Path) -> int:
+    # returns the linecount for a file (`f`)
+
+    with open(f, "r") as f_:
+        return len([l for l in f_])
+
+
+def list_filestems(d: Path) -> list:
+    # returns a list of file stems (as strings) found in a directory (`d`);
+    # 'hidden' files are always omitted
+
+    return [f.stem for f in _list_files(d)]
 
 
 def mkdir_output(path: Path, name: str):
@@ -115,43 +108,43 @@ def mkdir_output(path: Path, name: str):
 def save_models(
     path: Path,
     models: list,
-    descriptors: list,
     metadata: dict,
     dataset: dict = None,
 ):
+    """
+    Save trained models, descriptors, metadata, and datasets (if provided) to disk.
+    For bootstrap and ensemble training, the files are saved in a structured directory
+    format.
+    """
+
     mode_suffix = metadata["mode"].replace("train_", "")
     path.mkdir(parents=True, exist_ok=True)
-    save_path = unique_path(
-        path, metadata["model_type"] + "_" + metadata["scheme"] + "_" + mode_suffix
+    save_path = _unique_path(
+        path, metadata["model"]["type"] + "_" + metadata["scheme"] + "_" + mode_suffix
     )
     save_path.mkdir()
-
-    for idx, descriptor in enumerate(descriptors):
-        name = "descriptor" + str(idx) + "_" + descriptor.get_type() + ".pickle"
-        with open(save_path / name, "wb") as f:
-            pickle.dump(descriptor, f)
 
     if dataset is not None:
         with open(save_path / "dataset.npz", "wb") as f:
             np.savez_compressed(
                 f,
-                ids=dataset["ids"],
-                x=dataset["x"],
+                ids=dataset["index"],
+                x=dataset["X"],
                 y=dataset["y"],
             )
 
     if len(models) == 1:
         # Save single model
-        torch.save(models[0], save_path / f"model.pt")
-        print("\nModel saved to disk: %s" % save_path.resolve().as_uri())
+        torch.save(models[0].state_dict(), save_path / f"model_weights.pth")
+        logging.info("Model saved to disk: %s" % save_path.resolve().as_uri())
     else:
         # Save multiple models
         for model in models:
-            model_dir = unique_path(save_path, "model")
+            model_dir = _unique_path(save_path, "model")
             model_dir.mkdir()
 
-            torch.save(model, model_dir / f"model.pt")
-            print("\nModel saved to disk: %s" % model_dir.resolve().as_uri())
+            torch.save(model.state_dict(), model_dir / f"model_weights.pth")
+            logging.info("Model saved to disk: %s" % model_dir.resolve().as_uri())
 
     metadata["model_dir"] = str(save_path)
     with open(save_path / "metadata.yaml", "w") as f:
@@ -161,6 +154,10 @@ def save_models(
 def save_predict(
     path: Path, mode: str, result: dataclass, index: list, e: list, recon_flag: bool
 ):
+    """
+    Save prediction and reconstruction results to disk.
+    """
+
     if mode == "predict_xanes" or mode == "predict_all":
         # Save xanes prediction result to disk
         save_path = mkdir_output(path, "xanes_pred")
@@ -202,38 +199,108 @@ def save_predict(
                 with open(save_path / f"{id_}.txt", "w") as f:
                     save_xanes_mean(f, XANES(e, recon_), std_)
 
-    print("\nPrediction results saved to disk: %s" % path.resolve().as_uri())
 
+def load_descriptors(path: Path) -> List[Any]:
+    """
+    Load one or more descriptors from a local directory.
+    """
+    from xanesnet.creator import create_descriptors_from_meta
 
-def load_models(path: Path):
-    model_list = []
-    n_models = len(next(os.walk(path))[1])
+    config_path = path / "metadata.yaml"
+    with open(config_path, "r") as f:
+        config = yaml.safe_load(f)
 
-    for i in range(1, n_models + 1):
-        n_dir = f"{path}/model_{i:03d}/model.pt"
-        model = torch.load(n_dir, map_location=torch.device("cpu"))
-        model_list.append(model)
+    descriptor_config = config["descriptors"]
+    descriptor_types = ", ".join(d["type"] for d in descriptor_config)
 
-    return model_list
-
-
-def load_descriptors(path: Path):
-    descriptor_list = []
-
-    file_pattern = path / "descriptor*.pickle"
-    files = glob.glob(str(file_pattern))
-
-    for filename in files:
-        with open(filename, "rb") as f:
-            descriptor = pickle.load(f)
-            descriptor_list.append(descriptor)
+    logging.info(f">> Loading descriptors: {descriptor_types}")
+    descriptor_list = create_descriptors_from_meta(config=descriptor_config)
 
     # Return the list of loaded descriptors
     return descriptor_list
 
 
+def load_model(path: Path):
+    from xanesnet.creator import create_model
+
+    config_path = path / "metadata.yaml"
+    weight_path = path / "model_weights.pth"
+
+    with open(config_path, "r") as f:
+        config = yaml.safe_load(f)
+
+    model_type = config["model"]["type"]
+    model_config = {k: v for k, v in config["model"].items() if k != "type"}
+
+    model = create_model(model_type, **model_config)
+
+    # Load state_dict
+    state_dict = torch.load(weight_path, map_location=torch.device("cpu"))
+    model.load_state_dict(state_dict)
+
+    model.eval()
+
+    return model
+
+
+def load_models(path: Path) -> List[Any]:
+    """
+    Load multiple models from a local directory.
+    """
+    from xanesnet.creator import create_model
+
+    model_list = []
+    config_path = path / "metadata.yaml"
+    n_models = len(next(os.walk(path))[1])
+
+    for i in range(1, n_models + 1):
+        model_dir = path / f"model_{i:03d}"
+        weight_path = model_dir / "model_weights.pth"
+
+        with open(config_path, "r") as f:
+            config = yaml.safe_load(f)
+
+        model_type = config["model"]["type"]
+        model_config = {k: v for k, v in config["model"].items() if k != "type"}
+        model = create_model(model_type, **model_config)
+
+        # Load state_dict
+        state_dict = torch.load(weight_path, map_location=torch.device("cpu"))
+        model.load_state_dict(state_dict)
+
+        model.eval()
+        model_list.append(model)
+
+    return model_list
+
+
+def init_model_weights(model, **kwargs):
+    """
+    Initialise model weight & bias
+    """
+    kernel = kwargs.get("kernel", "xavier_uniform")
+    bias = kwargs.get("bias", "zeros")
+    seed = kwargs.get("seed", random.randrange(1000))
+
+    kernel_init = KernelInitSwitch().get(kernel)
+    bias_init = BiasInitSwitch().get(bias)
+
+    # set seed
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+    else:
+        torch.manual_seed(seed)
+
+    # Apply initialization recursively
+    model.apply(lambda m: _weight_bias(m, kernel_init, bias_init))
+
+    return model
+
+
 def load_xyz(xyz_f: TextIO) -> Atoms:
-    # loads an Atoms object from a .xyz file
+    """
+    Load an Atoms object from a .xyz file
+    """
 
     xyz_f_l = xyz_f.readlines()
 
@@ -253,7 +320,7 @@ def load_xyz(xyz_f: TextIO) -> Atoms:
     try:
         info = dict(
             [
-                [key, str_to_numeric(val)]
+                [key, _str_to_numeric(val)]
                 for key, val in [
                     pair.split(" = ") for pair in comment_block.split(" | ")
                 ]
@@ -271,7 +338,9 @@ def load_xyz(xyz_f: TextIO) -> Atoms:
 
 
 def save_xyz(xyz_f: TextIO, atoms: Atoms):
-    # saves an Atoms object in .xyz format
+    """
+    Save an Atoms object in .xyz format
+    """
 
     # write the number of atoms in `atoms`
     xyz_f.write(f"{len(atoms)}\n")
@@ -292,7 +361,9 @@ def save_xyz(xyz_f: TextIO, atoms: Atoms):
 
 
 def load_xanes(xanes_f: TextIO) -> XANES:
-    # loads a XANES object from an FDMNES (.txt) output file
+    """
+    Load a XANES object from an FDMNES (.txt) output file
+    """
 
     xanes_f_l = xanes_f.readlines()
 
@@ -311,7 +382,9 @@ def load_xanes(xanes_f: TextIO) -> XANES:
 
 
 def save_xanes(xanes_f: TextIO, xanes: XANES):
-    # saves a XANES object in FDMNES (.txt) output format
+    """
+    Save a XANES object in FDMNES (.txt) output format
+    """
 
     xanes_f.write(f'{"FDMNES":>10}\n{"energy":>10}{"<xanes>":>12}\n')
     for e_, m_ in zip(*xanes.spectrum):
@@ -322,7 +395,10 @@ def save_xanes(xanes_f: TextIO, xanes: XANES):
 
 
 def save_xanes_mean(xanes_f: TextIO, xanes: XANES, std):
-    # saves a mean and sandard deviation of XANES object in FDMNES (.txt) output format
+    """
+    Save a mean and standard deviation of XANES object in FDMNES (.txt) output format
+    """
+
     xanes_f.write(f'{"FDMNES"}\n{"energy <xanes> <std>"}\n')
     for e_, m_, std_ in zip(*xanes.spectrum, std):
         fmt = f"{e_:<10.2f}{m_:<15.7E}{std_:<15.7E}\n"
@@ -332,7 +408,10 @@ def save_xanes_mean(xanes_f: TextIO, xanes: XANES, std):
 
 
 def save_xyz_mean(xyz_f: TextIO, mean, std):
-    # saves a mean and sandard deviation of XANES object in FDMNES (.txt) output format
+    """
+    Save a mean and standard deviation of XANES object in FDMNES (.txt) output format
+    """
+
     xyz_f.write(f'{"<xyz> <std>"}\n')
     for m_, std_ in zip(mean, std):
         fmt = f"{m_:<15.7E}{std_:<15.7E}\n"
@@ -341,8 +420,20 @@ def save_xyz_mean(xyz_f: TextIO, mean, std):
     return 0
 
 
-def load_descriptor_direct(direct_f: TextIO):
-    # loads a descriptor directly from a (.dsc) input file
+def get_config_from_url(url: str) -> Dict[str, Any]:
+    response = requests.get(url)
+    response.raise_for_status()
+    config = yaml.safe_load(response.text)
+    # model_config = config.get("model")
+    # descriptor_config = config.get("descriptors")
 
-    v = np.loadtxt(direct_f)
-    return v
+    return config
+
+
+def overwrite_config(kwargs: Dict[str, Any], config: Dict[str, Any]) -> None:
+    """
+    Overrides values in config if matching keys are found in kwargs
+    """
+    for key in config:
+        if key in kwargs:
+            config[key] = kwargs[key]

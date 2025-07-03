@@ -14,6 +14,9 @@ You should have received a copy of the GNU General Public License along with
 this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
+import logging
+from typing import Optional, Tuple, List
+
 import numpy as np
 import torch
 
@@ -30,10 +33,12 @@ from xanesnet.data_transform import (
 
 @dataclass
 class Result:
-    xyz_pred: (np.ndarray, np.ndarray)
-    xanes_pred: (np.ndarray, np.ndarray)
-    xyz_recon: (np.ndarray, np.ndarray)
-    xanes_recon: (np.ndarray, np.ndarray)
+    """Data class to hold prediction results, including mean and standard deviation."""
+
+    xyz_pred: Optional[Tuple[np.ndarray, np.ndarray]] = None
+    xanes_pred: Optional[Tuple[np.ndarray, np.ndarray]] = None
+    xyz_recon: Optional[Tuple[np.ndarray, np.ndarray]] = None
+    xanes_recon: Optional[Tuple[np.ndarray, np.ndarray]] = None
 
 
 class AEPredict(Predict):
@@ -42,43 +47,37 @@ class AEPredict(Predict):
         self.recon_flag = 1
 
     def predict(self, model):
-        xyz_pred = None
-        xanes_pred = None
-        xyz_recon = None
-        xanes_recon = None
-
+        """
+        Performs a single prediction with a given model.
+        """
+        xyz_pred = xanes_pred = xyz_recon = xanes_recon = None
         model.eval()
 
         if self.pred_mode == "predict_xyz":
-            if self.fourier:
-                xanes = fourier_transform(self.xanes_data, self.fourier_concat)
-            else:
-                xanes = self.xanes_data
+            input_data = self.xanes_data
 
-            # Apply standardscaler to the training dataset
+            if self.fourier:
+                input_data = fourier_transform(input_data, self.fourier_concat)
             if self.scaler:
                 scaler = StandardScaler()
-                xanes = self.setup_scaler(scaler, xanes, False)
+                input_data = self.setup_scaler(scaler, input_data, inverse=False)
 
-            xanes = torch.from_numpy(xanes).float()
+            input_tensor = torch.from_numpy(input_data).float()
 
             # Prediction and reconstruction
-            xyz_pred = model.predict(xanes)
+            xyz_pred = model.predict(input_tensor)
             xyz_pred = xyz_pred.detach().numpy()
-            xanes_recon = model.reconstruct(xanes)
+            xanes_recon = model.reconstruct(input_tensor)
             xanes_recon = xanes_recon.detach().numpy()
 
-            # Standardscaler inverse transform
+            # Inverse Standardscaler and Fourier transform
             if self.scaler:
                 xanes_recon = self.setup_scaler(scaler, xanes_recon, True)
-
-            # Fourier inverse transform
             if self.fourier:
                 xanes_recon = inverse_fourier_transform(
                     xanes_recon, self.fourier_concat
                 )
 
-            # Print MSE
             Predict.print_mse(
                 "xanes", "xanes reconstruction", self.xanes_data, xanes_recon
             )
@@ -86,25 +85,24 @@ class AEPredict(Predict):
                 Predict.print_mse("xyz", "xyz prediction", self.xyz_data, xyz_pred)
 
         elif self.pred_mode == "predict_xanes":
-            xyz = self.xyz_data
-            # Apply standardscaler to training dataset
+            # Predict xanes data
+            input_data = self.xyz_data
+
             if self.scaler:
                 scaler = StandardScaler()
-                xyz = self.setup_scaler(scaler, xyz, False)
+                input_data = self.setup_scaler(scaler, input_data, False)
 
-            xyz = torch.from_numpy(xyz).float()
+            input_tensor = torch.from_numpy(input_data).float()
 
             # Prediction and reconstruction
-            xanes_pred = model.predict(xyz)
+            xanes_pred = model.predict(input_tensor)
             xanes_pred = xanes_pred.detach().numpy()
-            xyz_recon = model.reconstruct(xyz)
+            xyz_recon = model.reconstruct(input_tensor)
             xyz_recon = xyz_recon.detach().numpy()
 
             # Standardscaler inverse transform
             if self.scaler:
                 xyz_recon = self.setup_scaler(scaler, xyz_recon, True)
-
-            # Fourier inverse transform
             if self.fourier:
                 xanes_pred = inverse_fourier_transform(xanes_pred, self.fourier_concat)
 
@@ -118,168 +116,128 @@ class AEPredict(Predict):
         return xyz_pred, xanes_pred, xyz_recon, xanes_recon
 
     def predict_std(self, model):
-        xyz_std = None
-        xanes_std = None
-        xyz_recon_std = None
-        xanes_recon_std = None
+        """
+        Performs a single prediction and returns the result with a zero (dummy)
+        standard deviation array.
+        """
+        xyz_sd = xanes_sd = xyz_recon_sd = xanes_recon_sd = None
+        model_type = model.__class__.__name__.lower()
+        logging.info(f"\n--- Starting prediction with model: {model_type} ---")
 
+        # Get all predictions and reconstructions
         xyz_pred, xanes_pred, xyz_recon, xanes_recon = self.predict(model)
 
         # Create dummy array for STD
         if self.pred_mode == "predict_xyz":
-            xyz_std = np.zeros_like(xyz_pred)
-            xanes_recon_std = np.zeros_like(xanes_recon)
+            xyz_sd = np.zeros_like(xyz_pred)
+            xanes_recon_sd = np.zeros_like(xanes_recon)
         elif self.pred_mode == "predict_xanes":
-            xanes_std = np.zeros_like(xanes_pred)
-            xyz_recon_std = np.zeros_like(xyz_recon)
+            xanes_sd = np.zeros_like(xanes_pred)
+            xyz_recon_sd = np.zeros_like(xyz_recon)
 
         return Result(
-            xyz_pred=(xyz_pred, xyz_std),
-            xanes_pred=(xanes_pred, xanes_std),
-            xyz_recon=(xyz_recon, xyz_recon_std),
-            xanes_recon=(xanes_recon, xanes_recon_std),
+            xyz_pred=(xyz_pred, xyz_sd),
+            xanes_pred=(xanes_pred, xanes_sd),
+            xyz_recon=(xyz_recon, xyz_recon_sd),
+            xanes_recon=(xanes_recon, xanes_recon_sd),
         )
 
-    def predict_bootstrap(self, model_list):
-        xyz_pred_score = []
-        xyz_recon_score = []
-        xanes_pred_score = []
-        xanes_recon_score = []
+    def predict_bootstrap(self, model_list: List[torch.nn.Module]) -> Result:
+        """
+        Predictions and reconstructions on multiple autoencoder models
+        (bootstrapping) to calculate the mean and standard deviation.
+        """
+        # Get all predictions and reconstructions from model_list
+        all_preds = self._predict_from_models(model_list)
+        all_xyz_p, all_xanes_p, all_xyz_r, all_xanes_r = all_preds
 
-        xyz_pred_list = []
-        xanes_pred_list = []
-        xyz_recon_list = []
-        xanes_recon_list = []
+        xyz_pred = xanes_pred = xyz_recon = xanes_recon = None
 
-        for i, model in enumerate(model_list, start=1):
-            print(f">> Predicting with model {i}...")
-            xyz_pred, xanes_pred, xyz_recon, xanes_recon = self.predict(model)
+        logging.info("-" * 55)
 
-            if self.pred_mode == "predict_xyz":
-                mse = mean_squared_error(self.xanes_data, xanes_recon)
-                xanes_recon_score.append(mse)
+        if self.pred_mode == "predict_xyz":
+            # Calculate mean and std for xyz predictions
+            mean_xyz_pred = np.mean(all_xyz_p, axis=0)
+            std_xyz_pred = np.std(all_xyz_p, axis=0)
+            xyz_pred = (mean_xyz_pred, std_xyz_pred)
 
-                if self.pred_eval:
-                    mse = mean_squared_error(self.xyz_data, xyz_pred)
-                    xyz_pred_score.append(mse)
+            # Calculate mean and std for xanes reconstructions
+            mean_xanes_recon = np.mean(all_xanes_r, axis=0)
+            std_xanes_recon = np.std(all_xanes_r, axis=0)
+            xanes_recon = (mean_xanes_recon, std_xanes_recon)
 
-                xyz_pred_list.append(xyz_pred)
-                xanes_recon_list.append(xanes_recon)
-
-            elif self.pred_mode == "predict_xanes":
-                mse = mean_squared_error(self.xyz_data, xyz_recon)
-                xyz_recon_score.append(mse)
-
-                if self.pred_eval:
-                    mse = mean_squared_error(self.xanes_data, xanes_pred)
-                    xanes_pred_score.append(mse)
-
-                xanes_pred_list.append(xanes_pred)
-                xyz_recon_list.append(xyz_recon)
-
-        if len(xyz_pred_score) > 0:
-            xyz_pred_mean = np.mean(xyz_pred_score)
-            xyz_pred_std = np.std(xyz_pred_score)
-            print(
-                f"Mean score xyz prediction: {xyz_pred_mean:.4f}, Std: {xyz_pred_std:.4f}"
+            # Print MSE for mean prediction and reconstruction
+            Predict.print_mse(
+                "xanes", "mean xanes reconstruction", self.xanes_data, mean_xanes_recon
             )
+            if self.pred_eval:
+                Predict.print_mse(
+                    "xyz", "mean xyz prediction", self.xyz_data, mean_xyz_pred
+                )
 
-        if len(xanes_pred_score) > 0:
-            xanes_pred_mean = np.mean(xanes_pred_score)
-            xanes_pred_std = np.std(xanes_pred_score)
-            print(
-                f"Mean score xanes prediction: {xanes_pred_mean:.4f}, Std: {xanes_pred_std:.4f}"
+        elif self.pred_mode == "predict_xanes":
+            # Calculate mean and std for xanes predictions
+            mean_xanes_pred = np.mean(all_xanes_p, axis=0)
+            sd_xanes_pred = np.std(all_xanes_p, axis=0)
+            xanes_pred = (mean_xanes_pred, sd_xanes_pred)
+
+            # Calculate mean and std for xyz reconstructions
+            mean_xyz_recon = np.mean(all_xyz_r, axis=0)
+            sd_xyz_recon = np.std(all_xyz_r, axis=0)
+            xyz_recon = (mean_xyz_recon, sd_xyz_recon)
+
+            # Print MSE for mean prediction and reconstruction
+            Predict.print_mse(
+                "xyz", "mean xyz reconstruction", self.xyz_data, mean_xyz_recon
             )
+            if self.pred_eval:
+                Predict.print_mse(
+                    "xanes", "mean xanes prediction", self.xanes_data, mean_xanes_pred
+                )
 
-        if len(xyz_recon_score) > 0:
-            xyz_recon_mean = np.mean(xyz_recon_score)
-            xyz_recon_std = np.std(xyz_recon_score)
-            print(
-                f"Mean score xyz reconstruction: {xyz_recon_mean:.4f}, Std: {xyz_recon_std:.4f}"
-            )
-
-        if len(xanes_recon_score) > 0:
-            xanes_recon_mean = np.mean(xanes_recon_score)
-            xanes_recon_std = np.std(xanes_recon_score)
-            print(
-                f"Mean score xanes reconstruction: {xanes_recon_mean:.4f}, Std: {xanes_recon_std:.4f}"
-            )
-
-        xyz_mean = np.mean(xyz_pred_list, axis=0)
-        xyz_std = np.std(xyz_pred_list, axis=0)
-
-        xanes_mean = np.mean(xanes_pred_list, axis=0)
-        xanes_std = np.std(xanes_pred_list, axis=0)
-
-        xyz_recon_mean = np.mean(xyz_recon_list, axis=0)
-        xyz_recon_std = np.std(xyz_recon_list, axis=0)
-
-        xanes_recon_mean = np.mean(xanes_recon_list, axis=0)
-        xanes_recon_std = np.std(xanes_recon_list, axis=0)
-
+        # Return the comprehensive results
         return Result(
-            xyz_pred=(xyz_mean, xyz_std),
-            xanes_pred=(xanes_mean, xanes_std),
-            xyz_recon=(xyz_recon_mean, xyz_recon_std),
-            xanes_recon=(xanes_recon_mean, xanes_recon_std),
+            xyz_pred=xyz_pred,
+            xanes_pred=xanes_pred,
+            xyz_recon=xyz_recon,
+            xanes_recon=xanes_recon,
         )
 
     def predict_ensemble(self, model_list):
-        xyz_pred_list = []
-        xyz_recon_list = []
-        xanes_pred_list = []
-        xanes_recon_list = []
+        """
+        Performs predictions on an ensemble of models.
+        Same to bootstrap
+        """
+        return self.predict_bootstrap(model_list)
+
+    def _predict_from_models(
+        self, model_list: List[torch.nn.Module]
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Predictions for a list of models.
+        """
+        xyz_preds, xanes_preds, xyz_recons, xanes_recons = [], [], [], []
 
         for i, model in enumerate(model_list, start=1):
-            print(f">> Predicting with model {i}...")
-            xyz_pred, xanes_pred, xyz_recon, xanes_recon = self.predict(model)
+            model_type = model.__class__.__name__.lower()
+            logging.info(
+                f">> Predicting with model {model_type} ({i}/{len(model_list)})..."
+            )
 
+            with torch.no_grad():
+                xyz_p, xanes_p, xyz_r, xanes_r = self.predict(model)
+
+            # Append results based on prediction mode
             if self.pred_mode == "predict_xyz":
-                xyz_pred_list.append(xyz_pred)
-                xanes_recon_list.append(xanes_recon)
-
+                xyz_preds.append(xyz_p)
+                xanes_recons.append(xanes_r)
             elif self.pred_mode == "predict_xanes":
-                xanes_pred_list.append(xanes_pred)
-                xyz_recon_list.append(xyz_recon)
+                xanes_preds.append(xanes_p)
+                xyz_recons.append(xyz_r)
 
-        print(f"{'='*30}Ensemble Prediction Summary{'='*30}")
-        if self.pred_mode == "predict_xyz":
-            xanes_recon = sum(xanes_recon_list) / len(xanes_recon_list)
-            Predict.print_mse(
-                "Ensemble xanes", "xanes reconstruction", self.xanes_data, xanes_recon
-            )
-            if self.pred_eval:
-                xyz_pred = sum(xyz_pred_list) / len(xyz_pred_list)
-                Predict.print_mse(
-                    "Ensemble xyz", "xyz prediction", self.xyz_data, xyz_pred
-                )
-
-        elif self.pred_mode == "predict_xanes":
-            xyz_recon = sum(xyz_recon_list) / len(xyz_recon_list)
-            Predict.print_mse(
-                "Ensemble xyz", "xyz reconstruction", self.xyz_data, xyz_recon
-            )
-            if self.pred_eval:
-                xanes_pred = sum(xanes_pred_list) / len(xanes_pred_list)
-                Predict.print_mse(
-                    "Ensemble xanes", "xanes prediction", self.xanes_data, xanes_pred
-                )
-
-        xyz_mean = np.mean(xyz_pred_list, axis=0)
-        xyz_std = np.std(xyz_pred_list, axis=0)
-
-        xanes_mean = np.mean(xanes_pred_list, axis=0)
-        xanes_std = np.std(xanes_pred_list, axis=0)
-
-        xyz_recon_mean = np.mean(xyz_recon_list, axis=0)
-        xyz_recon_std = np.std(xyz_recon_list, axis=0)
-
-        xanes_recon_mean = np.mean(xanes_recon_list, axis=0)
-        xanes_recon_std = np.std(xanes_recon_list, axis=0)
-
-        return Result(
-            xyz_pred=(xyz_mean, xyz_std),
-            xanes_pred=(xanes_mean, xanes_std),
-            xyz_recon=(xyz_recon_mean, xyz_recon_std),
-            xanes_recon=(xanes_recon_mean, xanes_recon_std),
+        return (
+            np.array(xyz_preds),
+            np.array(xanes_preds),
+            np.array(xyz_recons),
+            np.array(xanes_recons),
         )

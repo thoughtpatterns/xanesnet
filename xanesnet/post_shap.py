@@ -82,6 +82,9 @@ def shap_analysis(path, mode, model, index, xyz, xanes, n_samples):
             model.forward = model.reconstruct_spectrum
             run_shap(model, save_path, data, index, n_samples, shap_mode="reconstruct")
 
+    else:
+        raise ValueError(f"Unsupported model for SHAP analysis")
+
 
 def run_shap(model, save_path, data, index, n_samples=100, shap_mode="predict"):
     """
