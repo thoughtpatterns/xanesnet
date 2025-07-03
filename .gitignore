@@ -8,7 +8,6 @@ analysis*/
 mlruns/
 ensemble/
 bootstrap/
-model/*
 xanesnet/model/__pycache__/
 *.egg-info
 build/
@@ -17,3 +16,4 @@ outputs/
 data/datasets/graph-set/xyz_train/graph/
 data/datasets/graph-set/xyz_test/graph/
 !tests/models/
+!xanesnet/models/
