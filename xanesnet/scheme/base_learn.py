@@ -14,94 +14,109 @@ You should have received a copy of the GNU General Public License along with
 this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-from pathlib import Path
-
+import copy
+import random
 import mlflow
-import optuna
 import torch
 import time
 import pickle
+import numpy as np
+
+# import optuna
 
 from abc import ABC, abstractmethod
 from datetime import datetime
-
-import yaml
+from pathlib import Path
 from sklearn.model_selection import train_test_split
 from torch.utils.tensorboard import SummaryWriter
-from sklearn.preprocessing import StandardScaler
+from torch_geometric.data import Dataset
 
-from xanesnet.creator import create_model
-from xanesnet.param_freeze import Freeze
-from xanesnet.utils_model import LRScheduler, WeightInitSwitch, weight_bias_init
-from xanesnet.param_optuna import ParamOptuna
+from xanesnet.switch import OptimSwitch, LossSwitch, LRSchedulerSwitch, LossRegSwitch
+from xanesnet.utils import init_model_weights
+
+# from xanesnet.param_optuna import ParamOptuna
+# from xanesnet.param_freeze import Freeze
 
 
 class Learn(ABC):
     """Base class for model training procedures"""
 
-    def __init__(self, x_data, y_data, **kwargs):
-        self.x_data = x_data
-        self.y_data = y_data
+    def __init__(self, model, X, y, **kwargs):
+        self.model = model
+        self.X = X
+        self.y = y
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.recon_flag = 0  # Set to 1 for AELearn or AEGANLearn
 
-        self.model = kwargs.get("model")
-        self.model_name = self.model["type"]
-        self.model_params = kwargs.get("model")["params"]
+        # Unpack kwargs
+        model_config = kwargs.get("model_config")
+        hyper_params = kwargs.get("hyper_params")
+        kfold_params = kwargs.get("kfold_params")
+        bootstrap_params = kwargs.get("bootstrap_params")
+        ensemble_params = kwargs.get("ensemble_params")
+        scheduler_params = kwargs.get("scheduler_params")
 
-        # kfold parameter set
-        self.kfold = kwargs.get("kfold")
-        self.kfold_params = kwargs.get("kfold_params")
-        self.n_splits = self.kfold_params["n_splits"]
-        self.n_repeats = self.kfold_params["n_repeats"]
-        self.seed_kfold = self.kfold_params["seed"]
+        # model parameter set
+        self.model_type = model_config.get("type")
+        self.model_params = model_config.get("params", {})
+        self.weights_params = model_config.get("weights", {})
 
         # hyperparameter set
-        self.hyper_params = kwargs.get("hyper_params")
-        self.batch_size = self.hyper_params["batch_size"]
-        self.n_epoch = self.hyper_params["epochs"]
-        self.kernel = self.hyper_params["kernel_init"]
-        self.bias = self.hyper_params["bias_init"]
-        self.model_eval = self.hyper_params["model_eval"]
-        self.weight_seed = self.hyper_params["weight_seed"]
-        self.seed = self.hyper_params["seed"]
+        self.hyper_params = hyper_params
+        self.batch_size = hyper_params.get("batch_size", 32)
+        self.epochs = hyper_params.get("epochs", 100)
+        self.lr = hyper_params.get("lr", 0.001)
+        self.optimizer = hyper_params.get("optimizer", "adam")
+        self.model_eval = hyper_params.get("model_eval", False)
+        self.loss = hyper_params.get("loss", "mse")
+        self.loss_reg = hyper_params.get("loss_reg", "None")
+        self.loss_lambda = hyper_params.get("loss_lambda", 0.0001)
+        self.seed = hyper_params.get("seed", random.randrange(1000))
+
+        # kfold parameter set
+        self.n_splits = kfold_params.get("n_splits", 3)
+        self.n_repeats = kfold_params.get("n_repeats", 1)
+        self.seed_kfold = kfold_params.get("seed", random.randrange(1000))
 
         # bootstrap parameter set
-        self.bootstrap_params = kwargs.get("bootstrap_params")
-        self.n_boot = self.bootstrap_params["n_boot"]
-        self.weight_seed_boot = self.bootstrap_params["weight_seed"]
-        self.n_size = self.bootstrap_params["n_size"]
+        self.n_boot = bootstrap_params.get("n_boot", 3)
+        self.n_size = bootstrap_params.get("n_size", 1.0)
+        self.weight_seed_boot = bootstrap_params.get(
+            "weight_seed", random.sample(range(1000), 3)
+        )
 
         # ensemble parameter set
-        self.ensemble_params = kwargs.get("ensemble_params")
-        self.n_ens = self.ensemble_params["n_ens"]
-        self.weight_seed_ens = self.ensemble_params["weight_seed"]
-
+        self.n_ens = ensemble_params.get("n_ens", 3)
+        self.weight_seed_ens = ensemble_params.get(
+            "weight_seed", random.sample(range(1000), 3)
+        )
         # learning rate scheduler
-        self.lr_scheduler = kwargs.get("scheduler")
-        self.scheduler_params = kwargs.get("scheduler_params")
-
-        # Optuna
-        self.optuna = kwargs.get("optuna")
-        self.optuna_params = kwargs.get("optuna_params")
-
-        # model freeze
-        self.freeze = kwargs.get("freeze")
-        self.freeze_params = kwargs.get("freeze_params")
-
-        # standard scaler
-        self.scaler = kwargs.get("scaler")
-
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.lr_scheduler = kwargs.get("lr_scheduler")
+        self.scheduler_type = scheduler_params.get("type")
+        self.scheduler_params = {
+            k: v for k, v in scheduler_params.items() if k != "type"
+        }
 
         # mlflow and tensorboard
         self.mlflow_flag = kwargs.get("mlflow")
         self.tb_flag = kwargs.get("tensorboard")
         self.writer = None
 
-        # reconstruction flag = 1 when calling AELearn and AEGANLearn
-        self.recon_flag = 0
+        # Initialise tensorboard writer with custom layout
+        if self.tb_flag:
+            layout = self.tensorboard_layout()
+            self.writer = self.setup_writer(layout)
+
+        # Initialise mlflow experiment
+        if self.mlflow_flag:
+            self.setup_mlflow()
 
     @abstractmethod
-    def train(self, model, x_data, y_data):
+    def tensorboard_layout(self):
+        pass
+
+    @abstractmethod
+    def train(self, model, X, y):
         pass
 
     @abstractmethod
@@ -112,144 +127,142 @@ class Learn(ABC):
     def train_kfold(self):
         pass
 
-    @abstractmethod
     def train_bootstrap(self):
-        pass
+        """
+        Trains multiple models on bootstrap resamples of the provided dataset.
+        """
 
-    @abstractmethod
-    def train_ensemble(self):
-        pass
-
-    def train_optuna(self, trial, x_data, y_data, seed):
-        po = ParamOptuna(trial, self.model_params, self.hyper_params)
-
-        for name, flag in self.optuna_params.items():
-            if name.startswith("tune_") and flag:
-                po.get_fn(name)
-
-        model = self.setup_model(x_data, y_data)
-        model = self.setup_weight(model, seed)
-        _, score = self.train(model, x_data, y_data)
-
-        return score
-
-    def setup_model(self, x_data, y_data):
-        if self.freeze:
-            # Load existing model from the specified path
-            model_path = self.freeze_params["model_path"]
-            metadata_path = Path(f"{model_path}/metadata.yaml")
-            print(f"Loading model from {model_path}")
-
-            with open(metadata_path, "r") as file:
-                metadata = yaml.safe_load(file)
-            model_name = metadata["model_type"]
-
-            # Get model with frozen layers
-            fz = Freeze(model_path)
-            model = fz.get_fn(model_name, self.freeze_params)
-
+        model_list = []
+        if isinstance(self.X, Dataset):
+            n_samples = int(len(self.X))
         else:
-            # Setup model with specified parameters
-            self.model_params["x_data"] = x_data
-            self.model_params["y_data"] = y_data
+            n_samples = self.X.shape[0]
 
-            model = create_model(self.model_name, **self.model_params)
+        # Size of each bootstrap sample
+        sample_size = int(n_samples * self.n_size)
 
-        model.to(self.device)
+        for i in range(self.n_boot):
+            rng = np.random.default_rng(self.weight_seed_boot[i])
 
-        return model
+            # Generate all random indices at once
+            bootstrap_indices = rng.choice(n_samples, size=sample_size, replace=True)
 
-    def setup_scheduler(self, *optimizers):
-        scheduler_type = self.scheduler_params["type"]
-        params = {
-            key: value for key, value in self.scheduler_params.items() if key != "type"
-        }
+            # Create the bootstrap sample in a single, fast indexing operation
+            X_boot = self.X[bootstrap_indices]
+            y_boot = self.y[bootstrap_indices]
 
-        # Create a scheduler for each optimizer
-        schedulers = [
-            LRScheduler(optimizer, scheduler_type=scheduler_type, params=params)
-            for optimizer in optimizers
-        ]
+            if not isinstance(self.X, Dataset):
+                X_boot = np.asarray(X_boot)
+                y_boot = np.asarray(y_boot)
 
-        # Return a list if multiple optimizers, else return a single scheduler
-        return schedulers if len(schedulers) > 1 else schedulers[0]
+            # Deep copy model and re-initialise model weight using bootstrap seeds
+            model = copy.deepcopy(self.model)
+            self.weights_params["seed"] = self.weight_seed_boot[i]
+            model = init_model_weights(model, **self.weights_params)
 
-    def setup_dataloader(self, x_data, y_data):
-        # split dataset and setup train/valid/test dataloader
-        x_data = torch.from_numpy(x_data)
-        y_data = torch.from_numpy(y_data)
-        eval_loader = None
+            # Train the model on the bootstrap sample
+            model, _ = self.train(model, X_boot, y_boot)
 
+            model_list.append(model)
+
+        return model_list
+
+    def train_ensemble(self):
+        """
+        Train multiple models with ensemble learning
+        """
+        model_list = []
+        X, y = self.X, self.y
+
+        for i in range(self.n_ens):
+            # Deep copy model and re-initialise model weight using ensemble seeds
+            model = copy.deepcopy(self.model)
+
+            self.weights_params["seed"] = self.weight_seed_ens[i]
+            model = init_model_weights(model, **self.weights_params)
+
+            model, _ = self.train(model, X, y)
+
+            model_list.append(model)
+
+        return model_list
+
+    def setup_components(self, model):
+        """Initializes optimizer, loss function, and LR scheduler."""
+        # --- Initialise Optimizer ---
+        optim_fn = OptimSwitch().get(self.optimizer)
+        optimizer = optim_fn(model.parameters(), self.lr)
+
+        # --- Initialise loss functions ---
+        criterion = LossSwitch().get(self.loss)
+
+        # --- Regularizer ---
+        regularizer = LossRegSwitch()
+
+        # --- LR schedulers (optional) ---
+        scheduler = None
+        if self.lr_scheduler:
+            scheduler = LRSchedulerSwitch(
+                optimizer,
+                self.scheduler_type,
+                self.scheduler_params,
+            )
+
+        return optimizer, criterion, regularizer, scheduler
+
+    def setup_dataloaders(self, X, y):
+        """
+        Splits data and creates DataLoaders.
+        """
         if self.model_eval:
             # Data split: train/valid/test
-            train_ratio = 0.75
-            test_ratio = 0.15
-            eval_ratio = 0.10
+            train_ratio, valid_ratio, eval_ratio = 0.75, 0.15, 0.10
 
-            x_train, x_test, y_train, y_test = train_test_split(
-                x_data, y_data, test_size=1 - train_ratio, random_state=42
+            # First split: train vs (test + eval)
+            X_train, X_temp, y_train, y_temp = train_test_split(
+                X, y, test_size=(1 - train_ratio), random_state=self.seed
             )
 
-            x_test, x_eval, y_test, y_eval = train_test_split(
-                x_test, y_test, test_size=eval_ratio / (eval_ratio + test_ratio)
+            # Second split: test vs eval
+            test_eval_ratio = eval_ratio / (eval_ratio + valid_ratio)
+            X_valid, X_eval, y_valid, y_eval = train_test_split(
+                X_temp, y_temp, test_size=test_eval_ratio, random_state=self.seed
             )
         else:
-            # Data split: train/valid
-            x_train, x_test, y_train, y_test = train_test_split(
-                x_data, y_data, test_size=0.2, random_state=42
+            # 80/20 train/valid split
+            X_train, X_valid, y_train, y_valid = train_test_split(
+                X, y, test_size=0.2, random_state=self.seed
             )
 
-        train_set = torch.utils.data.TensorDataset(x_train, y_train)
-        train_loader = torch.utils.data.DataLoader(
-            train_set,
-            batch_size=self.batch_size,
-            shuffle=True,
-        )
-
-        valid_set = torch.utils.data.TensorDataset(x_test, y_test)
-        valid_loader = torch.utils.data.DataLoader(
-            valid_set,
-            batch_size=self.batch_size,
-            shuffle=False,
-        )
+        train_loader = self._create_dataloader(X_train, y_train, shuffle=True)
+        valid_loader = self._create_dataloader(X_valid, y_valid, shuffle=False)
 
         if self.model_eval:
-            eval_set = torch.utils.data.TensorDataset(x_eval, y_eval)
-            eval_loader = torch.utils.data.DataLoader(
-                eval_set,
-                batch_size=self.batch_size,
-                shuffle=False,
-            )
-
-        return [train_loader, valid_loader, eval_loader]
-
-    def setup_weight(self, model, weight_seed):
-        # Initialise model weight & bias
-        kernel_init = WeightInitSwitch().fn(self.kernel)
-        bias_init = WeightInitSwitch().fn(self.bias)
-        # set seed
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed(weight_seed)
+            eval_loader = self._create_dataloader(X_eval, y_eval, shuffle=False)
         else:
-            torch.manual_seed(weight_seed)
+            eval_loader = None
 
-        model.apply(
-            lambda m: weight_bias_init(
-                m=m, kernel_init_fn=kernel_init, bias_init_fn=bias_init
-            )
+        return train_loader, valid_loader, eval_loader
+
+    def _create_dataloader(self, X, y, shuffle):
+        """A helper method to create a DataLoader"""
+        # Convert to tensors
+        X_tensor = torch.from_numpy(X).float()
+        y_tensor = torch.from_numpy(y).float()
+        dataset = torch.utils.data.TensorDataset(X_tensor, y_tensor)
+
+        return torch.utils.data.DataLoader(
+            dataset, batch_size=self.batch_size, shuffle=shuffle
         )
-        return model
 
     def setup_mlflow(self):
-        if mlflow.get_experiment_by_name(self.model_name) is None:
-            mlflow.create_experiment(name=self.model_name)
-        mlflow.set_experiment(self.model_name)
+        experiment_name = self.model.__class__.__name__
+        mlflow.set_experiment(experiment_name)
 
-        mlflow.start_run(
-            run_name=f"run_{datetime.today().strftime('%Y-%m-%d_%H-%M-%S')}"
-        )
+        run_name = f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        mlflow.start_run(run_name=run_name)
         mlflow.log_params(self.hyper_params)
-        mlflow.log_param("n_epoch", self.n_epoch)
+        mlflow.log_param("n_epoch", self.epochs)
 
     def setup_writer(self, layout: dict) -> SummaryWriter:
         # setup tensorboard stuff
@@ -258,15 +271,8 @@ class Learn(ABC):
 
         return writer
 
-    def setup_scaler(self, x_data):
-        scaler = StandardScaler()
-        x_data = scaler.fit_transform(x_data)
-
-        return x_data
-
     def log_mlflow(self, model):
         # Log the model as an artifact of the MLflow run.
-        print("\nLogging the trained model as a run artifact...")
         mlflow.pytorch.log_model(
             model, artifact_path="pytorch-model", pickle_module=pickle
         )
@@ -293,27 +299,22 @@ class Learn(ABC):
             mlflow.end_run()
             print(f"\nMLflow run saved at: {run_url}")
 
-    def proc_optuna(self, x_data, y_data, seed):
-        n_trials = self.optuna_params["n_trials"]
-
-        func = lambda trial: self.train_optuna(trial, x_data, y_data, seed)
-
-        study = optuna.create_study(direction="minimize")
-        study.optimize(func, n_trials=n_trials, timeout=None)
-        self.print_optuna(study)
-
-    def print_optuna(self, study):
-        # Print optuna study statistics
-        print(f"{'='*20} Optuna {'='*20}")
-        print("Study statistics: ")
-        print(f"  Number of finished trials: {len(study.trials)}")
-
-        print("Best trial:")
-        trial = study.best_trial
-
-        print(f"  Value: {trial.value}")
-
-        print("  Params: ")
-        for k, v in trial.params.items():
-            print(f"    {k}: {v}")
-        print(f"{'='*20} Optuna {'='*20}")
+    # TODO
+    # def evaluate(self, model, loaders):
+    #     """Performs final model evaluation and logs results to MLflow."""
+    #     train_loader, valid_loader, eval_loader = loaders
+    #     eval_test = create_eval_scheme(
+    #         self.model_name,
+    #         model,
+    #         train_loader,
+    #         valid_loader,
+    #         eval_loader,
+    #         self.X.shape[1],
+    #         self.y.shape[1],
+    #     )
+    #     eval_results = eval_test.eval()
+    #
+    #     if self.mlflow_flag:
+    #         print("Logging evaluation results to MLflow...")
+    #         for k, v in eval_results.items():
+    #             mlflow.log_dict(v, f"{k}.yaml")

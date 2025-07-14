@@ -21,9 +21,11 @@ from dscribe.core import System
 from dscribe.descriptors import Descriptor
 from dscribe.ext import MBTRWrapper
 
-from xanesnet.descriptor.base_descriptor import BaseDescriptor
+from xanesnet.descriptors.base_descriptor import BaseDescriptor
+from xanesnet.registry import register_descriptor
 
 
+@register_descriptor("mbtr")
 class MBTR(Descriptor, BaseDescriptor):
     """Implementation of the Many-body tensor representation up to :math:`k=3`.
     You can choose which terms to include by providing a dictionary in the
@@ -175,6 +177,20 @@ class MBTR(Descriptor, BaseDescriptor):
                 "in the MBTR constructor."
             )
         super().__init__(periodic=periodic, flatten=flatten, sparse=sparse)
+
+        self.config = {
+            "type": "mbtr",
+            "k1": k1,
+            "k2": k2,
+            "k3": k3,
+            "normalize_gaussians": normalize_gaussians,
+            "normalization": normalization,
+            "flatten": flatten,
+            "species": species,
+            "periodic": periodic,
+            "sparse": sparse,
+        }
+
         self.system = None
         self.k1 = k1
         self.k2 = k2

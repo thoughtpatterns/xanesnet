@@ -10,10 +10,10 @@ setup(
     license="This project is licensed under the GPL-3.0 License - see the LICENSE.md file for details.",
     packages=[
         "xanesnet",
-        "xanesnet.descriptor",
+        "xanesnet.descriptors",
         "xanesnet.scheme",
         "xanesnet.spectrum",
-        "xanesnet.model",
+        "xanesnet.models",
     ],
     package_dir={"xanesnet": "./xanesnet"},
     install_requires=[

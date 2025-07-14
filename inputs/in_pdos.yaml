@@ -79,21 +79,6 @@ ensemble_params:
   n_ens: 3
   weight_seed: [97, 39, 22]
 
-optuna: False
-optuna_params:
-  n_trials: 3
-  tune_optim_fn: True
-  tune_batch_size: True
-  tune_activation: True
-  tune_loss_fn: True
-  tune_lr: True
-  tune_dropout: True
-  tune_mlp: True
-
-freeze: False
-freeze_params:
-  model_path: ./models/model_mlp_001
-  n_dense: 2
 
 fourier_transform: False
 fourier_params:

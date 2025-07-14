@@ -25,7 +25,7 @@ fourier_transform: false
 hyperparams:
   batch_size: 2
   bias_init: zeros
-  epochs: 50
+  epochs: 1
   kernel_init: xavier_uniform
   loss:
     loss_args: null
@@ -42,7 +42,7 @@ lr_scheduler:
   step_size: 50
   type: step
 mode: train_xyz
-model_dir: models/model_gnn_001
+model_dir: models/gnn_std_xyz_002
 model_type: gnn
 node_features: null
 scheme: std

@@ -15,13 +15,12 @@ this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 import os
-
-import numpy as np
 import torch
+import numpy as np
 
-from torch_geometric.data import Dataset, Data
 from tqdm import tqdm
 from pathlib import Path
+from torch_geometric.data import Dataset, Data
 
 from xanesnet.xyz2graph import MolGraph
 
