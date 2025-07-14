@@ -13,13 +13,17 @@ PARTICULAR PURPOSE. See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+
 import torch
 from torch import nn
 
-from xanesnet.model.base_model import Model
-from xanesnet.utils_model import ActivationSwitch
+from xanesnet.models.base_model import Model
+from xanesnet.registry import register_model, register_scheme
+from xanesnet.switch import ActivationSwitch
 
 
+@register_model("ae_cnn")
+@register_scheme("ae_cnn", scheme_name="ae")
 class AE_CNN(Model):
     """
     A class for constructing a AE-CNN (Autoencoder Convolutional Neural Network) model.
@@ -31,106 +35,99 @@ class AE_CNN(Model):
 
     def __init__(
         self,
-        out_channel,
-        channel_mul,
-        hidden_size,
-        dropout,
-        kernel_size,
-        stride,
-        activation,
-        num_conv_layers,
-        x_data,
-        y_data,
+        in_size: int,
+        out_size: int,
+        out_channel: int = 32,
+        channel_mul: int = 2,
+        hidden_size: int = 64,
+        dropout: float = 0.2,
+        kernel_size: int = 3,
+        stride: int = 1,
+        activation: str = "prelu",
+        num_conv_layers: int = 3,
     ):
         """
         Args:
-            hidden_size (integer): Size of hidden layers
-                in the dense (fully connected) layers.
-            dropout (float): Dropout rate applied to
-                convolutional layers for regularization.
-            num_conv_layers (integer): Number of convolutional layers
-            activation (string): Name of activation function
-                for convolutional and dense layers.
-            out_channel (integer): Number of output channels
-                in the convolutional layers.
-            channel_mul (integer): Channel multiplication factor
-                for increasing output channels in subsequent
-                convolutional layers.
-            kernel_size (integer): Size of the convolutional kernel (filter).
-            stride (integer): Stride of the convolution operation.
-            x_data (NumPy array): Input data for the network
-            y_data (Numpy array): Output data for the network
+            in_size (int): Size of input data (length of the 1D signal).
+            out_size (int): Size of output data.
+            hidden_size (int): Size of the hidden layer in the dense predictor.
+            dropout (float): Dropout rate for regularization.
+            num_conv_layers (int): Number of convolutional layers in the encoder.
+            activation (str): Name of activation function for all layers.
+            out_channel (int): Number of output channels for the first conv layer.
+            channel_mul (int): Multiplies the number of channels at each subsequent layer.
+            kernel_size (int): Size of the convolutional kernel.
+            stride (int): Stride for convolution and upsampling.
         """
         super().__init__()
 
+        # Store model configuration for saving
+        self.config = {
+            "type": "ae_cnn",
+            "in_size": in_size,
+            "out_size": out_size,
+            "hidden_size": hidden_size,
+            "dropout": dropout,
+            "num_conv_layers": num_conv_layers,
+            "activation": activation,
+            "out_channel": out_channel,
+            "channel_mul": channel_mul,
+            "kernel_size": kernel_size,
+            "stride": stride,
+        }
+
         self.ae_flag = 1
-        self.out_channel = out_channel
-        self.channel_mul = channel_mul
-        self.hidden_size = hidden_size
-        self.dropout = dropout
-        self.kernel_size = kernel_size
-        self.stride = stride
-        self.activation = activation
-        self.num_conv_layers = num_conv_layers
-
-        input_size = x_data.shape[1]
-        output_size = y_data[0].size
-
-        # Instantiate ActivationSwitch for dynamic activation selection
-        activation_switch = ActivationSwitch()
-        act_fn = activation_switch.fn(activation)
+        act_fn = ActivationSwitch().get(activation)
 
         # Start collecting shape of convolutional layers for calculating padding
-        all_conv_shapes = [input_size]
+        all_conv_shapes = [in_size]
 
         # Starting shape
-        conv_shape = input_size
+        conv_shape = in_size
 
         # Construct encoder convolutional layers
         enc_layers = []
         enc_in_channel = 1
-        enc_out_channel = self.out_channel
-        for block in range(self.num_conv_layers):
+        enc_out_channel = out_channel
+        for block in range(num_conv_layers):
             # Create conv layer
             conv_layer = nn.Sequential(
                 nn.Conv1d(
                     in_channels=enc_in_channel,
                     out_channels=enc_out_channel,
-                    kernel_size=self.kernel_size,
-                    stride=self.stride,
+                    kernel_size=kernel_size,
+                    stride=stride,
                 ),
-                act_fn(),
+                act_fn,
             )
 
             enc_layers.append(conv_layer)
 
             # Update in and out channels
             enc_in_channel = enc_out_channel
-            enc_out_channel = enc_out_channel * self.channel_mul
+            enc_out_channel = enc_out_channel * channel_mul
 
             # Update output shape for conv layer
-            conv_shape = int(((conv_shape - self.kernel_size) / self.stride) + 1)
+            conv_shape = int(((conv_shape - kernel_size) / stride) + 1)
             all_conv_shapes.append(conv_shape)
 
         self.encoder_layers = nn.Sequential(*enc_layers)
 
         # Construct predictor dense layers
         dense_in_shape = (
-            self.out_channel
-            * self.channel_mul ** (self.num_conv_layers - 1)
-            * all_conv_shapes[-1]
+            out_channel * channel_mul ** (num_conv_layers - 1) * all_conv_shapes[-1]
         )
 
         dense_layers = []
 
         dense_layer1 = nn.Sequential(
-            nn.Linear(dense_in_shape, self.hidden_size),
-            act_fn(),
-            nn.Dropout(self.dropout),
+            nn.Linear(dense_in_shape, hidden_size),
+            act_fn,
+            nn.Dropout(dropout),
         )
 
         dense_layer2 = nn.Sequential(
-            nn.Linear(self.hidden_size, output_size),
+            nn.Linear(hidden_size, out_size),
         )
 
         dense_layers.append(dense_layer1)
@@ -139,20 +136,16 @@ class AE_CNN(Model):
         self.dense_layers = nn.Sequential(*dense_layers)
 
         # Construct decoder transpose convolutional layers
-        dec_in_channel = self.out_channel * self.channel_mul ** (
-            self.num_conv_layers - 1
-        )
-        dec_out_channel = self.out_channel * self.channel_mul ** (
-            self.num_conv_layers - 2
-        )
+        dec_in_channel = out_channel * channel_mul ** (num_conv_layers - 1)
+        dec_out_channel = out_channel * channel_mul ** (num_conv_layers - 2)
 
         dec_layers = []
 
-        for block in range(self.num_conv_layers):
-            tconv_out_shape = all_conv_shapes[self.num_conv_layers - block - 1]
-            tconv_in_shape = all_conv_shapes[self.num_conv_layers - block]
+        for block in range(num_conv_layers):
+            tconv_out_shape = all_conv_shapes[num_conv_layers - block - 1]
+            tconv_in_shape = all_conv_shapes[num_conv_layers - block]
 
-            tconv_shape = int(((tconv_in_shape - 1) * self.stride) + self.kernel_size)
+            tconv_shape = int(((tconv_in_shape - 1) * stride) + kernel_size)
 
             # Calculate padding to input or output of transpose conv layer
             if tconv_shape != tconv_out_shape:
@@ -168,32 +161,31 @@ class AE_CNN(Model):
                 padding = 0
                 output_padding = 0
 
-            if block == self.num_conv_layers - 1:
+            if block == num_conv_layers - 1:
                 dec_out_channel = 1
 
             tconv_layer = nn.Sequential(
                 nn.ConvTranspose1d(
                     in_channels=dec_in_channel,
                     out_channels=dec_out_channel,
-                    kernel_size=self.kernel_size,
-                    stride=self.stride,
+                    kernel_size=kernel_size,
+                    stride=stride,
                     output_padding=output_padding,
                     padding=padding,
                 ),
-                act_fn(),
+                act_fn,
             )
             dec_layers.append(tconv_layer)
 
             # Update in/out channels
-            if block < self.num_conv_layers - 1:
+            if block < num_conv_layers - 1:
                 dec_in_channel = dec_out_channel
-                dec_out_channel = dec_out_channel // self.channel_mul
+                dec_out_channel = dec_out_channel // channel_mul
 
         self.decoder_layers = nn.Sequential(*dec_layers)
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        x = x.unsqueeze(0)
-        x = x.permute(1, 0, 2)
+        x = x.unsqueeze(1)
 
         out = self.encoder_layers(x)
 

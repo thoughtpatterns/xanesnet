@@ -14,14 +14,16 @@ You should have received a copy of the GNU General Public License along with
 this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-import numpy as np
 import torch
 from torch import nn
 
-from xanesnet.model.base_model import Model
-from xanesnet.utils_model import ActivationSwitch
+from xanesnet.models.base_model import Model
+from xanesnet.registry import register_model, register_scheme
+from xanesnet.switch import ActivationSwitch
 
 
+@register_model("lstm")
+@register_scheme("lstm", scheme_name="nn")
 class LSTM(Model):
     """
     A class for constructing a customisable LSTM (Long Short-Term Memory) model.
@@ -37,16 +39,18 @@ class LSTM(Model):
 
     def __init__(
         self,
-        hidden_size: int,
-        hidden_out_size: int,
-        num_layers: int,
-        dropout: float,
-        activation: str,
-        x_data: np.ndarray,
-        y_data: np.ndarray,
+        in_size: int,
+        out_size: int,
+        hidden_size: int = 256,
+        hidden_out_size: int = 128,
+        num_layers: int = 5,
+        dropout: float = 0.2,
+        activation: str = "prelu",
     ):
         """
         Args:
+            in_size (integer): Input size
+            out_size (integer): Output size
             hidden_size (integer): Number of features in the hidden state of
                 the LSTM layer.
             hidden_out_size (integer): Intermediate size of the two dense layers
@@ -57,39 +61,42 @@ class LSTM(Model):
                 of the dense layer, with dropout probability equal to dropout.
             activation (string): Name of activation function for
                 the dense layers.
-            x_data (NumPy array): Input data for the network
-            y_data (Numpy array): Output data for the network
         """
         super().__init__()
 
+        # Store model configuration for saving
+        self.config = {
+            "type": "lstm",
+            "in_size": in_size,
+            "out_size": out_size,
+            "hidden_size": hidden_size,
+            "hidden_out_size": hidden_out_size,
+            "num_layers": num_layers,
+            "dropout": dropout,
+            "activation": activation,
+        }
+
         self.nn_flag = 1
-        input_size = x_data.shape[1]
-        output_size = y_data[0].size
+        act_fn = ActivationSwitch().get(activation)
 
-        # Instantiate ActivationSwitch for dynamic activation selection
-        activation_switch = ActivationSwitch()
-        act_fn = activation_switch.fn(activation)
-
-        # Define the LSTM layer
+        # LSTM layer
         self.lstm = nn.LSTM(
-            input_size=input_size,
+            input_size=in_size,
             hidden_size=hidden_size,
             num_layers=num_layers,
             bidirectional=True,
+            batch_first=True,
         )
 
-        # Define the dense layers
+        # Dense layers
         self.dense_layers = nn.Sequential(
             nn.Linear(2 * hidden_size, hidden_out_size),
-            act_fn(),
+            act_fn,
             nn.Dropout(p=dropout),
-            nn.Linear(hidden_out_size, output_size),
+            nn.Linear(hidden_out_size, out_size),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Forward pass of the LSTM layer.
         x, _ = self.lstm(x)
-        # Forward pass through dense layers
         out = self.dense_layers(x)
-
         return out

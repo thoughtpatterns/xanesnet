@@ -13,6 +13,9 @@ PARTICULAR PURPOSE. See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+from typing import TextIO
+
+import numpy as np
 
 ###############################################################################
 ############################### LIBRARY IMPORTS ###############################
@@ -20,24 +23,34 @@ this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from ase import Atoms
 
-from xanesnet.descriptor.base_descriptor import BaseDescriptor
+from xanesnet.descriptors.base_descriptor import BaseDescriptor
+from xanesnet.registry import register_descriptor
+
 
 ###############################################################################
 ################################## CLASSES ####################################
 ###############################################################################
 
 
-class MACE(BaseDescriptor):
+@register_descriptor("direct")
+class DIRECT(BaseDescriptor):
     """
     A class for reading the descriptor straight from a file. It tries to avoid
     doing any of the fancy stuff the other descriptors do. Only reads the file
     """
 
-    def transform(self, system: Atoms) -> int:
-        return 0
+    def __init__(self, nfeatures):
+        self.config = {
+            "type": "direct",
+            "nfeatures": nfeatures,
+        }
+        self.nfeatures = nfeatures
+
+    def transform(self, system: Atoms) -> np.ndarray:
+        pass
 
     def get_nfeatures(self) -> int:
-        return 0
+        return self.nfeatures
 
     def get_type(self) -> str:
-        return "mace"
+        return "direct"

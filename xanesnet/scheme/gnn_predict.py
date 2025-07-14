@@ -14,9 +14,11 @@ You should have received a copy of the GNU General Public License along with
 this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
+import logging
 import numpy as np
 import torch
-from sklearn.metrics import mean_squared_error
+
+from typing import Optional, Tuple, List
 from dataclasses import dataclass
 from torch_geometric.data import DataLoader
 
@@ -26,92 +28,80 @@ from xanesnet.data_transform import inverse_fourier_transform
 
 @dataclass
 class Result:
-    xyz_pred: (np.ndarray, np.ndarray)
-    xanes_pred: (np.ndarray, np.ndarray)
+    """Data class to hold prediction results, including mean and standard deviation."""
+
+    xyz_pred: Optional[Tuple[np.ndarray, np.ndarray]] = None
+    xanes_pred: Optional[Tuple[np.ndarray, np.ndarray]] = None
 
 
 class GNNPredict(Predict):
     def predict(self, model) -> np.ndarray:
+        """
+        Performs a single prediction with a given model.
+        """
         model.eval()
-
-        # Model prediction
         dataloader = DataLoader(self.xyz_data, batch_size=1, shuffle=False)
-        xanes_pred = []
-        for data in dataloader:
-            # reshape concatenated graph_attr to [batch_size, feat_size]
-            nfeats = data[0].graph_attr.shape[0]
-            graph_attr = data.graph_attr.reshape(len(data), nfeats)
-            out = model(
-                data.x.float(),
-                data.edge_attr.float(),
-                graph_attr.float(),
-                data.edge_index,
-                data.batch,
-            )
-            out = torch.squeeze(out)
-            xanes_pred.append(out.detach().numpy())
 
-        xanes_pred = np.array(xanes_pred)
+        with torch.no_grad():
+            predictions = [model(data).squeeze().numpy() for data in dataloader]
+
+        xanes_pred = np.array(predictions)
 
         if self.fourier:
             xanes_pred = inverse_fourier_transform(xanes_pred, self.fourier_concat)
-
-        # Print MSE if evaluation data is provided
         if self.pred_eval:
             Predict.print_mse("xanes", "xanes prediction", self.xanes_data, xanes_pred)
 
         return xanes_pred
 
     def predict_std(self, model):
-        print(f">> Predicting ...")
+        model_type = model.__class__.__name__.lower()
+        logging.info(f"\n--- Starting prediction with model: {model_type} ---")
+
         xanes_pred = self.predict(model)
         # Create dummy STD
-        xanes_std = np.zeros_like(xanes_pred)
+        xanes_sd = np.zeros_like(xanes_pred)
 
-        return Result(xyz_pred=(None, None), xanes_pred=(xanes_pred, xanes_std))
+        return Result(xanes_pred=(xanes_pred, xanes_sd))
 
     def predict_bootstrap(self, model_list):
-        predict_score = []
-        xanes_pred_list = []
+        """
+        Performs predictions on multiple models (bootstrapping)
+        """
+        # Get all predictions and reconstructions from model_list
+        all_preds = self._predict_from_models(model_list)
 
-        # Iterate over models to perform predicting
-        for i, model in enumerate(model_list, start=1):
-            print(f">> Predicting with model {i}...")
-            xanes_pred = self.predict(model)
-            
-            if self.pred_eval:
-                mse = mean_squared_error(self.xanes_data, xanes_pred)
-                predict_score.append(mse)
-                
-            xanes_pred_list.append(xanes_pred)
+        # Calculate mean and std
+        mean_pred = np.mean(all_preds, axis=0)
+        std_pred = np.std(all_preds, axis=0)
 
-        # Print MSE if evaluation data is provided
-        if self.pred_eval and len(predict_score) > 0:
-            mean_score = np.mean(predict_score)
-            std_score = np.std(predict_score)
-            print(f"Mean score prediction: {mean_score:.4f}, Std: {std_score:.4f}")
+        # Print MSE of the mean prediction
+        if self.pred_eval:
+            target_data = (
+                self.xyz_data if self.pred_mode == "predict_xyz" else self.xanes_data
+            )
+            logging.info("-" * 55)
+            Predict.print_mse("target", "mean prediction", target_data, mean_pred)
 
-        # Calculate mean and standard deviation across all predictions
-        xanes_mean = np.mean(xanes_pred_list, axis=0)
-        xanes_std = np.std(xanes_pred_list, axis=0)
-
-        return Result(xyz_pred=(None, None), xanes_pred=(xanes_mean, xanes_std))
+        return Result(xanes_pred=(mean_pred, std_pred))
 
     def predict_ensemble(self, model_list):
-        xanes_pred_list = []
+        """
+        Performs predictions on multiple models (ensemble)
+        """
+        return self.predict_bootstrap(model_list)
 
-        # Iterate over models to perform predicting
+    def _predict_from_models(self, model_list: List[torch.nn.Module]) -> np.ndarray:
+        """
+        Predictions for a list of models.
+        """
+        predictions = []
         for i, model in enumerate(model_list, start=1):
-            print(f">> Predicting with model {i}...")
-            xanes_pred = self.predict(model)    
-            xanes_pred_list.append(xanes_pred)
+            model_type = model.__class__.__name__.lower()
+            logging.info(
+                f">> Predicting with model {model_type} ({i}/{len(model_list)})..."
+            )
+            prediction = self.predict(model)
+            predictions.append(prediction)
 
-        # Print MSE summary
-        print(f"{'='*30}Ensemble Prediction Summary{'='*30}")
-        xanes_pred = sum(xanes_pred_list) / len(xanes_pred_list)
-        Predict.print_mse("xanes", "xanes prediction", self.xanes_data, xanes_pred)
-
-        xanes_mean = np.mean(xanes_pred_list, axis=0)
-        xanes_std = np.std(xanes_pred_list, axis=0)
-
-        return Result(xyz_pred=(None, None), xanes_pred=(xanes_mean, xanes_std))
+        return np.array(predictions)

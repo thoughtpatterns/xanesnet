@@ -14,20 +14,18 @@ You should have received a copy of the GNU General Public License along with
 this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-import os
-
 ###############################################################################
 ############################### LIBRARY IMPORTS ###############################
 ###############################################################################
 
 import sys
-from pathlib import Path
-
 import yaml
+import os
 
+from pathlib import Path
 from argparse import ArgumentParser
-from xanesnet.core_learn import train_model, train_model_gnn
-from xanesnet.core_predict import predict_data, predict_data_gnn
+from xanesnet.core_learn import train
+from xanesnet.core_predict import predict
 
 
 ###############################################################################
@@ -93,16 +91,13 @@ def main(args: list):
     else:
         args = parse_args(args)
 
-    print(f">> loading JSON input @ {args.in_file}\n")
+    print(f">> loading JSON input @ {args.in_file}")
 
     with open(args.in_file, "r") as f:
         config = yaml.safe_load(f)
 
     if "train" in args.mode:
-        if config["model"]["type"] == "gnn":
-            train_model_gnn(config, args)
-        else:
-            train_model(config, args)
+        train(config, args)
 
     elif "predict" in args.mode:
         metadata_file = Path(f"{args.in_model}/metadata.yaml")
@@ -112,10 +107,7 @@ def main(args: list):
         else:
             raise ValueError(f"Cannot find metadata file.")
 
-        if metadata["model_type"] == "gnn":
-            predict_data_gnn(config, args, metadata)
-        else:
-            predict_data(config, args, metadata)
+        predict(config, args, metadata)
 
     else:
         print(">>> Incorrect mode. Please try again.")

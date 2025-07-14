@@ -85,6 +85,7 @@ class TestSaveModels:
 
     def test_save_single(self, scheme, descriptors):
         metadata = {
+            "mode": "train_xyz",
             "model_type": self.config["model"]["type"],
             "scheme": "std",
         }
@@ -93,7 +94,7 @@ class TestSaveModels:
         save_models(self.path, models, descriptors, metadata)
 
         # Check directory
-        save_dir = Path("tests/save/mlp_std_001")
+        save_dir = Path("tests/save/mlp_std_xyz_001")
         assert save_dir.exists()
 
         # Check files
@@ -110,6 +111,7 @@ class TestSaveModels:
 
     def test_save_multiple(self, scheme, descriptors):
         metadata = {
+            "mode": "train_xyz",
             "model_type": self.config["model"]["type"],
             "scheme": "ensemble",
         }
@@ -117,13 +119,13 @@ class TestSaveModels:
         save_models(self.path, models, descriptors, metadata)
 
         # Check directory
-        save_dir = Path("tests/save/mlp_ensemble_001")
+        save_dir = Path("tests/save/mlp_ensemble_xyz_001")
         assert save_dir.exists()
-        model1_dir = Path("tests/save/mlp_ensemble_001/model_001")
+        model1_dir = Path("tests/save/mlp_ensemble_xyz_001/model_001")
         assert model1_dir.exists()
-        model2_dir = Path("tests/save/mlp_ensemble_001/model_002")
+        model2_dir = Path("tests/save/mlp_ensemble_xyz_001/model_002")
         assert model2_dir.exists()
-        model3_dir = Path("tests/save/mlp_ensemble_001/model_003")
+        model3_dir = Path("tests/save/mlp_ensemble_xyz_001/model_003")
         assert model3_dir.exists()
 
         # Check files
@@ -162,17 +164,17 @@ def init_predict_scheme(model_dir, mode):
     xyz, xanes, e, index = data_predict(
         config["xyz_path"], config["xanes_path"], descriptor_list, mode, False
     )
-    # Initialise prediction scheme
-    scheme = create_predict_scheme(
-        model_name,
-        xyz,
-        xanes,
-        mode,
-        False,
-        metadata["standardscaler"],
-        metadata["fourier_transform"],
-        metadata["fourier_param"],
-    )
+
+    kwargs = {
+        "pred_mode": mode,
+        "pred_eval": False,
+        "scaler": metadata["standardscaler"],
+        "fourier": metadata["fourier_transform"],
+        "fourier_param": metadata["fourier_param"],
+    }
+
+    # Initialise prediction scheme using kwargs
+    scheme = create_predict_scheme(model_name, xyz, xanes, **kwargs)
 
     return scheme, index, e
 

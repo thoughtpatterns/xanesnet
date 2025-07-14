@@ -23,7 +23,7 @@ import numpy as np
 
 from abc import ABC
 
-from xanesnet.descriptor.base_descriptor import BaseDescriptor
+from xanesnet.descriptors.base_descriptor import BaseDescriptor
 
 
 ###############################################################################

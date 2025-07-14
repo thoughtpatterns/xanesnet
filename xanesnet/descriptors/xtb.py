@@ -22,13 +22,16 @@ from tblite.interface import Calculator
 from ase import Atoms
 import numpy as np
 
-from xanesnet.descriptor import WACSF
+from xanesnet.descriptors import WACSF
+from xanesnet.registry import register_descriptor
+
 
 ###############################################################################
 ################################## CLASSES ####################################
 ###############################################################################
 
 
+@register_descriptor("xtb")
 class XTB(WACSF):
     """
     A class for transforming a molecular system into a project density of
@@ -80,6 +83,36 @@ class XTB(WACSF):
             verbosity (float): Set verbosity of printout
                 Defaults to 0
         """
+
+        self.config = {
+            "type": "xtb",
+            "r_min": r_min,
+            "r_max": r_max,
+            "method": method,
+            "accuracy": accuracy,
+            "guess": guess,
+            "max_iter": max_iter,
+            "mixer_damping": mixer_damping,
+            "save_integrals": save_integrals,
+            "temperature": temperature,
+            "verbosity": verbosity,
+            "e_min": e_min,
+            "e_max": e_max,
+            "sigma": sigma,
+            "num_points": num_points,
+            "use_wacsf": use_wacsf,
+            "n_g2": n_g2,
+            "n_g4": n_g4,
+            "l": l,
+            "z": z,
+            "g2_parameterisation": g2_parameterisation,
+            "g4_parameterisation": g4_parameterisation,
+            "use_charge": use_charge,
+            "use_spin": use_spin,
+            "use_quad": use_quad,
+            "use_occupied": use_occupied,
+        }
+
         if use_wacsf:
             super().__init__(
                 r_min,

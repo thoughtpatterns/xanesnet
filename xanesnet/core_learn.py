@@ -14,212 +14,267 @@ You should have received a copy of the GNU General Public License along with
 this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-from pathlib import Path
+import logging
+import random
+import sys
+import torch
+import time
 
+from datetime import timedelta
+from enum import Enum
+from pathlib import Path
 from numpy.random import RandomState
+from sklearn.preprocessing import StandardScaler
 from sklearn.utils import shuffle
+from torchinfo import summary
 
 from xanesnet.data_encoding import data_learn, data_gnn_learn
-from xanesnet.utils import save_models
+from xanesnet.data_transform import fourier_transform
+from xanesnet.models import AEGAN_MLP, GNN
+from xanesnet.models.pre_trained import PretrainedModels
+from xanesnet.switch import DataAugmentSwitch
+from xanesnet.utils import save_models, init_model_weights
 from xanesnet.creator import (
-    create_descriptor,
     create_learn_scheme,
+    create_descriptors,
+    create_model,
+    create_pretrained_model,
+    create_pretrained_descriptors,
+)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(message)s",
+    handlers=[
+        # logging.FileHandler("train.log", mode="w"),
+        logging.StreamHandler(sys.stdout),
+    ],
 )
 
 
-def train_model(config, args):
+class TrainingMode(Enum):
+    XYZ_TO_XANES = "train_xyz"
+    XANES_TO_XYZ = "train_xanes"
+    AEGAN = "train_aegan"
+
+
+def train(config, args):
     """
-    Train ML model based on the provided configuration and arguments
+    Train ML model based on the provided configuration and arguments.
     """
+    try:
+        mode = TrainingMode(args.mode)
+    except ValueError:
+        raise ValueError(f"'{args.mode}' is not a valid training mode.")
 
-    # Encode training dataset with specified descriptor types
-    descriptor_list = []
-    descriptors = config.get("descriptors")
+    # Setup descriptors from inputscript or pretrained model
+    descriptor_list = _setup_descriptors(config)
 
-    if descriptors is None:
-        raise ValueError("No descriptors found in the configuration file!")
+    # Load, encode, and preprocess data
+    X, y, index = _setup_datasets(config, descriptor_list, mode)
 
-    for d in descriptors:
-        print(f">> Initialising {d['type']} feature descriptor...")
-        if d["type"] in ("mace", "direct"):
-            descriptor = create_descriptor(d["type"])
+    # Setup model from inputscript or pretrained model
+    model = _setup_model(config, X, y)
+
+    # Setup training scheme
+    scheme = _setup_scheme(config, args, model, X, y)
+
+    # Run model training
+    model_list, train_scheme, train_time = _train_models(config, scheme)
+
+    # Print model summary
+    _model_summary(model_list[0], X, y)
+
+    # Print training time
+    logging.info(f"Training completed in {str(timedelta(seconds=int(train_time)))}")
+
+    # Save model, encoded data and config to disk
+    if args.save:
+        metadata = {
+            "mode": args.mode,
+            "model": model.config,
+            "descriptors": [desc.config for desc in descriptor_list],
+            "scheme": train_scheme,
+            "standardscaler": config["standardscaler"],
+            "fourier_transform": config["fourier_transform"],
+            "fourier_param": config["fourier_params"],
+            "node_features": config.get("node_features", {}),
+            "edge_features": config.get("edge_features", {}),
+        }
+
+        dataset = {"index": index, "X": X, "y": y}
+        save_models(Path("models"), model_list, metadata, dataset=dataset)
+
+
+def _setup_descriptors(config):
+    """Initialises or loads descriptors."""
+    model_type = config["model"]["type"]
+
+    if hasattr(PretrainedModels, model_type):
+        logging.info(f">> Loading descriptors from pretrained model: {model_type}")
+        descriptor_list = create_pretrained_descriptors(model_type)
+    else:
+        descriptor_config = config["descriptors"]
+        descriptor_types = ", ".join(d["type"] for d in descriptor_config)
+        logging.info(f">> Initialising descriptors: {descriptor_types}")
+        descriptor_list = create_descriptors(config=descriptor_config)
+
+    return descriptor_list
+
+
+def _setup_datasets(config, descriptor_list, mode: TrainingMode):
+    model_type = config["model"]["type"]
+
+    logging.info(">> Encoding training datasets...")
+    if model_type.lower() == "gnn":
+        # Preprocessing datasets into graph representation for GNN input
+        X, y, index = data_gnn_learn(
+            config["xyz_path"],
+            config["xanes_path"],
+            config["node_features"],
+            config["edge_features"],
+            descriptor_list,
+            config["fourier_transform"],
+            config["fourier_params"],
+        )
+    else:
+        # Preprocessing datasets for non-GNN models
+        xyz, xanes, index = data_learn(
+            config["xyz_path"], config["xanes_path"], descriptor_list
+        )
+
+        n_samples = config.get("hyperparams", {}).get("n_samples")
+        seed = config.get("hyperparams", {}).get("seed", random.sample(range(1000), 1))
+        logging.info(
+            f">> Shuffling training datasets: n_samples = {n_samples or 'all'}"
+        )
+        xyz, xanes = shuffle(
+            xyz, xanes, random_state=RandomState(seed=seed), n_samples=n_samples
+        )
+
+        if config.get("fourier_transform"):
+            logging.info("Applying Fourier transform to spectra data...")
+            params = config.get("fourier_params", {})
+            xanes = fourier_transform(xanes, params.get("concat", False))
+
+        if config.get("data_augment"):
+            logging.info("Applying data augmentation...")
+            params = config.get("augment_params", {})
+            xyz, xanes = DataAugmentSwitch().augment(xyz, xanes, **params)
+
+        # Assigns the final X and Y datasets based on the training mode.
+        logging.info(f">> Setting X and Y datasets for mode: {mode.value}")
+
+        if mode in [TrainingMode.XYZ_TO_XANES, TrainingMode.AEGAN]:
+            X, y = xyz, xanes
+            logging.info(f">> X = xyz (samples: {X.shape[0]}, features: {X.shape[1]})")
+            logging.info(f">> y = xanes(samples: {y.shape[0]}, features: {y.shape[1]})")
         else:
-            descriptor = create_descriptor(d["type"], **d["params"])
-        descriptor_list.append(descriptor)
+            X, y = xanes, xyz
+            logging.info(
+                f">> X = xanes (samples: {X.shape[0]}, features: {X.shape[1]})"
+            )
+            logging.info(f">> y = xyz(samples: {y.shape[0]}, features: {y.shape[1]})")
 
-    xyz, xanes, index = data_learn(
-        config["xyz_path"], config["xanes_path"], descriptor_list
-    )
+        if config.get("standardscaler"):
+            scaler = StandardScaler()
+            X = scaler.fit_transform(X)
 
-    # Shuffle the encoded data for randomness
-    xyz, xanes = shuffle(
-        xyz,
-        xanes,
-        random_state=RandomState(seed=config["hyperparams"]["seed"]),
-        n_samples=config["hyperparams"].get("max_samples", None),
-    )
-    print(
-        ">> Shuffled training dataset and limited to n_samples = %s"
-        % config["hyperparams"].get("max_samples", None),
-    )
+    return X, y, index
 
-    # Apply FFT to spectra training dataset if specified
-    if config["fourier_transform"]:
-        from .data_transform import fourier_transform
 
-        print(">> Transforming spectra data using Fourier transform...")
-        xanes = fourier_transform(xanes, config["fourier_params"]["concat"])
+def _setup_model(config, X, y):
+    """Initialises or loads the model and its descriptors."""
+    model_type = config["model"]["type"]
 
-    # Apply data augmentation if specified
-    if config["data_augment"]:
-        from .data_augmentation import data_augment
-
-        print(">> Applying data augmentation...")
-        xyz, xanes = data_augment(config["augment_params"], xyz, xanes)
-
-    # assign descriptor and spectra datasets to X and Y based on train mode
-    if args.mode == "train_xyz" or args.mode == "train_aegan":
-        x_data = xyz
-        y_data = xanes
-    elif args.mode == "train_xanes":
-        x_data = xanes
-        y_data = xyz
+    if hasattr(PretrainedModels, model_type):
+        logging.info(f">> Loading pretrained model: {model_type}")
+        model_params = config["model"].get("params", {})
+        model = create_pretrained_model(model_type, **model_params)
     else:
-        raise ValueError(f"Unsupported mode name: {args.mode}")
+        logging.info(f">> Initialising model: {model_type}")
+        model_params = config["model"].get("params", {})
 
-    # Initialise learn scheme
-    print(">> Initialising learn scheme...")
+        # Add additional model parameters
+        if model_type.lower() == "gnn":
+            model_params["in_size"] = X[0].x.shape[1]
+            model_params["out_size"] = X[0].y.shape[0]
+            model_params["mlp_feat_size"] = X[0].graph_attr.shape[0]
+        else:
+            model_params["in_size"] = X.shape[1]
+            model_params["out_size"] = y.shape[1]
+
+        model = create_model(model_type, **model_params)
+
+        weights_config = config["model"].get("weights", {})
+        weight_kernel = weights_config.get("kernel", "xavier_uniform")
+        logging.info(f">> Initialising model weights: {weight_kernel}")
+        model = init_model_weights(model, **weights_config)
+
+    return model
+
+
+def _setup_scheme(config, args, model, X, y):
+    model_type = config["model"].get("type")
+
+    logging.info(">> Initialising training scheme")
+    # Pack kwargs
     kwargs = {
-        "model": config["model"],
-        "hyper_params": config["hyperparams"],
-        "kfold": config["kfold"],
-        "kfold_params": config["kfold_params"],
-        "bootstrap_params": config["bootstrap_params"],
-        "ensemble_params": config["ensemble_params"],
-        "scheduler": config["lr_scheduler"],
-        "scheduler_params": config["scheduler_params"],
-        "optuna": config["optuna"],
-        "optuna_params": config["optuna_params"],
-        "freeze": config["freeze"],
-        "freeze_params": config["freeze_params"],
-        "scaler": config["standardscaler"],
+        "model_config": config.get("model"),
+        "hyper_params": config.get("hyperparams", {}),
+        "kfold_params": config.get("kfold_params", {}),
+        "bootstrap_params": config.get("bootstrap_params", {}),
+        "ensemble_params": config.get("ensemble_params", {}),
+        "lr_scheduler": config.get("lr_scheduler", False),
+        "scheduler_params": config.get("scheduler_params", {}),
         "mlflow": args.mlflow,
         "tensorboard": args.tensorboard,
     }
 
-    scheme = create_learn_scheme(
-        x_data,
-        y_data,
-        **kwargs,
-    )
+    scheme = create_learn_scheme(model_type, model, X=X, y=y, **kwargs)
 
-    # Train the model using selected training strategy
-    print(">> Training %s model..." % config["model"]["type"])
-    models = []
+    return scheme
+
+
+def _train_models(config, scheme):
+    model_list = []
+    start_time = time.time()
     if config["bootstrap"]:
+        logging.info(">> Training model using bootstrap resampling...\n")
         train_scheme = "bootstrap"
-        models = scheme.train_bootstrap()
+        model_list = scheme.train_bootstrap()
     elif config["ensemble"]:
+        logging.info(">> Training model using ensemble learning...\n")
         train_scheme = "ensemble"
-        models = scheme.train_ensemble()
+        model_list = scheme.train_ensemble()
     elif config["kfold"]:
+        logging.info(">> Training model using kfold cross-validation...\n")
         train_scheme = "kfold"
-        models.append(scheme.train_kfold())
+        model_list.append(scheme.train_kfold())
     else:
+        logging.info(">> Training model using standard training procedure...\n")
         train_scheme = "std"
-        models.append(scheme.train_std())
+        model_list.append(scheme.train_std())
 
-    # Save trained model, metadata, compressed dataset, and descriptors to disk
-    if args.save:
-        metadata = {
-            "mode": args.mode,
-            "model_type": config["model"]["type"],
-            "descriptors": config["descriptors"],
-            "hyperparams": config["hyperparams"],
-            "lr_scheduler": config["scheduler_params"],
-            "standardscaler": config["standardscaler"],
-            "fourier_transform": config["fourier_transform"],
-            "fourier_param": config["fourier_params"],
-            "scheme": train_scheme,
-        }
+    train_time = time.time() - start_time
 
-        dataset = {"ids": index, "x": xyz, "y": xanes}
-        save_models(Path("models"), models, descriptor_list, metadata, dataset=dataset)
+    return model_list, train_scheme, train_time
 
 
-def train_model_gnn(config, args):
-    if args.mode != "train_xyz":
-        raise ValueError(f"Unsupported mode name for GNN: {args.mode}")
+def _model_summary(model, X, y):
+    logging.info("\n--- Model Summary ---")
 
-    # Encode training dataset with specified descriptor types
-    descriptor_list = []
-    if config["descriptors"] is not None:
-        for d in config["descriptors"]:
-            print(f">> Initialising {d['type']} feature descriptor...")
-            descriptor = create_descriptor(d["type"], **d["params"])
-            descriptor_list.append(descriptor)
-
-    graph_dataset = data_gnn_learn(
-        config["xyz_path"],
-        config["xanes_path"],
-        config["model"]["node_features"],
-        config["model"]["edge_features"],
-        descriptor_list,
-        config["fourier_transform"],
-        config["fourier_params"],
-    )
-
-    # Initialise learn scheme
-    print(">> Initialising learn scheme...")
-    kwargs = {
-        "model": config["model"],
-        "hyper_params": config["hyperparams"],
-        "kfold": config["kfold"],
-        "kfold_params": config["kfold_params"],
-        "bootstrap_params": config["bootstrap_params"],
-        "ensemble_params": config["ensemble_params"],
-        "scheduler": config["lr_scheduler"],
-        "scheduler_params": config["scheduler_params"],
-        "optuna": config["optuna"],
-        "optuna_params": config["optuna_params"],
-        "freeze": config["freeze"],
-        "freeze_params": config["freeze_params"],
-        "scaler": config["standardscaler"],
-        "mlflow": args.mlflow,
-        "tensorboard": args.tensorboard,
-    }
-
-    models = []
-    scheme = create_learn_scheme(graph_dataset, None, **kwargs)
-    # Train the model using selected training strategy
-    print(">> Training %s model..." % config["model"]["type"])
-    if config["bootstrap"]:
-        train_scheme = "bootstrap"
-        models = scheme.train_bootstrap()
-    elif config["ensemble"]:
-        train_scheme = "ensemble"
-        models = scheme.train_ensemble()
-    elif config["kfold"]:
-        train_scheme = "kfold"
-        models.append(scheme.train_kfold())
+    if isinstance(model, AEGAN_MLP):
+        X_dim = X.shape[1]
+        y_dim = y.shape[1]
+        dummy_x = torch.randn(1, X_dim)
+        dummy_y = torch.randn(1, y_dim)
+        input_data = (dummy_x, dummy_y)
+    elif isinstance(model, GNN):
+        input_data = None
     else:
-        train_scheme = "std"
-        models.append(scheme.train_std())
+        X_dim = X.shape[1]
+        dummy_x = torch.randn(1, X_dim)
+        input_data = dummy_x
 
-    # Save trained model, metadata, and descriptors to disk
-    if args.save:
-        metadata = {
-            "mode": args.mode,
-            "model_type": config["model"]["type"],
-            "node_features": config["model"]["node_features"],
-            "edge_features": config["model"]["edge_features"],
-            "descriptors": config["descriptors"],
-            "hyperparams": config["hyperparams"],
-            "lr_scheduler": config["scheduler_params"],
-            "standardscaler": config["standardscaler"],
-            "fourier_transform": config["fourier_transform"],
-            "fourier_param": config["fourier_params"],
-            "scheme": train_scheme,
-        }
-
-        save_models(Path("models"), models, descriptor_list, metadata)
+    summary(model, input_data=input_data)

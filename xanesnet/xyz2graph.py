@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from ase import Atoms
+
 from xanesnet.utils import load_xyz
 
 

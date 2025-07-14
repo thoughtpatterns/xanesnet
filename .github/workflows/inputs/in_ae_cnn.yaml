@@ -21,45 +21,27 @@ model:
       channel_mul: 2
       kernel_size: 3
       stride: 1
+   weights:
+      kernel: xavier_uniform
+      bias: zeros
+      seed: 2025
 
 hyperparams:
   batch_size: 3
   lr: 0.0001
   epochs: 10
   optim_fn: Adam
-  kernel_init: xavier_uniform
-  bias_init: zeros
-  model_eval : True
+  model_eval : False
   seed: 2021
-  weight_seed: 2023
-  loss:
-    loss_fn: mse
-    loss_args: null
-    loss_reg_type: L2 # null, L1, L2
-    loss_reg_param: 0.001
+  loss: mse
+  loss_reg: L2
+  loss_lambda: 0.001
 
 kfold: False
 kfold_params:
   n_splits: 2
   n_repeats: 1
   seed: 2022
-
-lr_scheduler: True
-scheduler_params:
-  type: step
-  step_size: 50
-  gamma: 0.1
-
-data_augment: True
-augment_params:
-  type: random_noise
-  # augment_type: random_combination
-  augment_mult: 5
-  # for random noise
-  normal_mean: 0
-  normal_sd: 0.1
-  # for random combination
-  # augment_params : {}
 
 bootstrap: False
 bootstrap_params:
@@ -72,24 +54,20 @@ ensemble_params:
   n_ens: 3
   weight_seed: [97, 39, 22]
 
-optuna: False
-optuna_params:
-  n_trials: 3
-  tune_optim_fn: True
-  tune_batch_size: True
-  tune_activation: True
-  tune_loss_fn: True
-  tune_lr: True
-  tune_dropout: True
-  tune_cnn: True
+lr_scheduler: True
+scheduler_params:
+  type: step
+  step_size: 1
+  gamma: 0.1
 
-freeze: False
-freeze_params:
-  model_path: ./models/model_ae_cnn_001
-  n_encoder: 2
-  n_decoder: 2
-  n_dense: 1
-  n_conv: 4
+data_augment: True
+augment_params:
+  type: random_noise
+  augment_mult: 2
+  normal_mean: 0
+  normal_sd: 0.1
+  # type: random_combination
+  # augment_mult: 5
 
 fourier_transform: False
 fourier_params:

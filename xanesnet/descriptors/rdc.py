@@ -23,13 +23,16 @@ import numpy as np
 
 from ase import Atoms
 
-from xanesnet.descriptor.vector_descriptor import VectorDescriptor
+from xanesnet.descriptors.vector_descriptor import VectorDescriptor
+from xanesnet.registry import register_descriptor
+
 
 ###############################################################################
 ################################## CLASSES ####################################
 ###############################################################################
 
 
+@register_descriptor("rdc")
 class RDC(VectorDescriptor):
     """
     A class for transforming a molecular system into a radial (or 'pair')
@@ -71,6 +74,16 @@ class RDC(VectorDescriptor):
         """
 
         super().__init__(r_min, r_max, use_charge, use_spin)
+
+        self.config = {
+            "type": "rdc",
+            "r_min": r_min,
+            "r_max": r_max,
+            "dr": dr,
+            "alpha": alpha,
+            "use_charge": use_charge,
+            "use_spin": use_spin,
+        }
 
         if isinstance(dr, (int, float)) and r_max >= dr > 0.0:
             self.dr = float(dr)

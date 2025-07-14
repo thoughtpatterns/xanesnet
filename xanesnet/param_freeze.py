@@ -15,6 +15,7 @@ this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 import torch
+
 from torch import nn
 
 
@@ -200,7 +201,6 @@ class Freeze:
                             param.requires_grad = False
 
         return self.model
-
 
     def aegan_mlp(self, params):
         """

@@ -15,6 +15,8 @@ You should have received a copy of the GNU General Public License along with
 this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
+from typing import Dict
+
 ###############################################################################
 ############################### LIBRARY IMPORTS ###############################
 ###############################################################################
@@ -25,13 +27,16 @@ from ase import Atoms
 from abc import ABC
 from abc import abstractmethod
 
-from xanesnet.descriptor.vector_descriptor import VectorDescriptor
+from xanesnet.descriptors.vector_descriptor import VectorDescriptor
+from xanesnet.registry import register_descriptor
+
 
 ###############################################################################
 ################################## CLASSES ####################################
 ###############################################################################
 
 
+@register_descriptor("wacsf")
 class WACSF(VectorDescriptor):
     """
     A class for transforming a molecular system into a weighted atom-centered
@@ -48,12 +53,12 @@ class WACSF(VectorDescriptor):
 
     def __init__(
         self,
-        r_min: float = 0.0,
-        r_max: float = 8.0,
-        n_g2: int = 0,
-        n_g4: int = 0,
-        l: list = [1.0, -1.0],
-        z: list = [1.0],
+        r_min: float = 1.0,
+        r_max: float = 6.0,
+        n_g2: int = 16,
+        n_g4: int = 32,
+        l: list = None,
+        z: list = None,
         g2_parameterisation: str = "shifted",
         g4_parameterisation: str = "centred",
         use_charge=False,
@@ -101,13 +106,31 @@ class WACSF(VectorDescriptor):
 
         super().__init__(r_min, r_max, use_charge, use_spin)
 
+        self.config = {
+            "type": "wacsf",
+            "r_min": r_min,
+            "r_max": r_max,
+            "n_g2": n_g2,
+            "n_g4": n_g4,
+            "l": l,
+            "z": z,
+            "g2_parameterisation": g2_parameterisation,
+            "g4_parameterisation": g4_parameterisation,
+            "use_charge": use_charge,
+            "use_spin": use_spin,
+        }
+
+        self.r_min = r_min
+        self.r_max = r_max
         self.n_g2 = n_g2
         self.n_g4 = n_g4
-        if self.n_g4:
-            self.l = l
-            self.z = z
         self.g2_parameterisation = g2_parameterisation
         self.g4_parameterisation = g4_parameterisation
+        self.use_charge = use_charge
+        self.use_spin = use_spin
+        if self.n_g4:
+            self.l = l if l is not None else [1.0, -1.0]
+            self.z = z if z is not None else [1.0]
 
         if self.n_g2:
             self.g2_transformer = G2SymmetryFunctionTransformer(

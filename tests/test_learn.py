@@ -49,8 +49,8 @@ def init_dataset_gnn(config):
 
 
 def init_model(config, xyz, xanes):
-    config["model"]["params"]["x_data"] = xyz
-    config["model"]["params"]["y_data"] = xanes
+    config["model"]["params"]["in_size"] = xyz.shape[1]
+    config["model"]["params"]["out_size"] = xanes.shape[1]
 
     model = create_model(config.get("model")["type"], **config.get("model")["params"])
 
@@ -58,7 +58,8 @@ def init_model(config, xyz, xanes):
 
 
 def init_model_gnn(config, xyz):
-    config.get("model")["params"]["x_data"] = xyz
+    config.get("model")["params"]["in_size"] = xyz[0].x.shape[1]
+    config.get("model")["params"]["out_size"] = xyz[0].y.shape[0]
     config.get("model")["params"]["mlp_feat_size"] = xyz[0].graph_attr.shape[0]
 
     model = create_model(config.get("model")["type"], **config.get("model")["params"])
