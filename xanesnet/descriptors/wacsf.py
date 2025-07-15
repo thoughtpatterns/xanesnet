@@ -106,19 +106,7 @@ class WACSF(VectorDescriptor):
 
         super().__init__(r_min, r_max, use_charge, use_spin)
 
-        self.config = {
-            "type": "wacsf",
-            "r_min": r_min,
-            "r_max": r_max,
-            "n_g2": n_g2,
-            "n_g4": n_g4,
-            "l": l,
-            "z": z,
-            "g2_parameterisation": g2_parameterisation,
-            "g4_parameterisation": g4_parameterisation,
-            "use_charge": use_charge,
-            "use_spin": use_spin,
-        }
+        self.register_config(locals(), type="wacsf")
 
         self.r_min = r_min
         self.r_max = r_max

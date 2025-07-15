@@ -75,15 +75,7 @@ class RDC(VectorDescriptor):
 
         super().__init__(r_min, r_max, use_charge, use_spin)
 
-        self.config = {
-            "type": "rdc",
-            "r_min": r_min,
-            "r_max": r_max,
-            "dr": dr,
-            "alpha": alpha,
-            "use_charge": use_charge,
-            "use_spin": use_spin,
-        }
+        self.register_config(locals(), type="rdc")
 
         if isinstance(dr, (int, float)) and r_max >= dr > 0.0:
             self.dr = float(dr)

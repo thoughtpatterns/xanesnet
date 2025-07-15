@@ -79,15 +79,7 @@ class ARMSR(VectorDescriptor):
 
         super().__init__(r_min, r_max, use_charge, use_spin)
 
-        self.config = {
-            "type": "armsr",
-            "r_min": r_min,
-            "r_max": r_max,
-            "n_s2": n_s2,
-            "n_s3": n_s3,
-            "use_charge": use_charge,
-            "use_spin": use_spin,
-        }
+        self.register_config(locals(), type="armsr")
 
         self.n_s2 = n_s2
         self.n_s3 = n_s3

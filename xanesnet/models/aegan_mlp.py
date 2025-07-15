@@ -37,17 +37,8 @@ class AEGAN_MLP(Model):
     ):
         super().__init__()
 
-        # Store model configuration for saving
-        self.config = {
-            "type": "aegan_mlp",
-            "in_size": in_size,
-            "out_size": out_size,
-            "hidden_size": hidden_size,
-            "num_hidden_layers_gen": num_hidden_layers_gen,
-            "num_hidden_layers_shared": num_hidden_layers_shared,
-            "num_hidden_layers_dis": num_hidden_layers_dis,
-            "activation": activation,
-        }
+        # Save model configuration
+        self.register_config(locals(), type="aegan_mlp")
 
         self.aegan_flag = 1
         activation = ActivationSwitch().get(activation)

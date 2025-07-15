@@ -63,20 +63,8 @@ class CNN(Model):
         """
         super().__init__()
 
-        # Store model configuration for saving
-        self.config = {
-            "type": "cnn",
-            "in_size": in_size,
-            "out_size": out_size,
-            "hidden_size": hidden_size,
-            "dropout": dropout,
-            "num_conv_layers": num_conv_layers,
-            "activation": activation,
-            "out_channel": out_channel,
-            "channel_mul": channel_mul,
-            "kernel_size": kernel_size,
-            "stride": stride,
-        }
+        # Save model configuration
+        self.register_config(locals(), type="cnn")
 
         self.nn_flag = 1
         act_fn = ActivationSwitch().get(activation)

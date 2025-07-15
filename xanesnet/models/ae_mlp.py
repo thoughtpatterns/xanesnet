@@ -56,17 +56,8 @@ class AE_MLP(Model):
         """
         super().__init__()
 
-        # Store model configuration for saving
-        self.config = {
-            "type": "ae_mlp",
-            "in_size": in_size,
-            "out_size": out_size,
-            "hidden_size": hidden_size,
-            "dropout": dropout,
-            "num_hidden_layers": num_hidden_layers,
-            "shrink_rate": shrink_rate,
-            "activation": activation,
-        }
+        # Save model configuration
+        self.register_config(locals(), type="ae_mlp")
 
         self.ae_flag = 1
         act_fn = ActivationSwitch().get(activation)

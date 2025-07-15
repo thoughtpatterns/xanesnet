@@ -35,12 +35,7 @@ from xanesnet.registry import register_descriptor
 @register_descriptor("mace")
 class MACE(BaseDescriptor):
     def __init__(self, invariants_only: bool = False, num_layers: int = -1):
-        self.config = {
-            "type": "mace",
-            "invariants_only": invariants_only,
-            "num_layers": num_layers,
-        }
-
+        self.register_config(locals(), type="mace")
         self.invariants_only = invariants_only
         self.num_layers = num_layers
         self.mace = mace_mp()

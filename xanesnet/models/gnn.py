@@ -71,20 +71,8 @@ class GNN(Model):
         """
         super().__init__()
 
-        # Store model configuration for saving
-        self.config = {
-            "type": "gnn",
-            "in_size": in_size,
-            "out_size": out_size,
-            "mlp_feat_size": mlp_feat_size,
-            "layer_name": layer_name,
-            "layer_params": layer_params,
-            "hidden_size": hidden_size,
-            "dropout": dropout,
-            "num_hidden_layers": num_hidden_layers,
-            "num_mlp_hidden_layers": num_mlp_hidden_layers,
-            "activation": activation,
-        }
+        # Save model configuration
+        self.register_config(locals(), type="gnn")
 
         if layer_params is None:
             layer_params = {

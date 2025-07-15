@@ -103,7 +103,6 @@ def _setup_datasets(mode, config, metadata, descriptor_list, pred_eval):
             pred_eval,
         )
     else:
-        logging.info(">> Encoding prediction datasets...")
         xyz, xanes, e, index = data_predict(
             config["xyz_path"], config["xanes_path"], descriptor_list, mode, pred_eval
         )

@@ -178,18 +178,7 @@ class MBTR(Descriptor, BaseDescriptor):
             )
         super().__init__(periodic=periodic, flatten=flatten, sparse=sparse)
 
-        self.config = {
-            "type": "mbtr",
-            "k1": k1,
-            "k2": k2,
-            "k3": k3,
-            "normalize_gaussians": normalize_gaussians,
-            "normalization": normalization,
-            "flatten": flatten,
-            "species": species,
-            "periodic": periodic,
-            "sparse": sparse,
-        }
+        self.register_config(locals(), type="mbtr")
 
         self.system = None
         self.k1 = k1

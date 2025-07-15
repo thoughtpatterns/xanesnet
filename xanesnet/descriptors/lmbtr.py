@@ -24,11 +24,12 @@ from dscribe.core import System
 from dscribe.descriptors import MBTR
 from dscribe.ext import MBTRWrapper
 
+from xanesnet.descriptors.base_descriptor import BaseDescriptor
 from xanesnet.registry import register_descriptor
 
 
 @register_descriptor("lmbtr")
-class LMBTR(MBTR):
+class LMBTR(MBTR, BaseDescriptor):
     """Implementation of local -- per chosen atom -- kind of the Many-body
     tensor representation up to k=3.
     Notice that the species of the central atom is not encoded in the output,
@@ -164,17 +165,7 @@ class LMBTR(MBTR):
             sparse=sparse,
         )
 
-        self.config = {
-            "type": "lmbtr",
-            "k2": k2,
-            "k3": k3,
-            "normalize_gaussians": normalize_gaussians,
-            "normalization": normalization,
-            "flatten": flatten,
-            "species": species,
-            "periodic": periodic,
-            "sparse": sparse,
-        }
+        self.register_config(locals(), type="lmbtr")
 
     @property
     def normalization(self):

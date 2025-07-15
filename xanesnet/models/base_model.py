@@ -35,3 +35,23 @@ class Model(nn.Module):
         self.nn_flag = 0
         self.ae_flag = 0
         self.aegan_flag = 0
+        self.config = {}
+
+    def register_config(self, args, **kwargs):
+        """
+        Assign arguments from the child class's constructor to self.config.
+
+        Args:
+            args: The dictionary of arguments from the child class's constructor
+            **kwargs: additional arguments to store
+        """
+        config = kwargs.copy()
+
+        # Extract parameters from the local_vars, excluding 'self' and '__class__'
+        args_dict = {
+            key: val for key, val in args.items() if key not in ["self", "__class__"]
+        }
+
+        config.update(args_dict)
+
+        self.config = config
