@@ -40,10 +40,7 @@ class DIRECT(BaseDescriptor):
     """
 
     def __init__(self, nfeatures):
-        self.config = {
-            "type": "direct",
-            "nfeatures": nfeatures,
-        }
+        self.register_config(locals(), type="direct")
         self.nfeatures = nfeatures
 
     def transform(self, system: Atoms) -> np.ndarray:

@@ -85,17 +85,7 @@ class MSR(VectorDescriptor):
         self.n_s4 = n_s4
         self.n_s5 = n_s5
 
-        self.config = {
-            "type": "msr",
-            "r_min": r_min,
-            "r_max": r_max,
-            "n_s2": n_s2,
-            "n_s3": n_s3,
-            "n_s4": n_s4,
-            "n_s5": n_s5,
-            "use_charge": use_charge,
-            "use_spin": use_spin,
-        }
+        self.register_config(locals(), type="msr")
 
         if self.n_s2:
             self.s2_transformer = S2SymmetryFunctionTransformer(

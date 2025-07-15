@@ -138,21 +138,7 @@ class SOAP(Descriptor, BaseDescriptor):
                     * ``"float32"``: Single precision floating point numbers.
                     * ``"float64"``: Double precision floating point numbers.
         """
-        self.config = {
-            "type": "soap",
-            "r_cut": r_cut,
-            "n_max": n_max,
-            "l_max": l_max,
-            "sigma": sigma,
-            "rbf": rbf,
-            "weighting": weighting,
-            "crossover": crossover,
-            "average": average,
-            "species": species,
-            "periodic": periodic,
-            "sparse": sparse,
-            "dtype": dtype,
-        }
+        self.register_config(locals(), type="soap")
 
         var_dict = {}
         for var_new in ["r_cut", "n_max", "l_max"]:

@@ -34,6 +34,9 @@ from abc import ABC, abstractmethod
 class BaseDescriptor(ABC):
     """An abstract base class for all xanesnet descriptors."""
 
+    def __init__(self):
+        self.config = {}
+
     @abstractmethod
     def transform(self, system: Atoms) -> np.ndarray:
         """
@@ -63,3 +66,22 @@ class BaseDescriptor(ABC):
         """
 
         pass
+
+    def register_config(self, args, **kwargs):
+        """
+        Assign arguments from the child class's constructor to self.config.
+
+        Args:
+            args: The dictionary of arguments from the child class's constructor
+            **kwargs: additional arguments to store
+        """
+        config = kwargs.copy()
+
+        # Extract parameters from the local_vars, excluding 'self' and '__class__'
+        args_dict = {
+            key: val for key, val in args.items() if key not in ["self", "__class__"]
+        }
+
+        config.update(args_dict)
+
+        self.config = config

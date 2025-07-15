@@ -64,17 +64,8 @@ class LSTM(Model):
         """
         super().__init__()
 
-        # Store model configuration for saving
-        self.config = {
-            "type": "lstm",
-            "in_size": in_size,
-            "out_size": out_size,
-            "hidden_size": hidden_size,
-            "hidden_out_size": hidden_out_size,
-            "num_layers": num_layers,
-            "dropout": dropout,
-            "activation": activation,
-        }
+        # Save model configuration
+        self.register_config(locals(), type="lstm")
 
         self.nn_flag = 1
         act_fn = ActivationSwitch().get(activation)

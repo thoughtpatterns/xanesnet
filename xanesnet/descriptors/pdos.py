@@ -103,22 +103,7 @@ class PDOS(VectorDescriptor):
 
         super().__init__(0.0, 6.0, use_charge, use_spin)
 
-        self.config = {
-            "type": "pdos",
-            "e_min": e_min,
-            "e_max": e_max,
-            "sigma": sigma,
-            "orb_type": orb_type,
-            "quad_orb_type": quad_orb_type,
-            "num_points": num_points,
-            "basis": basis,
-            "init_guess": init_guess,
-            "max_scf_cycles": max_scf_cycles,
-            "use_charge": use_charge,
-            "use_spin": use_spin,
-            "use_quad": use_quad,
-            "use_occupied": use_occupied,
-        }
+        self.register_config(locals(), type="pdos")
 
         self.e_min = e_min
         self.e_max = e_max
