@@ -18,11 +18,12 @@ import copy
 import logging
 import numpy as np
 import torch
+from sklearn.metrics import mean_squared_error
 
 from sklearn.model_selection import RepeatedKFold
 
 from xanesnet.scheme.base_learn import Learn
-from xanesnet.switch import LossSwitch, LossRegSwitch
+from xanesnet.utils.switch import LossSwitch, LossRegSwitch
 
 
 class NNLearn(Learn):
