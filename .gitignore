@@ -17,4 +17,5 @@ wheels/
 mlruns/
 models/
 outputs/
+processed/
 tensorboard/
