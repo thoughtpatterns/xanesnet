@@ -152,7 +152,8 @@ class PDOS(VectorDescriptor):
                     raise ValueError(err_str)
             else:
                 charge = 0
-                spin = 0
+                # spin = 0
+                spin = 1 # HACK: Hardcoded to work with CoCl2(en)2.
 
         mol.build(charge=charge, spin=spin)
 
