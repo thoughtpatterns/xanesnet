@@ -24,8 +24,6 @@ import os
 
 from pathlib import Path
 from argparse import ArgumentParser
-from xanesnet.core_learn import train
-from xanesnet.core_predict import predict
 
 
 ###############################################################################
@@ -99,6 +97,7 @@ def main():
         config = yaml.safe_load(f)
 
     if "train" in args.mode:
+        from xanesnet.core_learn import train
         train(config, args)
 
     elif "predict" in args.mode:
@@ -109,6 +108,7 @@ def main():
         else:
             raise ValueError(f"Cannot find metadata file.")
 
+        from xanesnet.core_predict import predict
         predict(config, args, metadata)
 
     else:
