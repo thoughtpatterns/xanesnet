@@ -1,8 +1,8 @@
 dataset:
   type: graph
-  root_path: data/co_cl2_en2/cis/0.25_0.17_1/set_00
-  xyz_path: data/co_cl2_en2/cis/0.25_0.17_1/set_00/xyz
-  xanes_path: data/co_cl2_en2/cis/0.25_0.17_1/set_00/txt
+  root_path: data/co_cl2_en2/cis/0.25_0.17_1/aggregate
+  xyz_path: data/co_cl2_en2/cis/0.25_0.17_1/aggregate/xyz
+  xanes_path: data/co_cl2_en2/cis/0.25_0.17_1/aggregate/txt
 
 descriptors:
   - type: pdos
@@ -10,6 +10,9 @@ descriptors:
 
 model:
   type: gnn
+
+hyperparams:
+  epochs: 200
 
 kfold: False
 lr_scheduler: False
