@@ -1,7 +1,7 @@
 dataset:
-  root_path: data/co_cl2_en2/cis/0.25_0.10_1/set_00
-  xyz_path: data/co_cl2_en2/cis/0.25_0.10_1/set_00/xyz
-  xanes_path: data/co_cl2_en2/cis/0.25_0.10_1/set_00/txt
+  root_path: data/co_cl2_en2/cis/0.25_0.17_1/set_00
+  xyz_path: data/co_cl2_en2/cis/0.25_0.17_1/set_00/xyz
+  xanes_path: data/co_cl2_en2/cis/0.25_0.17_1/set_00/txt
 
 result_save: True
 plot_save: True
