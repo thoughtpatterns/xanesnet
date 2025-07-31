@@ -14,8 +14,8 @@ wheels/
 
 # XANESNET output
 *.pdf
+/models/
 mlruns/
-models/
 outputs/
 processed/
 tensorboard/
