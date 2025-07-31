@@ -15,6 +15,7 @@ wheels/
 # XANESNET output
 *.pdf
 /models/
+gnn_std_xyz_*/
 mlruns/
 outputs/
 processed/
