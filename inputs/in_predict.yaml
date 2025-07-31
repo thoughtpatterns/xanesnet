@@ -1,0 +1,11 @@
+dataset:
+  root_path: data/co_cl2_en2/cis/0.25_0.10_1/set_00
+  xyz_path: data/co_cl2_en2/cis/0.25_0.10_1/set_00/xyz
+  xanes_path: data/co_cl2_en2/cis/0.25_0.10_1/set_00/txt
+
+plot_save: False
+result_save: True
+
+shap: True
+shap_params:
+  nsamples: 5
