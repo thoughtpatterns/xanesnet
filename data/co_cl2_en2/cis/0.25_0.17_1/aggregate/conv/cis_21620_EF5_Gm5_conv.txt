@@ -1,1 +1,1 @@
-../set_01/conv/cis_21620_EF5_Gm5_conv.txt
+../../set_01/conv/cis_21620_EF5_Gm5_conv.txt

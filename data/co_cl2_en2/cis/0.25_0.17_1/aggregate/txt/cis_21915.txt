@@ -1,1 +1,1 @@
-../set_06/txt/cis_21915.txt
+../../set_06/txt/cis_21915.txt
