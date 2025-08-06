@@ -2,11 +2,15 @@ dataset:
   type: graph
   root_path: data/co_cl2_en2/cis/0.25_0.17_1/aggregate
   xyz_path: data/co_cl2_en2/cis/0.25_0.17_1/aggregate/xyz
-  xanes_path: data/co_cl2_en2/cis/0.25_0.17_1/aggregate/txt
+  xanes_path: data/co_cl2_en2/cis/0.25_0.17_1/aggregate/conv
 
 descriptors:
-  - type: pdos
   - type: wacsf
+    params:
+      r_min: 0.0
+      r_max: 8.0
+      n_g2: 64
+      n_g4: 32
 
 model:
   type: gnn
