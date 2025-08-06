@@ -1,0 +1,57 @@
+#!/usr/bin/env python
+
+"""Plot the `0.25_0.17_1` set against the respective GNN predictions."""
+
+from dataclasses import dataclass
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
+from numpy.typing import NDArray
+
+
+@dataclass
+class Spectrum:
+    """A representation of a XANES spectrum."""
+
+    energy: NDArray[np.float64]
+    xanes: NDArray[np.float64]
+
+
+def read_xanes(path: Path) -> Spectrum:
+    """Read a XANES `.txt` file."""
+    spectrum = np.loadtxt(path, skiprows=2)
+    return Spectrum(spectrum[:, 0], spectrum[:, 1])
+
+
+def plot_xanes(fdmnes: Path, xanesnet: Path, output: Path) -> None:
+    """Compare XANES data from two folders via plots."""
+    output.mkdir(parents=True)
+
+    filenames = [path.name for path in fdmnes.glob("*.txt")]
+    filenames.sort()
+
+    for filename in filenames:
+        f = read_xanes(fdmnes / filename)
+        x = read_xanes(xanesnet / filename)
+
+        fig, ax = plt.subplots()
+
+        ax.plot(f.energy, f.xanes, label="FDMNES")
+        ax.plot(x.energy, x.xanes, label="XANESNET")
+        ax.set_title(filename)
+        ax.legend()
+        ax.grid()
+
+        plot = output / f"{filename.replace('.txt', '')}.svg"
+        fig.savefig(plot)
+        plt.close(fig)
+
+
+if __name__ == "__main__":
+    root = Path(__file__).parent
+    plot_xanes(
+        root / "../../data/co_cl2_en2/cis/0.25_0.17_1/aggregate/txt",
+        root / "../../gnn_std_xyz_001/xanes_pred",
+        root / "plots",
+    )

@@ -48,7 +48,7 @@ packages = [
 ]
 
 [tool.basedpyright]
-include = ["xanesnet"]
+include = ["xanesnet", "scripts"]
 typeCheckingMode = "all"
 reportAny = false
 reportUnknownArgumentType = false
