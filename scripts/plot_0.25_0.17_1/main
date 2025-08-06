@@ -51,7 +51,7 @@ def plot_xanes(fdmnes: Path, xanesnet: Path, output: Path) -> None:
 if __name__ == "__main__":
     root = Path(__file__).parent
     plot_xanes(
-        root / "../../data/co_cl2_en2/cis/0.25_0.17_1/aggregate/txt",
+        root / "../../data/co_cl2_en2/cis/0.25_0.17_1/aggregate/conv",
         root / "../../gnn_std_xyz_001/xanes_pred",
         root / "plots",
     )
