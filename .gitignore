@@ -20,3 +20,6 @@ mlruns/
 outputs/
 processed/
 tensorboard/
+
+# Script output
+*.svg
