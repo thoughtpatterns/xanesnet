@@ -1,5 +1,5 @@
 dataset:
-  type: graph
+  type: xanesx
   root_path: data/co_cl2_en2/cis/0.25_0.17_1/aggregate
   xyz_path: data/co_cl2_en2/cis/0.25_0.17_1/aggregate/xyz
   xanes_path: data/co_cl2_en2/cis/0.25_0.17_1/aggregate/conv
@@ -13,10 +13,10 @@ descriptors:
       n_g4: 32
 
 model:
-  type: gnn
+  type: mlp
 
 hyperparams:
-  epochs: 200
+  epochs: 500
 
 fourier_transform: False
 standardscaler: False
