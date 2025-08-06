@@ -58,7 +58,7 @@ reportUnknownParameterType = false
 reportUnknownVariableType = false
 
 [tool.ruff]
-line-length = 80
+line-length = 88
 
 [tool.ruff.lint]
 select = ["ALL"]
