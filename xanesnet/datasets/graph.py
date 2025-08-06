@@ -70,11 +70,6 @@ class GraphDataset(BaseDataset):
             self, root, self.xyz_path, self.xanes_path, descriptors, **kwargs
         )
 
-        # >>> @makkimm: if processing was skipped, i.e., if files exist, load `e_data`.
-        if self.xanes_path and (e := Path(self.processed_dir) / "e.pt").exists():
-            self.e_data = torch.load(e)
-        # <<<
-
         # Save configuration
         params = {
             "fourier": self.fft,
@@ -123,10 +118,6 @@ class GraphDataset(BaseDataset):
         if self.xanes_path:
             xanes_data, e = encode_xanes(self.xanes_path, self.index)
             self.e_data = e
-
-            # >>> @makkimm: save energy data to avoid stretched spectra.
-            torch.save(self.e_data, Path(self.processed_dir) / "e.pt")
-            # <<<
 
         # Apply FFT to spectra training dataset if specified
         if self.fft:
