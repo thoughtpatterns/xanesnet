@@ -16,6 +16,7 @@ wheels/
 *.pdf
 /models/
 gnn_std_xyz_*/
+mlp_std_xyz_*/
 mlruns/
 outputs/
 processed/
