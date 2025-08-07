@@ -16,21 +16,11 @@ model:
   type: gnn
 
 hyperparams:
-  epochs: 200
-  loss:
-    loss_fn: mse
-    loss_reg_type: L2
-    loss_reg_param: 0.001
+  epochs: 40
 
 fourier_transform: False
 standardscaler: False
-
-lr_scheduler: True
-scheduler_params:
-  type: step
-  step_size: 20
-  gamma: 0.95
-
+lr_scheduler: False
 data_augment: False
 kfold: False
 bootstrap: False
