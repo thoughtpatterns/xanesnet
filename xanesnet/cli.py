@@ -104,6 +104,13 @@ def main():
         metadata_file = Path(f"{args.in_model}/metadata.yaml")
         if os.path.isfile(metadata_file):
             with open(metadata_file, "r") as f:
+                # @makkimm: add a YAML constructor to store an energy path.
+                # >>>
+                yaml.SafeLoader.add_constructor(
+                    "tag:yaml.org,2002:python/object/apply:pathlib.PosixPath",
+                    lambda loader, node: Path(*loader.construct_sequence(node)),
+                )
+                # <<<
                 metadata = yaml.safe_load(f)
         else:
             raise ValueError(f"Cannot find metadata file.")
