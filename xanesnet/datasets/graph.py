@@ -70,7 +70,8 @@ class GraphDataset(BaseDataset):
             self, root, self.xyz_path, self.xanes_path, descriptors, **kwargs
         )
 
-        # >>> @makkimm: load an `*_e.pt` file, if it exists, to scale spectra correctly.
+        # @makkimm: load an `*_e.pt` file, if it exists, to scale spectra correctly.
+        # >>>
         if self.xanes_path:
             e = Path(root) / f"processed/{self.xanes_path.name}_e.pt"
             self.e_data = torch.load(e)
