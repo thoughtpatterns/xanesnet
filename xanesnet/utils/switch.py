@@ -68,14 +68,12 @@ class LossSwitch:
         "wcc": WCCLoss,
     }
 
-    # @makkimm: refactor to handle a `dict`, to better suit the call at
-    # `xanesnet/scheme/base_learn.py:196`.
-    # >>>
+    # @makkimm: refactor to handle a `dict`.
+    # <<<
     # def get(self, loss_name: str, **kwargs) -> nn.Module:
     #     if loss_name.lower() not in self.LOSS:
     #         raise TypeError(f"Invalided loss function name '{loss_name}'.")
-    # >>>
-    # <<<
+    # ===
     def get(self, loss_config: str | dict, **kwargs) -> nn.Module:
         if isinstance(loss_config, str):
             loss_name = loss_config
@@ -96,7 +94,7 @@ class LossSwitch:
                 loss_params = {"gaussian_hwhm": loss_args}
             elif isinstance(loss_args, dict):
                 loss_params = loss_args
-        # <<<
+        # >>>
 
         if loss_name.lower() not in self.LOSS:
             raise TypeError(f"Invalided loss function name '{loss_name}'.")
