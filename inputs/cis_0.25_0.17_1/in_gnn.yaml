@@ -16,7 +16,7 @@ model:
   type: gnn
 
 hyperparams:
-  epochs: 40
+  epochs: 200
 
 fourier_transform: False
 standardscaler: False
@@ -28,8 +28,3 @@ ensemble: False
 optuna: False
 freeze: False
 shap: False
-kfold: False
-lr_scheduler: False
-bootstrap: False
-ensemble: False
-standardscaler: False
