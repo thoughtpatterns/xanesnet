@@ -71,8 +71,10 @@ class GraphDataset(BaseDataset):
         )
 
         # <<< @makkimm: load an `*_e.pt` file, if it exists, to scale spectra correctly.
-        if self.xanes_path:
-            e = Path(root) / f"processed/{self.xanes_path.name}_e.pt"
+        if (
+            self.xanes_path
+            and (e := Path(root) / f"processed/{self.xanes_path.name}_e.pt").exists()
+        ):
             self.e_data = torch.load(e)
         # >>>
 
