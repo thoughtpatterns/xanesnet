@@ -29,6 +29,8 @@
             uv
           ];
 
+          NIX_CFLAGS_COMPILE = "-ftemplate-depth=2048"; # Needed for `dscribe`.
+
           shellHook = ''
             if ! [ -d .venv ]
             then uv venv -p ${python}/bin/python
