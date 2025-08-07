@@ -1,13 +1,26 @@
 #!/usr/bin/env python
 
-"""Plot the `0.25_0.17_1` set against the respective GNN predictions."""
+"""Plot an FDMNES dataset against the respective XANESNET output."""
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Final
 
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy.typing import NDArray
+from yaml import safe_load
+
+root: Final = Path(__file__).parent
+
+
+@dataclass
+class Config:
+    """Input and output paths to be defined by configuration."""
+
+    fdmnes: Path
+    xanesnet: Path
+    output: Path
 
 
 @dataclass
@@ -16,6 +29,16 @@ class Spectrum:
 
     energy: NDArray[np.float64]
     xanes: NDArray[np.float64]
+
+
+def read_config(path: Path) -> Config:
+    """Read configuration of input and output paths."""
+    with path.open() as f:
+        config = safe_load(f)
+    return Config(**{k: root / v for k, v in config.items()})
+        # root / config["fdmnes"],
+        # root / config["xanesnet"],
+        # root / config["output"],
 
 
 def read_xanes(path: Path) -> Spectrum:
@@ -49,9 +72,5 @@ def plot_xanes(fdmnes: Path, xanesnet: Path, output: Path) -> None:
 
 
 if __name__ == "__main__":
-    root = Path(__file__).parent
-    plot_xanes(
-        root / "../../data/co_cl2_en2/cis/0.25_0.17_1/aggregate/conv",
-        root / "../../gnn_std_xyz_001/xanes_pred",
-        root / "plots",
-    )
+    config = read_config(root / "config.yaml")
+    plot_xanes(**config.__dict__)
