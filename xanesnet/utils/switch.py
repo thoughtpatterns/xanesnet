@@ -13,6 +13,7 @@ PARTICULAR PURPOSE. See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+
 import random
 import warnings
 import numpy as np
@@ -67,12 +68,41 @@ class LossSwitch:
         "wcc": WCCLoss,
     }
 
-    def get(self, loss_name: str, **kwargs) -> nn.Module:
+    # @makkimm: refactor to handle a `dict`, to better suit the call at
+    # `xanesnet/scheme/base_learn.py:196`.
+    # >>>
+    # def get(self, loss_name: str, **kwargs) -> nn.Module:
+    #     if loss_name.lower() not in self.LOSS:
+    #         raise TypeError(f"Invalided loss function name '{loss_name}'.")
+    # >>>
+    # <<<
+    def get(self, loss_config: str | dict, **kwargs) -> nn.Module:
+        if isinstance(loss_config, str):
+            loss_name = loss_config
+            loss_params = kwargs
+        else:
+            if not (loss_name := loss_config.get("loss_fn")):
+                msg = "`loss_config` must have key `loss_fn`"
+                raise ValueError(msg)
+
+            loss_args = loss_config.get("loss_args")
+            loss_params = {}
+
+            if (
+                loss_name.lower() == "wcc"
+                and not isinstance(loss_args, dict)
+                and loss_args is not None
+            ):
+                loss_params = {"gaussian_hwhm": loss_args}
+            elif isinstance(loss_args, dict):
+                loss_params = loss_args
+        # <<<
+
         if loss_name.lower() not in self.LOSS:
             raise TypeError(f"Invalided loss function name '{loss_name}'.")
 
         loss_class = self.LOSS[loss_name.lower()]
-        return loss_class(**kwargs)
+        return loss_class(**loss_params)
 
 
 class LossRegSwitch:
