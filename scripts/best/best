@@ -1,0 +1,83 @@
+#!/usr/bin/env python
+
+# ruff: noqa: E731
+
+"""Sort an output set by prediction strength."""
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Final
+
+import numpy as np
+from numpy.typing import NDArray
+from yaml import safe_load
+from csv import DictWriter
+
+root: Final = Path(__file__).parent
+
+
+@dataclass
+class Config:
+    """Input and output paths to be defined by configuration."""
+
+    fdmnes: Path
+    xanesnet: Path
+    output: Path
+
+
+@dataclass
+class Spectrum:
+    """A representation of a XANES spectrum."""
+
+    energy: NDArray[np.float64]
+    xanes: NDArray[np.float64]
+
+
+@dataclass
+class Entry:
+    """A spectrum RMSD with its file entry."""
+
+    filename: str
+    rmsd: float
+
+
+def read_config(path: Path) -> Config:
+    """Read configuration of input and output paths."""
+    with path.open() as f:
+        config = safe_load(f)
+    return Config(**{k: root / v for k, v in config.items()})
+
+
+def read_xanes(path: Path) -> Spectrum:
+    """Read a XANES `.txt` file."""
+    spectrum = np.loadtxt(path, skiprows=2)
+    return Spectrum(spectrum[:, 0], spectrum[:, 1])
+
+
+def sort_xanes(fdmnes: Path, xanesnet: Path, **_) -> list[Entry]:  # noqa: ANN003
+    """Sorts via RMSD."""
+    filenames = [path.name for path in fdmnes.glob("*.txt")]
+    filenames.sort()
+
+    xanes = lambda x: read_xanes(x).xanes
+    rmsd = lambda x, y: np.sqrt(np.mean((xanes(x) - xanes(y)) ** 2))
+
+    entries = [
+        Entry(filename, rmsd(fdmnes / filename, xanesnet / filename))
+        for filename in filenames
+    ]
+
+    entries.sort(key=lambda x: x.rmsd)
+    return entries
+
+
+if __name__ == "__main__":
+    config = read_config(root / "config.yaml")
+    entries = sort_xanes(**config.__dict__)
+    fields = list(entries[0].__dict__)
+
+    with config.output.open("w", newline="") as f:
+        writer = DictWriter(f, fieldnames=fields)
+        writer.writeheader()
+        for entry in entries:
+            writer.writerow(entry.__dict__)
