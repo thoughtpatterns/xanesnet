@@ -35,6 +35,9 @@ class Model(nn.Module):
         self.nn_flag = 0
         self.ae_flag = 0
         self.aegan_flag = 0
+        self.gnn_flag = 0
+
+        self.batch_flag = 0  # forward() accepts batch object as input if 1
         self.config = {}
 
     def register_config(self, args, **kwargs):

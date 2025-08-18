@@ -14,6 +14,7 @@ PARTICULAR PURPOSE. See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+
 import copy
 import logging
 import os
@@ -23,10 +24,12 @@ import torch
 from torch.utils.data import Dataset
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Union, List, Any, Callable
+from typing import Union, List, Any, Callable, Tuple, Iterator
 
 from torch import Tensor
 from torch_geometric.io import fs
+
+from xanesnet.utils.mode import Mode, get_mode
 
 IndexType = Union[slice, Tensor, np.ndarray, Sequence]
 
@@ -43,6 +46,7 @@ class BaseDataset(Dataset):
         root: str | Path,
         xyz_path: List[str] | str | Path = None,
         xanes_path: List[str] | str | Path = None,
+        mode: Mode = None,
         descriptors: List = None,
         **kwargs,
     ):
@@ -51,34 +55,48 @@ class BaseDataset(Dataset):
         self.root = Path(root)
         self.xyz_path = xyz_path
         self.xanes_path = xanes_path
-        self.descriptor_list = descriptors
+        self.mode = mode
+        self.descriptors = descriptors
+        self.preload = kwargs.get("preload", True)
 
         self.config = {}
-        self.index = None
-        self.xyz_data = self.xanes_data = self.e_data = None
-        self.X = self.y = None
+        self.preload_dataset = []
+        self.file_names = None
 
-        self.set_index()
+        self.set_file_names()
         self._process()
 
-    def indices(self) -> Sequence:
-        return range(len(self.index))
-
-    def set_index(self) -> List[str]:
-        """List of identifiers for each data point."""
+    def set_file_names(self):
+        """Set a list of file names (stems) used in the dataset."""
         raise NotImplementedError
 
     def process(self):
-        r"""Processes the dataset to the `self.processed_dir` folder."""
+        """Processes the dataset and save to the self.processed_dir folder."""
         raise NotImplementedError
 
-    def __getitem__(self, idx: int | slice) -> None:
+    @property
+    def x_size(self) -> Union[int, List[int]]:
+        """Size of the feature array."""
         raise NotImplementedError
+
+    @property
+    def y_size(self) -> int:
+        """Size of the label array."""
+        raise NotImplementedError
+
+    def collate_fn(self, batch):
+        """Custom collate function to handle a list of Data objects."""
+        return None
+
+    @property
+    def indices(self) -> Sequence:
+        """A list of integer indices corresponding to the data points."""
+        return list(range(len(self.file_names)))
 
     @property
     def processed_file_names(self) -> List[str]:
         """A list of all processed file names."""
-        raise NotImplementedError
+        return [f"{stem}.pt" for i, stem in enumerate(self.file_names)]
 
     @property
     def processed_dir(self) -> str:
@@ -96,7 +114,21 @@ class BaseDataset(Dataset):
         return [os.path.join(self.processed_dir, f) for f in to_list(files)]
 
     def __len__(self) -> int:
-        return len(self.index)
+        return len(self.file_names)
+
+    def __getitem__(self, idx: Union[int, np.integer, IndexType]):
+        if (
+            isinstance(idx, (int, np.integer))
+            or (isinstance(idx, Tensor) and idx.dim() == 0)
+            or (isinstance(idx, np.ndarray) and np.isscalar(idx))
+        ):
+            if self.preload:
+                return self.preload_dataset[self.indices[idx]]
+            else:
+                return torch.load(self.processed_paths[idx])
+
+        else:
+            return self.index_select(idx)
 
     def _process(self):
         """
@@ -106,18 +138,31 @@ class BaseDataset(Dataset):
             logging.info(
                 f">> Processed files exist in {self.processed_dir}, skipping data processing."
             )
-            return
+        else:
+            os.makedirs(self.processed_dir, exist_ok=True)
+            self.process()
 
-        os.makedirs(self.processed_dir, exist_ok=True)
-        self.process()
+        if self.preload:
+            logging.info(">> Preloading dataset into memory...")
+            self.preload_dataset = [torch.load(path) for path in self.processed_paths]
+
+    def unique_path(self, path) -> Path:
+        if isinstance(path, list):
+            if len(path) > 1:
+                raise ValueError(
+                    "Dataset does not support multiple paths. Please provide only one."
+                )
+            path = path[0] if path else None
+
+        return Path(path) if path is not None else None
 
     def index_select(self, idx: IndexType) -> "BaseDataset":
-        r"""Creates a subset of the dataset from specified indices :obj:`idx`.
-        Indices :obj:`idx` can be a slicing object, *e.g.*, :obj:`[2:5]`, a
+        """Creates a subset of the dataset from specified indices.
+        Indices can be a slicing object, *e.g.*, :obj:`[2:5]`, a
         list, a tuple, or a :obj:`torch.Tensor` or :obj:`np.ndarray` of type
         long or bool.
         """
-        indices = self.indices()
+        index = self.file_names
 
         if isinstance(idx, slice):
             start, stop, step = idx.start, idx.stop, idx.step
@@ -128,7 +173,7 @@ class BaseDataset(Dataset):
                 stop = round(stop * len(self))
             idx = slice(start, stop, step)
 
-            indices = indices[idx]
+            index = index[idx]
 
         elif isinstance(idx, Tensor) and idx.dtype == torch.long:
             return self.index_select(idx.flatten().tolist())
@@ -145,7 +190,7 @@ class BaseDataset(Dataset):
             return self.index_select(idx.flatten().tolist())
 
         elif isinstance(idx, Sequence) and not isinstance(idx, str):
-            indices = [indices[i] for i in idx]
+            index = [index[i] for i in idx]
 
         else:
             raise IndexError(
@@ -155,7 +200,13 @@ class BaseDataset(Dataset):
             )
 
         dataset = copy.copy(self)
-        dataset._indices = indices
+        dataset.file_names = index
+        return dataset
+
+    def shuffle(self) -> "BaseDataset":
+        """Randomly shuffles the examples in the dataset."""
+        perm = torch.randperm(len(self))
+        dataset = self.index_select(perm)
         return dataset
 
     def register_config(self, args, **kwargs):
@@ -164,17 +215,12 @@ class BaseDataset(Dataset):
 
         Args:
             args: The dictionary of arguments from the child class's constructor
-            awargs: Addition
             **kwargs: additional arguments to store
         """
         config = kwargs.copy()
 
         # Extract parameters from the local_vars, excluding 'self' and '__class__'
-        args_dict = {
-            key: val
-            for key, val in args.items()
-            if key not in ["self", "__class__", "descriptors", "kwargs"]
-        }
+        args_dict = {key: val for key, val in args.items() if key in ["type", "params"]}
 
         # config.update(params)
         config.update(args_dict)

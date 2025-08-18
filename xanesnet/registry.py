@@ -75,8 +75,6 @@ def register_scheme(model_name, scheme_name):
                 AEGANPredict,
                 AELearn,
                 AEPredict,
-                GNNLearn,
-                GNNPredict,
                 NNEval,
                 NNLearn,
                 NNPredict,
@@ -98,11 +96,6 @@ def register_scheme(model_name, scheme_name):
                         "learn": AEGANLearn,
                         "predict": AEGANPredict,
                         "eval": AEGANEval,
-                    },
-                    "gnn": {
-                        "learn": GNNLearn,
-                        "predict": GNNPredict,
-                        "eval": None,
                     },
                 },
             )

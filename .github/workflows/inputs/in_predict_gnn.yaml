@@ -1,5 +1,5 @@
 dataset:
-  root_path: .github/workflows/data/graph-set
+  root_path: .github/workflows/data/graph-set/processed_predict
   xyz_path:  .github/workflows/data/graph-set/xyz_test
   xanes_path:  .github/workflows/data/graph-set/xanes_test
 

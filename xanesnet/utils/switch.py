@@ -13,6 +13,7 @@ PARTICULAR PURPOSE. See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+
 import random
 import warnings
 import numpy as np
@@ -103,64 +104,6 @@ class LossRegSwitch:
         # L2 regularization loss (sum of squared values).
         all_params = torch.cat([p.view(-1) for p in model.parameters()])
         return torch.norm(all_params, p=2)
-
-
-class DataAugmentSwitch:
-    """
-    Calculates data augmentation to input data
-    """
-
-    def augment(self, xyz: np.ndarray, xanes: np.ndarray, **params: Dict):
-        # Construct the method name and retrieve it from the class instance
-        aug_type = params["type"]
-        fn = getattr(self, f"_augment_{str(aug_type).lower()}", None)
-
-        if not callable(fn):
-            raise ValueError(
-                f"Augmentation type '{aug_type}' not found or not implemented."
-            )
-
-        aug_xyz, aug_xanes = fn(xyz, xanes, **params)
-
-        xyz_out = np.vstack((xyz, aug_xyz))
-        xanes_out = np.vstack((xanes, aug_xanes))
-
-        return xyz_out, xanes_out
-
-    def _augment_random_noise(self, xyz, xanes, **params):
-        # augment data as random data point + noise
-        n_samples = xyz.shape[0]
-        n_x_features = xyz.shape[1]
-        n_y_features = xanes[0].size
-        n_aug_samples = np.multiply(n_samples, params["augment_mult"]) - n_samples
-        rand = random.choices(range(n_samples), k=n_aug_samples)
-
-        noise1 = np.random.normal(
-            params["normal_mean"],
-            params["normal_sd"],
-            (n_aug_samples, n_x_features),
-        )
-        noise2 = np.random.normal(
-            params["normal_mean"],
-            params["normal_sd"],
-            (n_aug_samples, n_y_features),
-        )
-
-        aug_xyz = xyz[rand, :] + noise1
-        aug_xanes = xanes[rand, :] + noise2
-
-        return aug_xyz, aug_xanes
-
-    def _augment_random_combination(self, xyz, xanes, **params):
-        n_samples = xyz.shape[0]
-        n_aug_samples = np.multiply(n_samples, params["augment_mult"]) - n_samples
-        rand1 = random.choices(range(n_samples), k=n_aug_samples)
-        rand2 = random.choices(range(n_samples), k=n_aug_samples)
-
-        aug_xyz = 0.5 * (xyz[rand1, :] + xyz[rand2, :])
-        aug_xanes = 0.5 * (xanes[rand1, :] + xanes[rand2, :])
-
-        return aug_xyz, aug_xanes
 
 
 class BiasInitSwitch:

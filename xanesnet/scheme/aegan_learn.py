@@ -33,9 +33,9 @@ from xanesnet.utils.switch import (
 
 
 class AEGANLearn(Learn):
-    def __init__(self, model, X, y, **kwargs):
+    def __init__(self, model, dataset, **kwargs):
         # Call the constructor of the parent class
-        super().__init__(model, X, y, **kwargs)
+        super().__init__(model, dataset, **kwargs)
 
         # Unpack AEGAN hyperparameters
         hyper_params = self.hyper_params
@@ -49,12 +49,11 @@ class AEGANLearn(Learn):
             "loss_lambda", [0.001, 0.001]
         )
 
-    def train(self, model, X, y):
+    def train(self, model, dataset):
         """
         Main training loop
         """
-
-        train_loader, valid_loader, eval_loader = self.setup_dataloaders(X, y)
+        train_loader, valid_loader, eval_loader = self.setup_dataloaders(dataset)
 
         optimizers, criterion, regularizer, schedulers = self.setup_components(model)
         model.to(self.device)
@@ -116,7 +115,7 @@ class AEGANLearn(Learn):
         """
         Performs standard training run
         """
-        model, _ = self.train(self.model, self.X, self.y)
+        model, _ = self.train(self.model, self.dataset)
 
         return self.model
 
@@ -124,7 +123,6 @@ class AEGANLearn(Learn):
         """
         Performs K-fold cross-validation
         """
-        X, y = self.X, self.y
         best_model = None
         best_score = float("inf")
         score_list = {"train_score": [], "test_score": []}
@@ -139,17 +137,20 @@ class AEGANLearn(Learn):
         criterion = [LossSwitch().get(self.loss_gen), LossSwitch().get(self.loss_dis)]
         regularizer = LossRegSwitch()
 
-        for i, (train_index, test_index) in enumerate(kfold_splitter.split(X, y)):
+        # indices for k-fold splits
+        indices = self.dataset.indices
+
+        for i, (train_index, test_index) in enumerate(kfold_splitter.split(indices)):
             # Deep copy model
             model = copy.deepcopy(self.model)
 
             #  Train model on the training split
-            X_train, y_train = X[train_index], y[train_index]
-            model, train_score = self.train(model, X_train, y_train)
+            train_data = self.dataset[train_index]
+            model, train_score = self.train(model, train_data)
 
             # Evaluate model on the test split
-            X_test, y_test = X[test_index], y[test_index]
-            test_loader = self._create_dataloader(X_test, y_test, shuffle=False)
+            test_data = self.dataset[test_index]
+            test_loader = self._create_loader(test_data, shuffle=False)
 
             test_losses = self._run_one_epoch(
                 "valid", test_loader, model, criterion, regularizer
@@ -238,11 +239,11 @@ class AEGANLearn(Learn):
 
         with torch.set_grad_enabled(is_train):
             # self.X = a, self.y = b
-            for inputs_a, inputs_b in loader:
-                inputs_a, inputs_b = (
-                    inputs_a.to(device).float(),
-                    inputs_b.to(device).float(),
-                )
+            for batch in loader:
+                inputs_a = batch.x
+                inputs_b = batch.y
+
+                inputs_a, inputs_b = (inputs_a.to(device), inputs_b.to(device))
 
                 if is_train:
                     optimizer_gen = optimizer[0]

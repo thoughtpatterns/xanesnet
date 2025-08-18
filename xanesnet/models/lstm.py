@@ -64,10 +64,11 @@ class LSTM(Model):
         """
         super().__init__()
 
+        self.nn_flag = 1
+
         # Save model configuration
         self.register_config(locals(), type="lstm")
 
-        self.nn_flag = 1
         act_fn = ActivationSwitch().get(activation)
 
         # LSTM layer

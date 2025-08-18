@@ -5,7 +5,7 @@
 #  xyz_path:  data/graph-set/xyz_test
 #  xanes_path:  data/graph-set/xanes_test
 dataset:
-  root_path: data/fe
+  root_path: data/fe/processed_predict
   xyz_path:  data/fe/xyz_test
   xanes_path:  data/fe/xanes_test
 

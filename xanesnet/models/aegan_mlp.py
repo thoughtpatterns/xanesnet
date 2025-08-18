@@ -36,11 +36,11 @@ class AEGAN_MLP(Model):
         activation: str = "prelu",
     ):
         super().__init__()
+        self.aegan_flag = 1
 
         # Save model configuration
         self.register_config(locals(), type="aegan_mlp")
 
-        self.aegan_flag = 1
         activation = ActivationSwitch().get(activation)
 
         # Initialise the generative autoencoder networks

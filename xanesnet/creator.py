@@ -120,17 +120,15 @@ def create_descriptors(config: Dict = None):
     return descriptor_list
 
 
-def create_learn_scheme(name, model, X=None, y=None, **kwargs):
+def create_learn_scheme(name, model, dataset, **kwargs):
     if name in LEARN_SCHEME_REGISTRY:
-        return LEARN_SCHEME_REGISTRY[name](model, X, y, **kwargs)
+        return LEARN_SCHEME_REGISTRY[name](model, dataset, **kwargs)
     raise ValueError(f"Unsupported learn scheme for the model: {name}")
 
 
-def create_predict_scheme(
-    name: str, xyz: np.ndarray = None, xanes: np.ndarray = None, **kwargs
-):
+def create_predict_scheme(name: str, dataset, mode, **kwargs):
     if name in PREDICT_SCHEME_REGISTRY:
-        return PREDICT_SCHEME_REGISTRY[name](xyz, xanes, **kwargs)
+        return PREDICT_SCHEME_REGISTRY[name](dataset, mode, **kwargs)
     else:
         raise ValueError(f"Unsupported predict scheme for the model: {name}")
 

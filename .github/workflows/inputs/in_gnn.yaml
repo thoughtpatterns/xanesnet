@@ -1,14 +1,15 @@
 dataset:
   type: graph
-  root_path: .github/workflows/data
+  root_path: .github/workflows/data/processed_train
   xyz_path: .github/workflows/data/graph-set/xyz_train
   xanes_path: .github/workflows/data/graph-set/xanes_train
   params:
+    preload: True                    # Preload dataset into RAM if True; otherwise load on-the-fly
+    fourier: False
+    fourier_concat: False
     n: 16
     r_min: 0.0
     r_max: 4.0
-    fourier: False
-    fourier_concat: False
 
 descriptors:
   - type: pdos
@@ -84,9 +85,5 @@ ensemble: False
 ensemble_params:
   n_ens: 3
   weight_seed: [97, 39, 22]
-
-fourier_transform: False
-fourier_params:
-  concat: True
 
 standardscaler: False

@@ -62,11 +62,11 @@ class CNN(Model):
             stride (int): Stride for convolution and upsampling.
         """
         super().__init__()
+        self.nn_flag = 1
 
         # Save model configuration
         self.register_config(locals(), type="cnn")
 
-        self.nn_flag = 1
         act_fn = ActivationSwitch().get(activation)
 
         # --- Convolutional Layers ---

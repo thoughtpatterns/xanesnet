@@ -55,11 +55,11 @@ class AE_MLP(Model):
             activation (str): Name of activation function for hidden layers.
         """
         super().__init__()
+        self.ae_flag = 1
 
         # Save model configuration
         self.register_config(locals(), type="ae_mlp")
 
-        self.ae_flag = 1
         act_fn = ActivationSwitch().get(activation)
 
         # --- Encoder Construction ---

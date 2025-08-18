@@ -15,19 +15,22 @@ this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 import logging
+from dataclasses import dataclass
+
 import numpy as np
 import torch
 
-from dataclasses import dataclass
 from typing import List, Optional, Tuple
 from sklearn.preprocessing import StandardScaler
 
+from xanesnet.models.base_model import Model
 from xanesnet.scheme.base_predict import Predict
-from xanesnet.utils.fourier import fourier_transform, inverse_fourier_transform
+from xanesnet.utils.fourier import inverse_fft
+from xanesnet.utils.mode import Mode
 
 
 @dataclass
-class Result:
+class Prediction:
     """Data class to hold prediction results, including mean and standard deviation."""
 
     xyz_pred: Optional[Tuple[np.ndarray, np.ndarray]] = None
@@ -35,114 +38,95 @@ class Result:
 
 
 class NNPredict(Predict):
-    def predict(self, model) -> tuple[np.ndarray, np.ndarray]:
+    def predict(self, model):
         """
         Performs a single prediction with a given model.
         """
-        xyz_pred, xanes_pred = None, None
+        data_loader = self._create_loader(model, self.dataset)
+
         model.eval()
+        predictions, targets = [], []
 
-        if self.mode == "predict_xyz":
-            # Predict xyz data
-            input_data = self.xanes_data
-            if self.fourier:
-                input_data = fourier_transform(input_data, self.fourier_concat)
-            if self.scaler:
-                scaler = StandardScaler()
-                input_data = self.setup_scaler(scaler, input_data, inverse=False)
+        with torch.no_grad():
+            for data in data_loader:
+                # Pass X or batch object to model
+                input_data = data if model.batch_flag else data.x
+                output = model(input_data)
+                output = self.to_numpy(output)
 
-            input_tensor = torch.from_numpy(input_data).float()
+                if self.mode is Mode.XYZ_TO_XANES and self.fft:
+                    output = inverse_fft(output, self.fft_concat)
 
-            with torch.no_grad():
-                xyz_pred = model(input_tensor).detach().numpy()
+                predictions.append(output)
 
-            if self.pred_eval:
-                Predict.print_mse("xyz", "xyz prediction", self.xyz_data, xyz_pred)
+                if self.pred_eval:
+                    target = self.to_numpy(data.y)
+                    targets.append(target)
 
-        elif self.mode == "predict_xanes":
-            # Predict xanes data
-            input_data = self.xyz_data
+        predictions = np.array(predictions)
+        targets = np.array(targets)
 
-            if self.scaler:
-                scaler = StandardScaler()
-                input_data = self.setup_scaler(scaler, input_data, inverse=False)
+        if self.pred_eval:
+            # Print MSE of the model prediction
+            Predict.print_mse("target", "prediction", targets, predictions)
 
-            input_tensor = torch.from_numpy(input_data).float()
+        return predictions, targets
 
-            with torch.no_grad():
-                xanes_pred = model(input_tensor).detach().numpy()
-
-            if self.fourier:
-                xanes_pred = inverse_fourier_transform(xanes_pred, self.fourier_concat)
-            if self.pred_eval:
-                # Print MSE of the model prediction
-                Predict.print_mse(
-                    "xanes", "xanes prediction", self.xanes_data, xanes_pred
-                )
-
-        return xyz_pred, xanes_pred
-
-    def predict_std(self, model: torch.nn.Module) -> Result:
+    def predict_std(self, model: Model) -> Prediction:
         """
         Performs a single prediction and returns the result with a zero (dummy)
         standard deviation array.
         """
-        model_type = model.__class__.__name__.lower()
-        logging.info(f"\n--- Starting prediction with model: {model_type} ---")
+        logging.info(
+            f"\n--- Starting prediction with model: {model.__class__.__name__.lower()} ---"
+        )
 
-        xyz_pred, xanes_pred = self.predict(model)
+        predictions, targets = self.predict(model)
+        std_pred = np.zeros_like(predictions)
 
-        if self.mode == "predict_xyz":
-            std_dev = np.zeros_like(xyz_pred)
-            return Result(xyz_pred=(xyz_pred, std_dev))
-        else:  # predict_xanes
-            std_dev = np.zeros_like(xanes_pred)
-            return Result(xanes_pred=(xanes_pred, std_dev))
+        if self.mode is Mode.XANES_TO_XYZ:
+            return Prediction(xyz_pred=(predictions, std_pred))
+        # predict_xanes
+        return Prediction(xanes_pred=(predictions, std_pred))
 
-    def predict_bootstrap(self, model_list: List[torch.nn.Module]) -> Result:
+    def predict_bootstrap(self, model_list: List[Model]) -> Prediction:
         """
         Performs predictions on multiple models (bootstrapping)
         """
-        # Get all predictions and reconstructions from model_list
-        all_preds = self._predict_from_models(model_list)
+        # Get all predictions and targets from model_list
+        prediction_list, targets = self._predict_from_models(model_list)
 
         # Calculate mean and std
-        mean_pred = np.mean(all_preds, axis=0)
-        std_pred = np.std(all_preds, axis=0)
+        mean_pred = np.mean(prediction_list, axis=0)
+        std_pred = np.std(prediction_list, axis=0)
 
         # Print MSE of the mean prediction
         if self.pred_eval:
-            target_data = (
-                self.xyz_data if self.mode == "predict_xyz" else self.xanes_data
-            )
             logging.info("-" * 55)
-            Predict.print_mse("target", "mean prediction", target_data, mean_pred)
+            Predict.print_mse("target", "mean prediction", targets, mean_pred)
 
-        if self.mode == "predict_xyz":
-            return Result(xyz_pred=(mean_pred, std_pred))
-        else:  # predict_xanes
-            return Result(xanes_pred=(mean_pred, std_pred))
+        if self.mode is Mode.XANES_TO_XYZ:
+            return Prediction(xyz_pred=(mean_pred, std_pred))
+        # predict_xanes
+        return Prediction(xanes_pred=(mean_pred, std_pred))
 
-    def predict_ensemble(self, model_list: List[torch.nn.Module]) -> Result:
+    def predict_ensemble(self, model_list: List[Model]) -> Prediction:
         """
         Performs predictions on multiple models (ensemble)
         """
         return self.predict_bootstrap(model_list)
 
-    def _predict_from_models(self, model_list: List[torch.nn.Module]) -> np.ndarray:
+    def _predict_from_models(self, model_list: List[Model]):
         """
         Predictions for a list of models.
         """
-        predictions = []
-        for i, model in enumerate(model_list, start=1):
-            model_type = model.__class__.__name__.lower()
-            logging.info(
-                f">> Predicting with model {model_type} ({i}/{len(model_list)})..."
-            )
-            pred_result = self.predict(model)
-            prediction = (
-                pred_result[0] if self.mode == "predict_xyz" else pred_result[1]
-            )
-            predictions.append(prediction)
+        prediction_list, targets = [], []
 
-        return np.array(predictions)
+        for i, model in enumerate(model_list, start=1):
+            logging.info(
+                f">> Predicting with model {model.__class__.__name__.lower()} ({i}/{len(model_list)})..."
+            )
+            predictions, targets = self.predict(model)
+            prediction_list.append(predictions)
+
+        return np.array(prediction_list), targets

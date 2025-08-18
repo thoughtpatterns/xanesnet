@@ -1,17 +1,12 @@
 dataset:
   type: xanesx
-  root_path: .github/workflows/data/fe
+  root_path: .github/workflows/data/fe/processed_train
   xyz_path: .github/workflows/data/fe/xyz_train
   xanes_path: .github/workflows/data/fe/xanes_train
   params:
+    preload: True                    # Preload dataset into RAM if True; otherwise load on-the-fly
     fourier: False
     fourier_concat: False
-    augment: False
-    augment_params:
-      type: random_noise #random_combination
-      augment_mult: 5
-      normal_mean: 0
-      normal_sd: 0.1
 
 descriptors:
   - type: wacsf
@@ -43,7 +38,7 @@ hyperparams:
   model_eval : False
   seed: 2021
   loss: mse
-  loss_reg: L2 #None L1
+  loss_reg: None #None L1 L2
   loss_lambda: 0.001
 
 kfold: False
@@ -63,23 +58,10 @@ ensemble_params:
   n_ens: 3
   weight_seed: [97, 39, 22]
 
-lr_scheduler: True
+lr_scheduler: False
 scheduler_params:
   type: step
   step_size: 1
   gamma: 0.5
-
-data_augment: True
-augment_params:
-  type: random_noise
-  augment_mult: 2
-  normal_mean: 0
-  normal_sd: 0.1
-  # type: random_combination
-  # augment_mult: 5
-
-fourier_transform: False
-fourier_params:
-  concat: True
 
 standardscaler: False

@@ -13,6 +13,8 @@ PARTICULAR PURPOSE. See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with 
 this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+import dataclasses
+import io
 
 ###############################################################################
 ############################### LIBRARY IMPORTS ###############################
@@ -28,12 +30,14 @@ import numpy as np
 
 from pathlib import Path
 from ase import Atoms
-from typing import TextIO, List, Any, Dict
+from typing import TextIO, List, Any, Dict, Tuple
 from dataclasses import dataclass
 
+from torch import Tensor
 from torch.hub import load_state_dict_from_url
 
 from xanesnet.models.pre_trained import ModelInfo
+from xanesnet.utils.mode import Mode
 from xanesnet.utils.xanes import XANES
 
 
@@ -132,53 +136,53 @@ def save_models(
         yaml.dump_all([metadata], f)
 
 
-def save_predict_result(
-    path: Path, mode: str, result: dataclass, index: list, e: list, recon_flag: bool
-):
+def save_predict_result(path: Path, mode: Mode, result, dataset, recon_flag: bool):
     """
     Save prediction and reconstruction results to disk.
     """
+    energy = dataset[0].e.numpy() if dataset[0].e is not None else None
+    file_names = dataset.file_names
 
-    if mode == "predict_xanes" or mode == "predict_all":
+    if mode in [Mode.XYZ_TO_XANES, Mode.BIDIRECTIONAL]:
         # Save xanes prediction result to disk
         save_path = mkdir_output(path, "xanes_pred")
-        if e is None:
-            e = np.arange(result.xanes_pred[0].shape[1])
+        if energy is None:
+            energy = np.arange(result.xanes_pred[0].shape[1])
 
         for id_, predict_, std_ in tqdm.tqdm(
-            zip(index, result.xanes_pred[0], result.xanes_pred[1])
+            zip(file_names, result.xanes_pred[0], result.xanes_pred[1])
         ):
             with open(save_path / f"{id_}.txt", "w") as f:
-                save_xanes_mean(f, XANES(e, predict_), std_)
+                save_xanes_mean(f, XANES(energy, predict_), std_)
 
         # Save xyz reconstruction result to disk
         if recon_flag:
             save_path = mkdir_output(path, "xyz_recon")
             for id_, recon_, std_ in tqdm.tqdm(
-                zip(index, result.xyz_recon[0], result.xyz_recon[1])
+                zip(file_names, result.xyz_recon[0], result.xyz_recon[1])
             ):
                 with open(save_path / f"{id_}.txt", "w") as f:
                     save_xyz_mean(f, recon_, std_)
 
-    if mode == "predict_xyz" or mode == "predict_all":
+    if mode in [Mode.XANES_TO_XYZ, Mode.BIDIRECTIONAL]:
         # Save xyz prediction result to disk
         save_path = mkdir_output(path, "xyz_pred")
         for id_, predict_, std_ in tqdm.tqdm(
-            zip(index, result.xyz_pred[0], result.xyz_pred[1])
+            zip(file_names, result.xyz_pred[0], result.xyz_pred[1])
         ):
             with open(save_path / f"{id_}.txt", "w") as f:
                 save_xyz_mean(f, predict_, std_)
 
         # Save xanes reconstruction result to disk
         if recon_flag:
-            if e is None:
-                e = np.arange(result.xanes_recon[0].shape[1])
+            if energy is None:
+                energy = np.arange(result.xanes_recon[0].shape[1])
             save_path = mkdir_output(path, "xanes_recon")
             for id_, recon_, std_ in tqdm.tqdm(
-                zip(index, result.xanes_recon[0], result.xanes_recon[1])
+                zip(file_names, result.xanes_recon[0], result.xanes_recon[1])
             ):
                 with open(save_path / f"{id_}.txt", "w") as f:
-                    save_xanes_mean(f, XANES(e, recon_), std_)
+                    save_xanes_mean(f, XANES(energy, recon_), std_)
 
 
 def _create_descriptors_from_meta(config: Dict = None):
@@ -407,12 +411,12 @@ def save_xyz(xyz_f: TextIO, atoms: Atoms):
     return 0
 
 
-def load_xanes(xanes_f: TextIO) -> XANES:
+def load_xanes(file_path: str) -> Tuple[Tensor, Tensor]:
     """
     Load a XANES object from an FDMNES (.txt) output file
     """
-
-    xanes_f_l = xanes_f.readlines()
+    with open(file_path, "r") as f:
+        xanes_f_l = f.readlines()
 
     # pop the FDMNES header block
     for _ in range(2):
@@ -421,11 +425,37 @@ def load_xanes(xanes_f: TextIO) -> XANES:
     # pop the XANES spectrum block
     xanes_block = [xanes_f_l.pop(0).split() for _ in range(len(xanes_f_l))]
     # absorption energies
-    e = np.array([l[0] for l in xanes_block], dtype="float64")
+    e = torch.tensor([float(l[0]) for l in xanes_block], dtype=torch.float64)
     # absorption intensities
-    m = np.array([l[1] for l in xanes_block], dtype="float64")
+    m = torch.tensor([float(l[1]) for l in xanes_block], dtype=torch.float64)
 
-    return XANES(e, m)
+    return e, m
+
+
+def transform_xyz(file_path: str, descriptor_list: List) -> Tensor:
+    """
+    Encodes XYZ data using a list-append strategy.
+    """
+    feature_list = []
+
+    with open(file_path, "r") as f:
+        file_lines = f.read()
+
+    atoms_object = None
+
+    for descriptor in descriptor_list:
+        if descriptor.get_type() == "direct":
+            with io.StringIO(file_lines) as file_stream:
+                result = np.loadtxt(file_stream).flatten()
+        else:
+            if atoms_object is None:
+                with io.StringIO(file_lines) as file_stream:
+                    atoms_object = load_xyz(file_stream)
+            result = descriptor.transform(atoms_object)
+
+        feature_list.extend(result)
+
+    return torch.tensor(feature_list, dtype=torch.float64)
 
 
 def save_xanes(xanes_f: TextIO, xanes: XANES):

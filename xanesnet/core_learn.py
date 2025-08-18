@@ -21,7 +21,6 @@ import torch
 import time
 
 from datetime import timedelta
-from enum import Enum
 from pathlib import Path
 
 from sklearn.preprocessing import StandardScaler
@@ -29,6 +28,7 @@ from torch import nn
 from torchinfo import summary
 
 from xanesnet.models.pre_trained import PretrainedModels
+from xanesnet.utils.mode import Mode, get_mode
 from xanesnet.utils.switch import KernelInitSwitch, BiasInitSwitch
 from xanesnet.utils.io import (
     save_models,
@@ -52,45 +52,30 @@ logging.basicConfig(
 )
 
 
-class TrainingMode(Enum):
-    XYZ_TO_XANES = "train_xyz"
-    XANES_TO_XYZ = "train_xanes"
-    TRAIN_ALL = "train_all"
-
-
 def train(config, args):
     """
     Train ML model based on the provided configuration and arguments.
     """
-    try:
-        mode = TrainingMode(args.mode)
-        logging.info(f">> Training mode: {mode.value}")
-    except ValueError:
-        raise ValueError(f"'{args.mode}' is not a valid training mode.")
+    logging.info(f">> Training mode: {args.mode}")
+    mode = get_mode(args.mode)
 
     # Setup descriptors from inputscript or pretrained model
     descriptor_list = _setup_descriptors(config)
 
     # Load, encode, and preprocess data
-    dataset = _setup_datasets(config, descriptor_list)
-
-    # Assign dataset items to training features X and labels y
-    X, y = _setup_X_y(config, mode, dataset)
-
-    # Print dataset summary
-    _dataset_summary(config, X, y)
+    dataset = _setup_datasets(config, mode, descriptor_list)
 
     # Setup model from inputscript or pretrained model
-    model = _setup_model(config, X, y, mode)
+    model = _setup_model(config, dataset)
 
     # Setup training scheme
-    scheme = _setup_scheme(config, args, model, X, y)
+    scheme = _setup_scheme(config, args, model, dataset)
 
     # Run model training
     model_list, scheme_type, train_time = _train_models(config, scheme)
 
     # Print trained model summary
-    _model_summary(config, model_list[0], X, y)
+    _summary_model(model_list[0], dataset)
 
     # Print training time
     logging.info(f"Training completed in {str(timedelta(seconds=int(train_time)))}")
@@ -125,7 +110,7 @@ def _setup_descriptors(config):
     return descriptor_list
 
 
-def _setup_datasets(config, descriptor_list):
+def _setup_datasets(config, mode, descriptor_list):
     dataset_type = config["dataset"]["type"]
 
     logging.info(f">> Initialising training datasets: {dataset_type}")
@@ -134,35 +119,23 @@ def _setup_datasets(config, descriptor_list):
         "root": config["dataset"]["root_path"],
         "xyz_path": config["dataset"]["xyz_path"],
         "xanes_path": config["dataset"]["xanes_path"],
+        "mode": mode,
         "descriptors": descriptor_list,
         "shuffle": True,
         **config["dataset"].get("params", {}),
     }
 
     dataset = create_dataset(dataset_type, **kwargs)
+
+    # Log dataset summary
+    logging.info(
+        f">> Dataset Summary: # of samples = {len(dataset)}, feature(X) size = {dataset.x_size}, label(y) size = {dataset.y_size}"
+    )
+
     return dataset
 
 
-def _setup_X_y(config, mode: TrainingMode, dataset):
-    logging.info(f">> Setting X and y datasets ...")
-
-    X = y = None
-    if mode in [TrainingMode.XYZ_TO_XANES, TrainingMode.TRAIN_ALL]:
-        logging.info(f">> X = XYZ dataset, Y = Xanes dataset")
-        X, y = dataset.xyz_data, dataset.xanes_data
-
-    elif mode == TrainingMode.XANES_TO_XYZ:
-        logging.info(f">> X = Xanes dataset, Y = XYZ dataset")
-        X, y = dataset.xanes_data, dataset.xyz_data
-
-    if config.get("standardscaler"):
-        logging.info(">> Applying standard scaler to X...")
-        X = StandardScaler().fit_transform(X)
-
-    return X, y
-
-
-def _setup_model(config, X, y, mode: TrainingMode):
+def _setup_model(config, dataset):
     """Initialises or loads the model and its descriptors."""
     model_type = config["model"]["type"]
 
@@ -175,13 +148,8 @@ def _setup_model(config, X, y, mode: TrainingMode):
         model_params = config["model"].get("params", {})
 
         # Add additional model parameters
-        if model_type.lower() == "gnn":
-            model_params["in_size"] = X[0].x.shape[1]
-            model_params["out_size"] = X[0].y.shape[0]
-            model_params["mlp_feat_size"] = X[0].graph_attr.shape[0]
-        else:
-            model_params["in_size"] = X.shape[1]
-            model_params["out_size"] = y.shape[1]
+        model_params["in_size"] = dataset.x_size
+        model_params["out_size"] = dataset.y_size
 
         model = create_model(model_type, **model_params)
 
@@ -223,7 +191,7 @@ def _init_model_weights(model, **kwargs):
     return model
 
 
-def _setup_scheme(config, args, model, X, y):
+def _setup_scheme(config, args, model, dataset):
     model_type = config["model"].get("type")
 
     logging.info(">> Initialising training scheme")
@@ -240,7 +208,7 @@ def _setup_scheme(config, args, model, X, y):
         "tensorboard": args.tensorboard,
     }
 
-    scheme = create_learn_scheme(model_type, model, X=X, y=y, **kwargs)
+    scheme = create_learn_scheme(model_type, model, dataset, **kwargs)
 
     return scheme
 
@@ -270,38 +238,17 @@ def _train_models(config, scheme):
     return model_list, scheme_type, train_time
 
 
-def _dataset_summary(config, X, y):
-    # Print dataset summary
-    model_type = config["model"]["type"]
-    if model_type.lower() == "gnn":
-        logging.info(
-            f">> Graph dataset (samples: {len(X)}, "
-            f"node features: {X[0].x.shape[1]}, "
-            f"edge features: {X[0].edge_attr.shape[1]}, "
-            f"graph features: {X[0].graph_attr.shape[0]})"
-        )
-    else:
-        logging.info(f">> XYZ dataset: samples = {X.shape[0]}, features = {X.shape[1]}")
-        logging.info(
-            f">> XANES dataset: samples = {y.shape[0]}, features = {y.shape[1]}"
-        )
-
-
-def _model_summary(config, model, X, y):
+def _summary_model(model, dataset):
     logging.info("\n--- Model Summary ---")
-    model_type = config["model"].get("type")
 
-    if model_type.lower() == "aegan_mlp":
-        X_dim = X.shape[1]
-        y_dim = y.shape[1]
-        dummy_x = torch.randn(1, X_dim)
-        dummy_y = torch.randn(1, y_dim)
+    if model.aegan_flag:
+        dummy_x = torch.randn(1, dataset.x_size)
+        dummy_y = torch.randn(1, dataset.y_size)
         input_data = (dummy_x, dummy_y)
-    elif model_type.lower() == "gnn":
+    elif model.batch_flag:
         input_data = None
     else:
-        X_dim = X.shape[1]
-        dummy_x = torch.randn(1, X_dim)
+        dummy_x = torch.randn(1, dataset.x_size)
         input_data = dummy_x
 
     summary(model, input_data=input_data)

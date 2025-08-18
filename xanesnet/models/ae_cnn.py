@@ -60,11 +60,11 @@ class AE_CNN(Model):
             stride (int): Stride for convolution and upsampling.
         """
         super().__init__()
+        self.ae_flag = 1
 
         # Save model configuration
         self.register_config(locals(), type="ae_cnn")
 
-        self.ae_flag = 1
         act_fn = ActivationSwitch().get(activation)
 
         # Start collecting shape of convolutional layers for calculating padding

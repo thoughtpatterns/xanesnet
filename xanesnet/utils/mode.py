@@ -14,33 +14,18 @@ You should have received a copy of the GNU General Public License along with
 this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-import numpy as np
+
+from enum import Enum
 
 
-def fft(x, concat):
-    """
-    Transform xanes spectra using Fourier
-    """
-
-    y = np.hstack((x, x[::-1]))
-    f = np.fft.fft(y)
-    z = f.real
-
-    # Combine features
-    if concat:
-        z = np.concatenate((x, z))
-
-    return z
+class Mode(Enum):
+    XYZ_TO_XANES = ["train_xyz", "predict_xanes"]
+    XANES_TO_XYZ = ["train_xanes", "predict_xyz"]
+    BIDIRECTIONAL = ["train_all", "predict_all"]
 
 
-def inverse_fft(z, concat):
-    """
-    Get inverse of fourier transformed data
-    """
-    # Decompose features
-    if concat:
-        z = z[z.size // 3 :]
-
-    iz = np.fft.ifft(z).real[: z.size // 2]
-
-    return iz
+def get_mode(mode_str: str) -> Mode:
+    for mode in Mode:
+        if mode_str in mode.value:
+            return mode
+    raise ValueError(f"'{mode_str}' is not a valid mode.")

@@ -1,25 +1,20 @@
 dataset:
   type: xanesx
-  root_path: data/fe
+  root_path: data/fe/processed_train
   xyz_path: data/fe/xyz_train
   xanes_path: data/fe/xanes_train
-  params:
-    fourier: False
-    fourier_concat: False
-    augment: False
-    augment_params:
-      type: random_noise #random_combination
-      augment_mult: 5
-      normal_mean: 0
-      normal_sd: 0.1
+#  params:
+#    preload: True                    # Preload dataset into RAM if True; otherwise load on-the-fly
+#    fourier: False
+#    fourier_concat: False
 
 descriptors:
   - type: wacsf
-    params:
-      r_min: 1.0
-      r_max: 6.0
-      n_g2: 16
-      n_g4: 32
+#    params:
+#      r_min: 1.0
+#      r_max: 6.0
+#      n_g2: 16
+#      n_g4: 32
 
 model:
   type: ae_mlp
@@ -37,7 +32,7 @@ model:
 hyperparams:
   batch_size: 32
   lr: 0.001
-  epochs: 10
+  epochs: 100
   optimizer: Adam
   model_eval : False
   seed: 2021
@@ -51,7 +46,7 @@ kfold_params:
   n_repeats: 1
   seed: 2021
 
-bootstrap: True
+bootstrap: False
 bootstrap_params:
   n_boot: 3
   n_size: 1.0

@@ -59,11 +59,11 @@ class MLP(Model):
         """
 
         super().__init__()
+        self.nn_flag = 1
 
         # Save model configuration
         self.register_config(locals(), type="mlp")
 
-        self.nn_flag = 1
         act_fn = ActivationSwitch().get(activation)
         layers = []
 

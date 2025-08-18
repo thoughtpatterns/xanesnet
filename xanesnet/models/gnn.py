@@ -18,7 +18,7 @@ import inspect
 import torch
 import torch_geometric.nn as geom_nn
 
-from typing import Optional
+from typing import Optional, List
 from torch import nn
 
 from xanesnet.models.base_model import Model
@@ -34,7 +34,7 @@ gnn_layer_by_name = {
 
 
 @register_model("gnn")
-@register_scheme("gnn", scheme_name="gnn")
+@register_scheme("gnn", scheme_name="nn")
 class GNN(Model):
     """
     A class for constructing a customisable GNN (Graph Neural Network) model.
@@ -42,9 +42,8 @@ class GNN(Model):
 
     def __init__(
         self,
-        in_size: int,
+        in_size: List[int],
         out_size: int,
-        mlp_feat_size: int,
         layer_name: str = "GATv2",
         layer_params: Optional[dict] = None,
         hidden_size: int = 512,
@@ -55,10 +54,8 @@ class GNN(Model):
     ):
         """
         Args:
-            in_size (integer): Input size
+            in_size (List[int]): List of input size integers
             out_size (integer): Output size
-            mlp_feat_size (integer): Size of features added to the MLP layers.
-                This should be the sum of feature sizes from all descriptors
             layer_name (string): Name of GNN layer (GAT, GATv2, GCN, GraphConv)
             layer_params (dict): parameters pass to GNN layers
             hidden_size (integer): Size of the hidden layer.
@@ -70,9 +67,16 @@ class GNN(Model):
                 to the hidden layers.
         """
         super().__init__()
+        self.nn_flag = 1
+        self.gnn_flag = 1
+        self.batch_flag = 1
 
         # Save model configuration
         self.register_config(locals(), type="gnn")
+
+        # Two input sizes: one for the GNN part, one for the MLP part
+        gnn_feat_size = in_size[0]
+        mlp_feat_size = in_size[1]
 
         if layer_params is None:
             layer_params = {
@@ -82,7 +86,6 @@ class GNN(Model):
             }
         heads = layer_params.get("heads")
 
-        self.nn_flag = 1
         act_fn = ActivationSwitch().get(activation)
         gnn_layer = gnn_layer_by_name[layer_name]
 
@@ -90,23 +93,27 @@ class GNN(Model):
         layers = []
         for i in range(num_hidden_layers):
             layers.append(
-                gnn_layer(in_channels=in_size, out_channels=hidden_size, **layer_params)
+                gnn_layer(
+                    in_channels=gnn_feat_size, out_channels=hidden_size, **layer_params
+                )
             )
             layers.append(nn.BatchNorm1d(hidden_size * heads))
             layers.append(act_fn)
             layers.append(nn.Dropout(dropout))
 
-            in_size = hidden_size * heads
+            gnn_feat_size = hidden_size * heads
 
         # --- Output Layer ---
         layers.append(
-            gnn_layer(in_channels=in_size, out_channels=hidden_size, **layer_params)
+            gnn_layer(
+                in_channels=gnn_feat_size, out_channels=hidden_size, **layer_params
+            )
         )
 
         self.gnn_layers = nn.ModuleList(layers)
 
         # ---- MLP hidden Layers ----
-        mlp_in_size = in_size + mlp_feat_size
+        mlp_in_size = gnn_feat_size + mlp_feat_size
         num_mlp_hidden_size = mlp_in_size * 2
 
         layers = []

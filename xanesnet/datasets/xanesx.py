@@ -13,21 +13,36 @@ PARTICULAR PURPOSE. See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+
 import logging
+import os
+from dataclasses import dataclass
+
+import torch
+
 from pathlib import Path
 from typing import List, Union
+from tqdm import tqdm
 
-import numpy as np
-import torch
-from sklearn.utils import shuffle
-from torch import Tensor
-
-from xanesnet.datasets.base_dataset import BaseDataset, IndexType
+from xanesnet.core_learn import Mode
+from xanesnet.datasets.base_dataset import BaseDataset
 from xanesnet.registry import register_dataset
-from xanesnet.utils.encode import encode_xyz, encode_xanes
-from xanesnet.utils.fourier import fourier_transform
-from xanesnet.utils.io import list_filestems
-from xanesnet.utils.switch import DataAugmentSwitch
+from xanesnet.utils.fourier import fft
+from xanesnet.utils.io import list_filestems, load_xanes, transform_xyz
+
+
+@dataclass
+class Data:
+    x: torch.Tensor = None
+    y: torch.Tensor = None
+    e: torch.Tensor = None
+
+    def to(self, device):
+        # send batch do device
+        self.x = self.x.to(device) if self.x is not None else None
+        self.y = self.y.to(device) if self.y is not None else None
+
+        return self
 
 
 @register_dataset("xanesx")
@@ -37,144 +52,103 @@ class XanesXDataset(BaseDataset):
         root: str,
         xyz_path: List[str] | str | Path = None,
         xanes_path: List[str] | str | Path = None,
+        mode: Mode = None,
         descriptors: list = None,
-        shuffle: bool = False,
         **kwargs,
     ):
         # Unpack kwargs
         self.fft = kwargs.get("fourier", False)
         self.fft_concat = kwargs.get("fourier_concat", False)
-        self.augment = kwargs.get("data_augment", False)
-        self.aug_params = kwargs.get("augment_params", {})
-        self.shuffle = shuffle
 
-        # XYZXanes dataset accepts only a single path
-        if isinstance(xyz_path, List):
-            self.xyz_path = Path(xyz_path[0]) if xyz_path else None
-            if xyz_path and len(xyz_path) > 1:
-                raise ValueError("Invalid dataset: xyz_path cannot be > 1")
-        else:
-            self.xyz_path = Path(xyz_path) if xyz_path else None
-
-        if isinstance(xanes_path, List):
-            self.xanes_path = Path(xanes_path[0]) if xanes_path else None
-            if xanes_path and len(xanes_path) > 1:
-                raise ValueError("Invalid dataset: xyz_paths cannot be > 1")
-        else:
-            self.xanes_path = Path(xanes_path) if xanes_path else None
+        # dataset accepts only one path each for the XYZ and XANES datasets.
+        xyz_path = self.unique_path(xyz_path)
+        xanes_path = self.unique_path(xanes_path)
 
         BaseDataset.__init__(
-            self, root, self.xyz_path, self.xanes_path, descriptors, **kwargs
+            self, root, xyz_path, xanes_path, mode, descriptors, **kwargs
         )
 
         # Save configuration
         params = {
             "fourier": self.fft,
             "fourier_concat": self.fft_concat,
-            "data_augment": self.augment,
-            "augment_params": self.aug_params,
         }
         self.register_config(locals(), type="xanesx")
-        # Load processed data into RAM
-        self.set_datasets()
 
-    def set_datasets(self):
-        processed_dir = Path(self.processed_dir)
-        # Load structural data if the path exists
-        if self.xyz_path:
-            file_path = processed_dir / f"{self.xyz_path.name}.pt"
-            self.xyz_data = torch.load(file_path)
-
-        # Load spectral and energy data if the path exists
-        if self.xanes_path:
-            xanes_file_path = processed_dir / f"{self.xanes_path.name}.pt"
-            self.xanes_data = torch.load(xanes_file_path)
-
-            e_file_path = processed_dir / f"{self.xanes_path.name}_e.pt"
-            self.e_data = torch.load(e_file_path)
-
-    def set_index(self):
+    def set_file_names(self):
+        """
+        Get the list of valid file stems based on the
+        xyz_path and/or xanes_path. If both are given, only common stems are kept.
+        """
         xyz_path = self.xyz_path
         xanes_path = self.xanes_path
 
         if xyz_path and xanes_path:
             xyz_stems = set(list_filestems(xyz_path))
             xanes_stems = set(list_filestems(xanes_path))
-            index = sorted(list(xyz_stems & xanes_stems))
+            file_names = sorted(list(xyz_stems & xanes_stems))
         elif xyz_path:
             xyz_stems = set(list_filestems(xyz_path))
-            index = sorted(list(xyz_stems))
-        elif xyz_path:
+            file_names = sorted(list(xyz_stems))
+        elif xanes_path:
             xanes_stems = set(list_filestems(xanes_path))
-            index = sorted(list(xanes_stems))
+            file_names = sorted(list(xanes_stems))
         else:
             raise ValueError("At least one data dataset path must be provided.")
 
-        if not index:
+        if not file_names:
             raise ValueError("No matching files found in the provided paths.")
 
-        self.index = index
-
-    def processed_file_names(self) -> List[str]:
-        """A list of all processed file names."""
-        file_list = []
-
-        # Conditionally add the xyz processed file name
-        if self.xyz_path:
-            file_list.append(f"{self.xyz_path.name}.pt")
-
-        # Conditionally add the xanes processed file names
-        if self.xanes_path:
-            file_list.append(f"{self.xanes_path.name}.pt")
-            file_list.append(f"{self.xanes_path.name}_e.pt")
-
-        return file_list
-
-    def __getitem__(self, idx: Union[int, np.integer, IndexType]):
-        data = {}
-        # Dataset preloaded in RAM
-        if (
-            isinstance(idx, (int, np.integer))
-            or (isinstance(idx, Tensor) and idx.dim() == 0)
-            or (isinstance(idx, np.ndarray) and np.isscalar(idx))
-        ):
-            if self.xyz_path:
-                data["xyz"] = self.xyz_data[idx]
-            if self.xanes_path:
-                data["xanes"] = self.xanes_data[idx]
-            return data
-        else:
-            return self.index_select(idx)
+        self.file_names = file_names
 
     def process(self):
-        """Processes raw data and saves it to the processed_dir."""
-        processed_dir = Path(self.processed_dir)
-        xyz_data = xanes_data = e_data = None
+        """Processes raw XYZ and XANES file to convert them into data objects."""
+        logging.info(f"Processing {len(self.file_names)} files to data objects...")
+        for idx, stem in tqdm(enumerate(self.file_names), total=len(self.file_names)):
+            xyz = xanes = e = None
 
-        # Encode xyz data
-        if self.xyz_path:
-            xyz_data = encode_xyz(self.xyz_path, self.index, self.descriptor_list)
+            # transform xyz file into feature array
+            if self.xyz_path:
+                raw_path = os.path.join(self.xyz_path, f"{stem}.xyz")
+                xyz = transform_xyz(raw_path, self.descriptors)
 
-        # Encode xanes data
-        if self.xanes_path:
-            xanes_data, e_data = encode_xanes(self.xanes_path, self.index)
-            if self.fft:
-                logging.info(">> Transforming spectra data using Fourier transform...")
-                xanes_data = fourier_transform(xanes_data, self.fft_concat)
+            # get xanes and energy arrays
+            if self.xanes_path:
+                raw_path = os.path.join(self.xanes_path, f"{stem}.txt")
+                e, xanes = load_xanes(raw_path)
+                if self.fft:
+                    xanes = fft(xanes, self.fft_concat)
 
-        if self.shuffle:
-            xyz_data, xanes_data = shuffle(xyz_data, xanes_data)
+            if self.mode == Mode.XANES_TO_XYZ:
+                x = xanes
+                y = xyz
+            else:
+                x = xyz
+                y = xanes
 
-        if self.augment:
-            logging.info("Applying data augmentation...")
-            xyz_data, xanes_data = DataAugmentSwitch().augment(
-                xyz_data, xanes_data, **self.aug_params
-            )
+            data = Data(x=x, y=y, e=e)
 
-        # Save dataset to disk
-        if self.xyz_path:
-            torch.save(xyz_data, processed_dir / f"{self.xyz_path.name}.pt")
+            save_path = os.path.join(self.processed_dir, f"{stem}.pt")
+            torch.save(data, save_path)
 
-        if self.xanes_path:
-            torch.save(xanes_data, processed_dir / f"{self.xanes_path.name}.pt")
-            torch.save(e_data, processed_dir / f"{self.xanes_path.name}_e.pt")
+    def collate_fn(self, batch: list[Data]) -> Data:
+        """
+        Collates a list of Data objects into a single Data object  with batched tensors.
+        """
+        x_list = [sample.x for sample in batch]
+        y_list = [sample.y for sample in batch]
+
+        batched_x = torch.stack(x_list, dim=0).to(torch.float32)
+        batched_y = torch.stack(y_list, dim=0).to(torch.float32)
+
+        return Data(x=batched_x, y=batched_y)
+
+    @property
+    def x_size(self) -> Union[int, List[int]]:
+        """Size of the feature array."""
+        return len(self[0].x)
+
+    @property
+    def y_size(self) -> int:
+        """Size of the label array."""
+        return len(self[0].y)

@@ -4,6 +4,7 @@ dataset:
   xyz_path: data/graph-set/xyz_train
   xanes_path: data/graph-set/xanes_train
 #  params:
+#    preload: True
 #    n: 16
 #    r_min: 0.0
 #    r_max: 4.0
@@ -46,10 +47,10 @@ model:
 #    bias: zeros
 #    seed: 2025
 
-#hyperparams:
+hyperparams:
 #  batch_size: 5
 #  lr: 0.001
-#  epochs: 100
+  epochs: 10
 #  optim_fn: Adam
 #  seed: 2021
 #  loss: mse

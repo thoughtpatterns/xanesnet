@@ -17,6 +17,9 @@ import logging
 import numpy as np
 
 from abc import ABC, abstractmethod
+
+import torch
+import torch_geometric
 from sklearn.metrics import mean_squared_error
 
 
@@ -26,15 +29,14 @@ class Predict(ABC):
 
     """
 
-    def __init__(self, xyz_data, xanes_data, **kwargs):
-        self.xyz_data = xyz_data
-        self.xanes_data = xanes_data
+    def __init__(self, dataset, mode, **kwargs):
+        self.dataset = dataset
 
         self.mode = kwargs.get("pred_mode")
         self.pred_eval = kwargs.get("pred_eval")
         self.scaler = kwargs.get("scaler")
-        self.fourier = kwargs.get("fourier")
-        self.fourier_concat = kwargs.get("fourier_concat")
+        self.fft = kwargs.get("fourier")
+        self.fft_concat = kwargs.get("fourier_concat")
 
         self.recon_flag = 0
 
@@ -53,6 +55,24 @@ class Predict(ABC):
     @abstractmethod
     def predict_ensemble(self, model_list):
         pass
+
+    @staticmethod
+    def to_numpy(tensor):
+        return tensor.squeeze().detach().cpu().numpy()
+
+    @staticmethod
+    def _create_loader(model, dataset):
+        if model.gnn_flag:
+            dataloader_cls = torch_geometric.data.DataLoader
+        else:
+            dataloader_cls = torch.utils.data.DataLoader
+
+        return dataloader_cls(
+            dataset,
+            batch_size=1,
+            shuffle=False,
+            collate_fn=dataset.collate_fn,
+        )
 
     @staticmethod
     def print_mse(

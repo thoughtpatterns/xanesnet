@@ -27,11 +27,11 @@ from xanesnet.utils.switch import LossSwitch, LossRegSwitch
 
 
 class NNLearn(Learn):
-    def train(self, model, X, y):
+    def train(self, model, dataset):
         """
         Main training loop
         """
-        train_loader, valid_loader, eval_loader = self.setup_dataloaders(X, y)
+        train_loader, valid_loader, eval_loader = self.setup_dataloaders(dataset)
 
         optimizer, criterion, regularizer, scheduler = self.setup_components(model)
         model.to(self.device)
@@ -78,7 +78,7 @@ class NNLearn(Learn):
         """
         Performs standard training run
         """
-        model, _ = self.train(self.model, self.X, self.y)
+        model, _ = self.train(self.model, self.dataset)
 
         return self.model
 
@@ -86,7 +86,6 @@ class NNLearn(Learn):
         """
         Performs K-fold cross-validation
         """
-        X, y = self.X, self.y
         best_model = None
         best_score = float("inf")
         score_list = {"train_score": [], "test_score": []}
@@ -101,17 +100,20 @@ class NNLearn(Learn):
         criterion = LossSwitch().get(self.loss)
         regularizer = LossRegSwitch()
 
-        for i, (train_index, test_index) in enumerate(kfold_splitter.split(X, y)):
+        # indices for k-fold splits
+        indices = self.dataset.indices
+
+        for i, (train_index, test_index) in enumerate(kfold_splitter.split(indices)):
             # Deep copy model
             model = copy.deepcopy(self.model)
 
             #  Train model on the training split
-            X_train, y_train = X[train_index], y[train_index]
-            model, train_score = self.train(model, X_train, y_train)
+            train_data = self.dataset[train_index]
+            model, train_score = self.train(model, train_data)
 
             # Evaluate model on the test split
-            X_test, y_test = X[test_index], y[test_index]
-            test_loader = self._create_dataloader(X_test, y_test, shuffle=False)
+            test_data = self.dataset[test_index]
+            test_loader = self._create_loader(test_data, shuffle=False)
 
             test_score = self._run_one_epoch(
                 "valid", test_loader, model, criterion, regularizer
@@ -149,15 +151,21 @@ class NNLearn(Learn):
         device = self.device
 
         with torch.set_grad_enabled(is_train):
-            for inputs, labels in loader:
-                inputs, labels = inputs.to(device).float(), labels.to(device).float()
+            for batch in loader:
+                batch.to(device)
 
                 # Zero the parameter gradients only during training
                 if is_train:
                     optimizer.zero_grad()
 
-                predict = model(inputs)
-                loss = criterion(predict, labels).mean()
+                # Pass X or batch object to model
+                input_data = batch if model.batch_flag else batch.x
+                predict = model(input_data)
+
+                if model.gnn_flag:
+                    predict = torch.flatten(predict)
+
+                loss = criterion(predict, batch.y.float())
 
                 # Add regularization loss
                 loss_reg = regularizer.loss(model, self.loss_reg, device)
