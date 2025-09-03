@@ -36,9 +36,6 @@ def read_config(path: Path) -> Config:
     with path.open() as f:
         config = safe_load(f)
     return Config(**{k: root / v for k, v in config.items()})
-        # root / config["fdmnes"],
-        # root / config["xanesnet"],
-        # root / config["output"],
 
 
 def read_xanes(path: Path) -> Spectrum:
