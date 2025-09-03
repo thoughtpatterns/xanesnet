@@ -1,8 +1,8 @@
 dataset:
   type: graph
-  root_path: data/co_cl2_en2/cis/0.25_0.17_1/aggregate
-  xyz_path: data/co_cl2_en2/cis/0.25_0.17_1/aggregate/xyz
-  xanes_path: data/co_cl2_en2/cis/0.25_0.17_1/aggregate/conv
+  root_path: data/modes/cocl2en2/cis/0.25_0.17_1/aggregate
+  xyz_path: data/modes/cocl2en2/cis/0.25_0.17_1/aggregate/xyz
+  xanes_path: data/modes/cocl2en2/cis/0.25_0.17_1/aggregate/conv
 
 descriptors:
   - type: wacsf
