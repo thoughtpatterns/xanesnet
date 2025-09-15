@@ -38,8 +38,8 @@ class GraphDataset(BaseDataset):
     def __init__(
         self,
         root: str,
-        xyz_path: List[str] | str | Path = None,
-        xanes_path: List[str] | str | Path = None,
+        xyz_path: List[str] | str = None,
+        xanes_path: List[str] | str = None,
         mode: Mode = None,
         descriptors: list = None,
         **kwargs,
@@ -56,7 +56,7 @@ class GraphDataset(BaseDataset):
         xanes_path = self.unique_path(xanes_path)
 
         BaseDataset.__init__(
-            self, root, xyz_path, xanes_path, mode, descriptors, **kwargs
+            self, Path(root), xyz_path, xanes_path, mode, descriptors, **kwargs
         )
 
         # Save configuration
@@ -86,6 +86,11 @@ class GraphDataset(BaseDataset):
             raise ValueError("No matching files found in xyz_path and xanes_path.")
 
         self.file_names = file_names
+
+    def collate_fn(self, batch):
+        """Custom collate function to handle a list of Data objects."""
+        # This will be handle in torch_geometric.data.DataLoader
+        return None
 
     @property
     def x_size(self) -> Union[int, List[int]]:

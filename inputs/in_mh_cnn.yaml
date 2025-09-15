@@ -1,8 +1,14 @@
 dataset:
-  type: xanesx
-  root_path: data/fe
-  xyz_path: data/fe/xyz_train
-  xanes_path: data/fe/xanes_train
+  type: multihead
+  root_path: data/multihead/processed_train  # Path to save processed dataset
+  xyz_path:
+    - data/multihead/xyz1_train         # Path to the directory containing .XYZ files
+    - data/multihead/xyz2_train
+    - data/multihead/xyz3_train
+  xanes_path:
+    - data/multihead/xanes1_train     # Path to the directory containing XANES files
+    - data/multihead/xanes2_train
+    - data/multihead/xanes3_train
 #  params:
 #    preload: True                    # Preload dataset into RAM if True; otherwise load on-the-fly
 #    fourier: False
@@ -16,9 +22,8 @@ descriptors:
       n_g2: 16
       n_g4: 32
 
-#CNN
 model:
-  type: ae_cnn
+  type: mh_cnn
   params:
     hidden_size: 64
     dropout: 0.2
@@ -28,14 +33,17 @@ model:
     channel_mul: 2
     kernel_size: 3
     stride: 1
+    head_hidden_size: 512
+    head_num_hidden_layers: 2
+    head_shrink_rate: 1.0
   weights:
     kernel: xavier_uniform
     bias: zeros
     seed: 2025
 
 hyperparams:
-  batch_size: 32
-  lr: 0.0001
+  batch_size: 4
+  lr: 0.001
   epochs: 100
   optim_fn: Adam
   model_eval : False
@@ -48,7 +56,7 @@ kfold: False
 kfold_params:
   n_splits: 3
   n_repeats: 1
-  seed: 2022
+  seed: 2021
 
 bootstrap: False
 bootstrap_params:

@@ -78,6 +78,7 @@ def register_scheme(model_name, scheme_name):
                 NNEval,
                 NNLearn,
                 NNPredict,
+                MHLearn,
             )
 
             SCHEME_REGISTRY.update(
@@ -97,6 +98,7 @@ def register_scheme(model_name, scheme_name):
                         "predict": AEGANPredict,
                         "eval": AEGANEval,
                     },
+                    "mh": {"learn": MHLearn, "predict": None, "eval": None},
                 },
             )
 

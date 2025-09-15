@@ -3,15 +3,10 @@ dataset:
   root_path: data/fe
   xyz_path: data/fe/xyz_train
   xanes_path: data/fe/xanes_train
-  params:
-    fourier: False
-    fourier_concat: False
-    augment: False
-    augment_params:
-      type: random_noise #random_combination
-      augment_mult: 5
-      normal_mean: 0
-      normal_sd: 0.1
+#  params:
+#    preload: True                    # Preload dataset into RAM if True; otherwise load on-the-fly
+#    fourier: False
+#    fourier_concat: False
 
 descriptors:
   - type: pdos

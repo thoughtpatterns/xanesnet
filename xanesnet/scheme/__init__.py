@@ -13,3 +13,5 @@ from .aegan_predict import AEGANPredict
 from .base_learn import Learn
 from .base_eval import Eval
 from .base_predict import Predict
+
+from .mh_learn import MHLearn

@@ -43,16 +43,16 @@ class BaseDataset(Dataset):
 
     def __init__(
         self,
-        root: str | Path,
-        xyz_path: List[str] | str | Path = None,
-        xanes_path: List[str] | str | Path = None,
+        root: Path,
+        xyz_path: List[Path] | Path = None,
+        xanes_path: List[Path] | Path = None,
         mode: Mode = None,
         descriptors: List = None,
         **kwargs,
     ):
         super().__init__()
 
-        self.root = Path(root)
+        self.root = root
         self.xyz_path = xyz_path
         self.xanes_path = xanes_path
         self.mode = mode
@@ -74,19 +74,19 @@ class BaseDataset(Dataset):
         """Processes the dataset and save to the self.processed_dir folder."""
         raise NotImplementedError
 
+    def collate_fn(self, batch):
+        """Custom collate function to handle a list of Data objects."""
+        raise NotImplementedError
+
     @property
     def x_size(self) -> Union[int, List[int]]:
         """Size of the feature array."""
         raise NotImplementedError
 
     @property
-    def y_size(self) -> int:
+    def y_size(self) -> Union[int, List[int]]:
         """Size of the label array."""
         raise NotImplementedError
-
-    def collate_fn(self, batch):
-        """Custom collate function to handle a list of Data objects."""
-        return None
 
     @property
     def indices(self) -> Sequence:
@@ -155,6 +155,11 @@ class BaseDataset(Dataset):
             path = path[0] if path else None
 
         return Path(path) if path is not None else None
+
+    def list_path(self, path) -> List[Path]:
+        if isinstance(path, list):
+            return [Path(x) for x in path] if path else None
+        return [path] if path is not None else None
 
     def index_select(self, idx: IndexType) -> "BaseDataset":
         """Creates a subset of the dataset from specified indices.

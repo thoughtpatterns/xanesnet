@@ -43,6 +43,7 @@ class ActivationSwitch:
         "elu": nn.ELU,
         "leakyrelu": nn.LeakyReLU,
         "selu": nn.SELU,
+        "silu": nn.SiLU,
     }
 
     def get(self, activation_name: str, **kwargs) -> nn.Module:

@@ -121,7 +121,6 @@ def _setup_datasets(config, mode, descriptor_list):
         "xanes_path": config["dataset"]["xanes_path"],
         "mode": mode,
         "descriptors": descriptor_list,
-        "shuffle": True,
         **config["dataset"].get("params", {}),
     }
 
