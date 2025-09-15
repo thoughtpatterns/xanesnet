@@ -238,17 +238,13 @@ class Learn(ABC):
         train_loader = self._create_loader(
             dataset[train_idx], shuffle=True, drop_last=True
         )
-        valid_loader = self._create_loader(
-            dataset[valid_idx], shuffle=False, drop_last=False
-        )
-        eval_loader = (
-            self._create_loader(dataset[eval_idx], shuffle=False) if eval_idx else None
-        )
+        valid_loader = self._create_loader(dataset[valid_idx])
+        eval_loader = self._create_loader(dataset[eval_idx]) if eval_idx else None
 
         return train_loader, valid_loader, eval_loader
 
     # Helper function to create loaders
-    def _create_loader(self, dataset, shuffle: bool, drop_last: bool):
+    def _create_loader(self, dataset, shuffle: bool = False, drop_last: bool = False):
         if self.model.gnn_flag:
             dataloader_cls = torch_geometric.data.DataLoader
         else:

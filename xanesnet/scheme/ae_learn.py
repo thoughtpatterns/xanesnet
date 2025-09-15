@@ -13,6 +13,7 @@ PARTICULAR PURPOSE. See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with
 this program.  If not, see <https://www.gnu.org/licenses/>.
 """
+
 import copy
 import logging
 import torch
@@ -120,7 +121,7 @@ class AELearn(Learn):
 
             # Evaluate model on the test split
             test_data = self.dataset[test_index]
-            test_loader = self._create_loader(test_data, shuffle=False)
+            test_loader = self._create_loader(test_data)
 
             test_losses = self._run_one_epoch(
                 "valid", test_loader, model, criterion, regularizer

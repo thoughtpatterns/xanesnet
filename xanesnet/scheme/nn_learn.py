@@ -112,7 +112,7 @@ class NNLearn(Learn):
 
             # Evaluate model on the test split
             test_data = self.dataset[test_index]
-            test_loader = self._create_loader(test_data, shuffle=False)
+            test_loader = self._create_loader(test_data)
 
             test_score = self._run_one_epoch(
                 "valid", test_loader, model, criterion, regularizer
