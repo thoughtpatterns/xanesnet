@@ -85,11 +85,9 @@ def parse_args(args: list):
 ###############################################################################
 
 
-def main(args: list):
-    if len(args) == 0:
-        sys.exit()
-    else:
-        args = parse_args(args)
+def main():
+    args = sys.argv[1:]
+    args = parse_args(args)
 
     print(f">> loading JSON input @ {args.in_file}")
 
@@ -119,7 +117,7 @@ def main(args: list):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    main()
 
 ################################################################################
 ############################### PROGRAM ENDS HERE ##############################
