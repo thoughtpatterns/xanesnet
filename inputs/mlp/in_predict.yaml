@@ -1,0 +1,8 @@
+dataset:
+  root_path: data/cocl2en2/lhs/trans/0.50_clean
+  xyz_path: data/cocl2en2/lhs/trans/0.50_clean/xyz
+  xanes_path: data/cocl2en2/lhs/trans/0.50_clean/txt
+
+plot_save: True
+result_save: True
+shap: False

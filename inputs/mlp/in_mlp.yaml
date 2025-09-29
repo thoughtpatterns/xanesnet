@@ -1,0 +1,27 @@
+dataset:
+  type: xanesx
+  root_path: data/cocl2en2/lhs/trans/0.50_clean
+  xyz_path: data/cocl2en2/lhs/trans/0.50_clean/xyz
+  xanes_path: data/cocl2en2/lhs/trans/0.50_clean/txt
+
+descriptors:
+  - type: wacsf
+    params:
+      r_min: 0.0
+      r_max: 8.0
+      n_g2: 64
+      n_g4: 32
+
+model:
+  type: mlp
+
+hyperparams:
+  batch_size: 64 # Default: 32
+  lr: 0.00001 # Default: 1e-3
+  epochs: 500
+
+kfold: False
+bootstrap: False
+ensemble: False
+lr_scheduler: False
+standardscaler: False
