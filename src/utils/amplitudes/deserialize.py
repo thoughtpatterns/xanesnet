@@ -11,11 +11,11 @@
 # a threshold of 0.20 on a third 10,000, to find 615 structures, which gave 977 total
 # structures.
 
-# For each key, there are three arrays, e.g., raw[0.35] = [g2, amp, xyz], for which you
-# can view the shape of each array via `print()`, as the `__str__` method below simply
-# pretty-prints the shapes of a pickle's members, and the shape of their concatenation.
-# The concatenated matrices give a (977, 58) matrix, which can be used as a descriptor
-# for the inputs in `/data/cocl2en2/lhs/trans/0.50`.
+# For each key, there are three arrays, e.g., `raw[0.35] = [g2, amp, xyz]`, for
+# which you can view the shape of each array via `print()`, as the `__str__` method
+# below simply pretty-prints the shapes of a pickle's members, and the shape of their
+# concatenation.  The concatenated matrices give a (977, 58) matrix, which can be used
+# as a descriptor for the inputs in `/data/cocl2en2/lhs/trans/0.50`.
 
 # For the 0.75 set, there are more rows in the matrix than there are XANES files, as
 # some calculations failed. It _should_ be true that, for a file `trans_XXXXX.txt`, the
@@ -41,12 +41,15 @@ class _Threshold:
     xyz: Array
 
 
-class _Lhs:
+class Pickle:
+    """A loaded pickle file which comprises a list of normal mode thresholds."""
+
     def __init__(self, path: Path) -> None:
+        """Read a `Pickle` object from the filesystem."""
         with path.open("rb") as f:
             raw = load(f)
 
-        self.thresholds: dict[np.float64, _Threshold] = {
+        self._thresholds: dict[np.float64, _Threshold] = {
             threshold: _Threshold(g2=arrays[0], amp=arrays[1], xyz=arrays[2])
             for threshold, arrays in raw.items()
         }
@@ -60,19 +63,20 @@ class _Lhs:
                 f"  amp.shape: {array.amp.shape}",
                 f"  xyz.shape: {array.xyz.shape}",
             ]
-            for threshold, array in self.thresholds.items()
+            for threshold, array in self._thresholds.items()
         ] + [["", f"aggregate shape: {self.concat.shape}"]]
 
         return "\n".join(chain.from_iterable(result))
 
     @cached_property
     def concat(self) -> Array:
-        return np.concatenate([x.amp for x in self.thresholds.values()], axis=0)
+        """Concatenate amplitude matrices into a descriptor."""
+        return np.concatenate([x.amp for x in self._thresholds.values()], axis=0)
 
 
 if __name__ == "__main__":
-    lhs = _Lhs(Path("pickles/0.50.pk"))
+    lhs = Pickle(Path("pickles/0.50.pk"))
     print(lhs)
 
-    lhs = _Lhs(Path("pickles/0.75.pk"))
+    lhs = Pickle(Path("pickles/0.75.pk"))
     print(lhs)
