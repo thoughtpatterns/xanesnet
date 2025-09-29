@@ -41,6 +41,7 @@ xanesnet = "xanesnet.cli:main"
 requires = ["uv_build>=0.8.14,<0.9.0"]
 build-backend = "uv_build"
 module-name = [
+    "utils",
     "xanesnet",
     "xanesnet.datasets",
     "xanesnet.descriptors",
