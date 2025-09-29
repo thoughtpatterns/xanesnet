@@ -50,7 +50,7 @@ module-name = [
 ]
 
 [tool.basedpyright]
-include = ["xanesnet"]
+include = ["src"]
 typeCheckingMode = "all"
 reportAny = false
 reportUnknownArgumentType = false
