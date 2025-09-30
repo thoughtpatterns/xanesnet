@@ -54,6 +54,7 @@ module-name = [
 include = ["src"]
 typeCheckingMode = "all"
 reportAny = false
+reportExplicitAny = false
 reportUnknownArgumentType = false
 reportUnknownLambdaType = false
 reportUnknownMemberType = false
