@@ -9,7 +9,6 @@ from itertools import chain
 from pathlib import Path
 from pickle import load
 from typing import Final
-from re import compile
 
 import numpy as np
 from ase import Atoms
@@ -91,40 +90,36 @@ class _Pickle:
 # :::::::::::::::::::::::::::::::: `Amps` implementation. ::::::::::::::::::::::::::::::
 
 _name: Final = "amps"
-_re: Final = compile(r"(cis|trans)_\d{5}.txt")  # XXX: brittle --- make adaptable.
 
 
 @register_descriptor(_name)
 class Amps(BaseDescriptor):
     """Load a pre-computed `*.pk` file of normal mode amplitudes."""
 
-    def __init__(self, pickle: Path | str, xanes_path: Path | str) -> None:  # noqa: D107
+    def __init__(self, pickle: Path | str, skips: list[int] | None = None) -> None:  # noqa: D107
         super().__init__()
         self.register_config(locals(), type=_name)
 
-        pickle = Path(pickle)
-        txt = list(Path(xanes_path).glob("*.txt"))
-
-        if not all(_re.match(path.name) for path in txt):
-            msg = f"all `*.txt` files must match regex `{_re}` for descriptor `Amps`"
-            raise ValueError(msg)
-
-        to_key = lambda x: int(x.name.partition("_")[2].removesuffix(".txt"))  # noqa: E731
-        keys = [to_key(txt) for txt in txt]
-        amps = _Pickle(pickle).concat
-
-        self._amps: NDArray[np.float64] = np.array([amps[key] for key in keys])
+        self._amps: NDArray[np.float64] = _Pickle(Path(pickle)).concat
         self._index: int = 0
+        self._skips: list[int] = skips or []
+        self._test: list[int] = []
 
     @override
     def transform(self, system: Atoms) -> NDArray[np.float64]:
+        while self._index in self._skips:
+            self._index += 1
+
         aux = self._amps[self._index]
+        self._test.append(self._index)
         self._index += 1
+
         return aux
+
 
     @override
     def get_nfeatures(self) -> int:
-        return len(self._amps)
+        return self._amps.shape[1]
 
     @override
     def get_type(self) -> str:
