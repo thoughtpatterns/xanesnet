@@ -8,7 +8,8 @@ descriptors:
   - type: amps
     params:
       pickle: data/cocl2en2/lhs/trans/0.50_clean/pickle/0.50.pk
-      skips: [40, 86, 328, 727]
+      xanes_path: data/cocl2en2/lhs/trans/0.50_clean/txt
+      # skips: [40, 86, 328, 727]
 
 model:
   type: mlp
