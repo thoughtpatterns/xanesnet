@@ -134,13 +134,19 @@ class BaseDataset(Dataset):
         """
         Checks if processing is complete and runs the process() if not.
         """
-        if files_exist(self.processed_paths):
-            logging.info(
-                f">> Processed files exist in {self.processed_dir}, skipping data processing."
-            )
-        else:
-            os.makedirs(self.processed_dir, exist_ok=True)
-            self.process()
+
+        # XXX: disable cache while we implement the `Amps` descriptor.
+
+        # if files_exist(self.processed_paths):
+        #     logging.info(
+        #         f">> Processed files exist in {self.processed_dir}, skipping data processing."
+        #     )
+        # else:
+        #     os.makedirs(self.processed_dir, exist_ok=True)
+        #     self.process()
+
+        os.makedirs(self.processed_dir, exist_ok=True)
+        self.process()
 
         if self.preload:
             logging.info(">> Preloading dataset into memory...")
