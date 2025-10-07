@@ -1,7 +1,7 @@
 [project]
 name = "xanesnet"
 version = "0.1.0"
-requires-python = "==3.10.18" # Nixpkgs provides only v3.10.18.
+requires-python = ">=3.10" # Nixpkgs provides only v3.10.18.
 description = "Theoretical simulation of X-ray spectroscopy (XS)"
 license = "GPL-3.0-only"
 dependencies = [
