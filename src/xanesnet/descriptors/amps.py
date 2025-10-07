@@ -98,29 +98,20 @@ _re: Final = compile(r"(cis|trans)_\d{5}.txt")  # XXX: brittle --- make adaptabl
 class Amps(BaseDescriptor):
     """Load a pre-computed `*.pk` file of normal mode amplitudes."""
 
-    def __init__(self, pickle: Path | str, xanes_path: Path | str) -> None:  # noqa: D107
+    def __init__(self, pickle: Path) -> None:  # noqa: D107
         super().__init__()
         self.register_config(locals(), type=_name)
-
-        pickle = Path(pickle)
-        txt = list(Path(xanes_path).glob("*.txt"))
-
-        if not all(_re.match(path.name) for path in txt):
-            msg = f"all `*.txt` files must match regex `{_re}` for descriptor `Amps`"
-            raise ValueError(msg)
-
-        to_key = lambda x: int(x.name.partition("_")[2].removesuffix(".txt"))  # noqa: E731
-        keys = [to_key(txt) for txt in txt]
-        amps = _Pickle(pickle).concat
-
-        self._amps: NDArray[np.float64] = np.array([amps[key] for key in keys])
-        self._index: int = 0
+        self._pickle: Path = Path(pickle)
+        self._amps: NDArray[np.float64] = _Pickle(self._pickle).concat
 
     @override
     def transform(self, system: Atoms) -> NDArray[np.float64]:
-        aux = self._amps[self._index]
-        self._index += 1
-        return aux
+        if not (xyz_path := system.info["xyz_path"]):  # pyright: ignore[reportAttributeAccessIssue]
+            msg = '`system.info["xyz_path"]` is absent for descriptor `Amps`'
+            raise ValueError(msg)
+
+        index = int(xyz_path.partition("_")[2].removesuffix(".xyz"))
+        return self._amps[index]
 
     @override
     def get_nfeatures(self) -> int:

@@ -451,6 +451,9 @@ def transform_xyz(file_path: str, descriptor_list: List) -> Tensor:
             if atoms_object is None:
                 with io.StringIO(file_lines) as file_stream:
                     atoms_object = load_xyz(file_stream)
+
+                if descriptor.get_type() == "amps":
+                    atoms_object.info["xyz_path"] = Path(file_path).name
             result = descriptor.transform(atoms_object)
 
         feature_list.extend(result)
