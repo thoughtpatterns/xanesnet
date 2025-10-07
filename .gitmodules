@@ -1,3 +1,3 @@
 [submodule "data"]
 	path = data
-	url = git@github.com:thoughtpatterns/xanesnet-data
+	url = https://github.com/thoughtpatterns/xanesnet-data
