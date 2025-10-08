@@ -23,7 +23,8 @@ The project also depends on,
 * `gfortran`,
 * and `pkg-config`.
 
-Then, to install a virtual environment which will run the project, run
+Then, to clone the project, and to install a virtual environment which will run
+the project, run
 ```bash
 # We store structure files and FDMNES output in a submodule at `/data/`, so
 # we must supply `--recurse-submodules`.
