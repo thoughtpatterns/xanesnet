@@ -1,21 +1,13 @@
-"""Implement the main's CLI entry point."""
+"""Implement `train()`."""
 
 # ruff: noqa: B008, E501, E731, ISC003
 # pyright: reportCallInDefaultInitializer=false
 
-from copy import deepcopy
 from pathlib import Path
-from typing import Final
 
-from torch import cuda, inf, no_grad, save
-from torch.nn import MSELoss
-from torch.optim import Adam
-from torch.utils.data import DataLoader
 from typer import Option
 
-from fit.cli import cli, console
-from fit.dataset import Dataset
-from xanesnet.models.mlp import MLP as Mlp  # noqa: N811
+from fit.cli import cli
 
 
 @cli.command()
@@ -50,6 +42,18 @@ def train(  # noqa: D103
         help="path to save the trained model, as a `.pt` file",
     ),
 ) -> None:
+    from copy import deepcopy
+    from typing import Final
+
+    from torch import cuda, inf, no_grad, save
+    from torch.nn import MSELoss
+    from torch.optim import Adam
+    from torch.utils.data import DataLoader
+
+    from fit.cli import console
+    from fit.dataset import Dataset
+    from xanesnet.models.mlp import MLP as Mlp  # noqa: N811
+
     # Define non-model hyperparameters.
     batch: Final = 32
     lr: Final = 1e-4
