@@ -3287,7 +3287,7 @@ requires-dist = [
     { name = "torch-geometric", specifier = "==2.5.3" },
     { name = "torchinfo", specifier = "==1.7.1" },
     { name = "tqdm", specifier = "==4.62.3" },
-    { name = "typer", specifier = ">=0.20.0" },
+    { name = "typer", specifier = "==0.20.0" },
 ]
 
 [[package]]
