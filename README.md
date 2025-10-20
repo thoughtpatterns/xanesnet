@@ -19,9 +19,12 @@ or see
 for package manager availability.
 
 The project also depends on,
-* `cmake`,
-* `gfortran`,
-* and `pkg-config`.
+* `cmake (3.31.7)`,
+* `gfortran (14.3.0)`,
+* and `pkg-config (0.29.2)`.
+
+The program is developed with the parenthesized versions, but lower versions may
+work.
 
 Then, to clone the project, and to install a virtual environment which will run
 the project, run
@@ -51,8 +54,8 @@ To train a model, run
 ```bash
 xanesnet --mode train_xyz --in_file <input> --save
 ```
-where `<input>` is a `.yaml` file --- see `/inputs/` for examples. Models will
-be placed into `/models/`.
+where `<input>` is a `.yaml` file — see `/inputs/` for examples. Models will be
+placed into `/models/`.
 
 To test a model, run
 
@@ -66,9 +69,9 @@ directory named for the input `<model>`.
 Structure and spectrum files are placed into `/data/cocl2en2/`, and are
 separated into,
 - `lhs/`, for structures computed via Latin-hypercube sampling,
-- and `/modes/`, for structures computed via normal mode amplitude variance.
+- and `modes/`, for structures computed via normal mode amplitude variance.
 
-Each of these is further separated into `cis/` and `trans`/, then into names
+Each of these is further separated into `cis/` and `trans/`, then into names
 for each dataset, and lastly, into,
 - `xyz/`, for structure files,
 - `txt/`, for FDMNES-computed spectrum files,
@@ -77,10 +80,10 @@ for each dataset, and lastly, into,
   - or `pickle/`, which stores normal mode amplitudes for use with the `amps`
     descriptor.
 
-See the example input files in `/input`/ for how to point XANESNET to a particular
+See the example input files in `/input/` for how to point XANESNET to a particular
 dataset.
 
 ## License
 
-This project is licensed under the GPL-3.0 License --- see the LICENSE file for
+This project is licensed under the GPL-3.0 License — see the LICENSE file for
 details.
