@@ -44,7 +44,7 @@ def fit(  # noqa: D103
     from numpy import save as save_npy
     from numpy.typing import NDArray
     from scipy.optimize import minimize
-    from torch import float64, load, no_grad, tensor
+    from torch import float32, load, no_grad, tensor
     from typer import Exit
 
     from fitter.cli import console
@@ -73,9 +73,9 @@ def fit(  # noqa: D103
 
     spectrum = load_npy(spectrum_)
 
-    def objective(amplitudes: NDArray[float64]) -> float64:  # pyright: ignore[reportInvalidTypeForm]
+    def objective(amplitudes: NDArray[float32]) -> float32:  # pyright: ignore[reportInvalidTypeForm]
         """Compute the MSE between predicted and target spectra."""
-        features = tensor(amplitudes, dtype=float64).unsqueeze(0)
+        features = tensor(amplitudes, dtype=float32).unsqueeze(0)
         with no_grad():
             predicted = model(features).squeeze().numpy()
         return mean((predicted - spectrum) ** 2)

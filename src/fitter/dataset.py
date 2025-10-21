@@ -5,7 +5,7 @@ from pathlib import Path
 from numpy import load as load_npy
 from numpy.typing import NDArray
 from sklearn.model_selection import train_test_split
-from torch import Tensor, float64, tensor
+from torch import Tensor, float32, tensor
 from torch.utils.data import Dataset as VirtualDataset
 from typing_extensions import Self, override
 
@@ -15,9 +15,9 @@ Return = tuple[Tensor, Tensor]
 class Dataset(VirtualDataset[Return]):
     """Load normal mode amplitudes and spectra from two arrays."""
 
-    def __init__(self, features: NDArray[float64], targets: NDArray[float64]) -> None:  # noqa: D107  # pyright: ignore[reportInvalidTypeForm]
-        self.features: Tensor = tensor(features, dtype=float64)
-        self.targets: Tensor = tensor(targets, dtype=float64)
+    def __init__(self, features: NDArray[float32], targets: NDArray[float32]) -> None:  # noqa: D107  # pyright: ignore[reportInvalidTypeForm]
+        self.features: Tensor = tensor(features, dtype=float32)
+        self.targets: Tensor = tensor(targets, dtype=float32)
 
         if len(self.features) != len(self.targets):
             msg = f"`{len(self.features) = }` must equal `{len(self.targets) = }`"
