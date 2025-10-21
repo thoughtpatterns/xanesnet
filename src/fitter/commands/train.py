@@ -15,19 +15,19 @@ def train(  # noqa: D103, PLR0915
     modes: Path = Option(
         ...,
         "--modes",
-        help="path to a 2D `.npy` file of modes",
+        help='path to a 2D ".npy" file of modes',
         exists=True,
     ),
     spectra: Path = Option(
         ...,
         "--spectra",
-        help="path to a 2D `.npy` file of spectra",
+        help='path to a 2D ".npy" file of spectra',
         exists=True,
     ),
     output: Path = Option(
         ...,
         "--output",
-        help="path to save the trained model, as a `.pt` file",
+        help='path to save the trained model, as a ".pt" file',
     ),
 ) -> None:
     from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -111,8 +111,8 @@ def train(  # noqa: D103, PLR0915
     # :: Start train procedure. ::
 
     console.print(
-        "train procedure initialized"
-        + f", [cyan]with{'' if device == 'cuda' else 'out'}[/cyan] CUDA",
+        "train procedure started"
+        + f", [cyan]with{'' if device == 'cuda' else 'out'}[/cyan] CUDA...",
         end="\n---\n",
     )
 
@@ -154,10 +154,10 @@ def train(  # noqa: D103, PLR0915
     console.print("---")
 
     if weights:
-        save({"state": params, "weights": weights}, output)
+        save({"params": params, "weights": weights}, output)
         console.print(
             "train procedure [green]succeeded[/green]"
-            + f', with model saved to "[cyan]{output}[/cyan]"',
+            + f', with model saved to [cyan]"{output}"[/cyan]',
         )
     else:
         console.print(
