@@ -77,8 +77,10 @@ for each dataset, and lastly, into,
 - `txt/`, for FDMNES-computed spectrum files,
 - and for some sets,
   - `unconv/`, for unconvolved spectrum files,
-  - or `pickle/`, which stores normal mode amplitudes for use with the `amps`
+  - `pickle/`, which stores normal mode amplitudes for use with the `amps`
     descriptor.
+  - or `numpy/`, which stores mode amplitudes and spectra files as `.npy` files
+    for use with the `fitter` command.
 
 See the example input files in `/input/` for how to point XANESNET to a particular
 dataset.

@@ -27,7 +27,7 @@ def fit(  # noqa: D103
     output: Path = Option(
         ...,
         "--output",
-        help="path to save the output modes, as a `.npy` file",
+        help="path to save the output modes, as an `.npy` file",
     ),
     bounds_: float | None = Option(
         None,
