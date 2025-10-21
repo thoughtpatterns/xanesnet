@@ -7,33 +7,33 @@ from pathlib import Path
 
 from typer import Option
 
-from fit.cli import cli
+from fitter.cli import cli
 
 
 @cli.command()
 def train(  # noqa: D103
-    tfeatures: Path = Option(
+    tmodes: Path = Option(
         ...,
-        "--tfeatures",
-        help="path to a directory of train feature `.npy` files",
+        "--tmodes",
+        help="path to a 2D `.npy` file of modes, with which to train the model",
         exists=True,
     ),
-    ttargets: Path = Option(
+    tspectra: Path = Option(
         ...,
-        "--ttargets",
-        help="path to a directory of train target `.npy` files",
+        "--tspectra",
+        help="path to a 2D `.npy` file of spectra, with which to train the model",
         exists=True,
     ),
-    vfeatures: Path = Option(
+    vmodes: Path = Option(
         ...,
-        "--vfeatures",
-        help="path to a directory of validation feature `.npy` files",
+        "--vmodes",
+        help="path to a 2D `.npy` file of modes, with which to validate the model",
         exists=True,
     ),
-    vtargets: Path = Option(
+    vspectra: Path = Option(
         ...,
-        "--vtargets",
-        help="path to a directory of validation target `.npy` files",
+        "--vspectra",
+        help="path to a 2D `.npy` file of spectra, with which to validate the model",
         exists=True,
     ),
     output: Path = Option(
@@ -42,6 +42,8 @@ def train(  # noqa: D103
         help="path to save the trained model, as a `.pt` file",
     ),
 ) -> None:
+    # :: Import within command, to save startup time. ::
+
     from copy import deepcopy
     from typing import Final
 
@@ -50,8 +52,8 @@ def train(  # noqa: D103
     from torch.optim import Adam
     from torch.utils.data import DataLoader
 
-    from fit.cli import console
-    from fit.dataset import Dataset
+    from fitter.cli import console
+    from fitter.dataset import Dataset
     from xanesnet.models.mlp import MLP as Mlp  # noqa: N811
 
     # Define non-model hyperparameters.
@@ -61,8 +63,8 @@ def train(  # noqa: D103
 
     # Define datasets and loaders.
     loader = lambda d, s: DataLoader(d, batch_size=batch, shuffle=s)
-    tloader = loader(tdataset := Dataset(tfeatures, ttargets), s=True)
-    vloader = loader(Dataset(vfeatures, vtargets), s=False)
+    tloader = loader(tdataset := Dataset(tmodes, tspectra), s=True)
+    vloader = loader(Dataset(vmodes, vspectra), s=False)
 
     # Define other hyperparameters.
     in_size, out_size = tdataset.dimensions
@@ -76,7 +78,7 @@ def train(  # noqa: D103
         "activation": "relu",
     }
 
-    # Define and print CUDA availability.
+    # Define CUDA availability.
     device = "cuda" if cuda.is_available() else "cpu"
 
     # Define model.
@@ -106,11 +108,11 @@ def train(  # noqa: D103
 
     console.print(
         "train procedure started"
-        + ", with device '[bold cyan]{device}[/bold cyan]'...",
+        + f", with device '[cyan]{device}[/cyan]'...",
     )
 
     best_vloss = inf
-    best_weights = None
+    weights = None
 
     for epoch in range(epochs):
         # Step, and get train loss.
@@ -139,17 +141,17 @@ def train(  # noqa: D103
             continue
 
         best_vloss = mean_vloss
-        best_weights = deepcopy(model.state_dict())
-        console.print("    -> [bold green]new minimum reached[/bold green]")
+        weights = deepcopy(model.state_dict())
+        console.print("    >>> [green]new minimum reached[/green]")
 
-    if best_weights:
-        save({"model_params": params, "model_state_dict": best_weights}, output)
+    if weights:
+        save({"state": params, "weights": weights}, output)
         console.print(
-            "\n[bold green]train procedure completed[/bold green]"
-            + f", model saved to [cyan]{output}[/cyan]",
+            "\n[green]train procedure completed successfully[/green]"
+            + f", with model saved to [cyan]{output}[/cyan]",
         )
     else:
         console.print(
-            "\n[bold yellow]train procedure completed"
-            + ", but no suitable model was found to save[/bold yellow]",
+            "\n[yellow]train procedure failed"
+            + ", as no acceptable model was reached[/yellow]",
         )

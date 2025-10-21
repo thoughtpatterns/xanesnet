@@ -37,13 +37,13 @@ email = "tom.penfold@ncl.ac.uk"
 
 [project.scripts]
 xanesnet = "xanesnet.cli:main"
-fit = "fit.__main__:main"
+fitter = "fitter.__main__:main"
 
 [build-system]
 requires = ["uv_build>=0.8.14,<0.9.0"]
 build-backend = "uv_build"
 module-name = [
-    "fit",
+    "fitter",
     "xanesnet",
     "xanesnet.datasets",
     "xanesnet.descriptors",

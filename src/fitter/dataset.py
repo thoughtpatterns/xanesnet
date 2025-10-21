@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-import numpy as np
+from numpy import load as load_npy
 from torch import Tensor, float64, tensor
 from torch.utils.data import Dataset as VirtualDataset
 from typing_extensions import override
@@ -14,8 +14,8 @@ class Dataset(VirtualDataset[Return]):
     """Load normal mode amplitudes and spectra from `.npy` files."""
 
     def __init__(self, features: Path, targets: Path) -> None:  # noqa: D107
-        self.features: Tensor = tensor(np.load(features), dtype=float64)
-        self.targets: Tensor = tensor(np.load(targets), dtype=float64)
+        self.features: Tensor = tensor(load_npy(features), dtype=float64)
+        self.targets: Tensor = tensor(load_npy(targets), dtype=float64)
 
         if len(self.features) != len(self.targets):
             msg = f"`{len(self.features) = }` must equal `{len(self.targets) = }`"
