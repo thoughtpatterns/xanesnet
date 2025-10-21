@@ -11,7 +11,7 @@ from fitter.cli import cli
 
 
 @cli.command()
-def train(  # noqa: D103
+def train(  # noqa: D103, PLR0915
     modes: Path = Option(
         ...,
         "--modes",
@@ -30,19 +30,33 @@ def train(  # noqa: D103
         help="path to save the trained model, as a `.pt` file",
     ),
 ) -> None:
-    # :: Import within command, to save startup time. ::
-
-    from copy import deepcopy
-    from typing import Final
-
-    from torch import cuda, inf, no_grad, save
-    from torch.nn import MSELoss
-    from torch.optim import Adam
-    from torch.utils.data import DataLoader
+    from rich.progress import Progress, SpinnerColumn, TextColumn
 
     from fitter.cli import console
-    from fitter.dataset import Dataset
-    from xanesnet.models.mlp import MLP as Mlp  # noqa: N811
+
+    p = lambda: Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        transient=True,
+    )
+
+    # Import within the command, to save time. Print a message as we import.
+    with p() as progress:
+        _ = progress.add_task(
+            description="train procedure imports called...",
+            total=None,
+        )
+
+        from copy import deepcopy
+        from typing import Final
+
+        from torch import cuda, inf, no_grad, save
+        from torch.nn import MSELoss
+        from torch.optim import Adam
+        from torch.utils.data import DataLoader
+
+        from fitter.dataset import Dataset
+        from xanesnet.models.mlp import MLP as Mlp  # noqa: N811
 
     # Define non-model hyperparameters.
     batch: Final = 32
@@ -97,7 +111,9 @@ def train(  # noqa: D103
     # :: Start train procedure. ::
 
     console.print(
-        "train procedure started" + f", with device '[cyan]{device}[/cyan]'...",
+        "train procedure initialized"
+        + f", [cyan]with{'' if device == 'cuda' else 'out'}[/cyan] CUDA",
+        end="\n---\n",
     )
 
     best_vloss = inf
@@ -119,28 +135,32 @@ def train(  # noqa: D103
         mean_vloss = vloss / len(vloader)
 
         console.print(
-            f"epoch {epoch + 1:05d} of {epochs}"
-            + f", train loss: {mean_tloss:.6f}"
-            + f", validation loss: {mean_vloss:.6f}",
+            f"epoch {epoch + 1:0{len(str(epochs))}d} of {epochs}"
+            + f", train loss: {mean_tloss:.8f}"
+            + f", validation loss: {mean_vloss:.8f}",
+            end="",  # Leave space for an asterisk, if we've reached a new minimum.
         )
 
         # :: Update our best model & loss cache, if necessary. ::
 
         if mean_vloss >= best_vloss:
+            console.print()  # We did not print an asterisk --- simply print the newline.
             continue
 
         best_vloss = mean_vloss
         weights = deepcopy(model.state_dict())
-        console.print("    >>> [green]new minimum reached[/green]")
+        console.print(" [bold green]*[/bold green]")
+
+    console.print("---")
 
     if weights:
         save({"state": params, "weights": weights}, output)
         console.print(
-            "\n[green]train procedure completed successfully[/green]"
-            + f", with model saved to [cyan]{output}[/cyan]",
+            "train procedure [green]succeeded[/green]"
+            + f', with model saved to "[cyan]{output}[/cyan]"',
         )
     else:
         console.print(
-            "\n[yellow]train procedure failed"
-            + ", as no acceptable model was reached[/yellow]",
+            "train procedure [yellow]failed[/yellow]"
+            + ", as no acceptable model was reached",
         )
