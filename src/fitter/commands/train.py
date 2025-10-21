@@ -12,28 +12,16 @@ from fitter.cli import cli
 
 @cli.command()
 def train(  # noqa: D103
-    tmodes: Path = Option(
+    modes: Path = Option(
         ...,
-        "--tmodes",
-        help="path to a 2D `.npy` file of modes, with which to train the model",
+        "--modes",
+        help="path to a 2D `.npy` file of modes",
         exists=True,
     ),
-    tspectra: Path = Option(
+    spectra: Path = Option(
         ...,
-        "--tspectra",
-        help="path to a 2D `.npy` file of spectra, with which to train the model",
-        exists=True,
-    ),
-    vmodes: Path = Option(
-        ...,
-        "--vmodes",
-        help="path to a 2D `.npy` file of modes, with which to validate the model",
-        exists=True,
-    ),
-    vspectra: Path = Option(
-        ...,
-        "--vspectra",
-        help="path to a 2D `.npy` file of spectra, with which to validate the model",
+        "--spectra",
+        help="path to a 2D `.npy` file of spectra",
         exists=True,
     ),
     output: Path = Option(
@@ -61,10 +49,12 @@ def train(  # noqa: D103
     lr: Final = 1e-4
     epochs: Final = 512
 
-    # Define datasets and loaders.
+    # :: Define datasets and loaders. ::
     loader = lambda d, s: DataLoader(d, batch_size=batch, shuffle=s)
-    tloader = loader(tdataset := Dataset(tmodes, tspectra), s=True)
-    vloader = loader(Dataset(vmodes, vspectra), s=False)
+
+    tdataset, vdataset = Dataset.from_npy(modes, spectra)
+    tloader = loader(tdataset, s=True)
+    vloader = loader(vdataset, s=False)
 
     # Define other hyperparameters.
     in_size, out_size = tdataset.dimensions
@@ -107,8 +97,7 @@ def train(  # noqa: D103
     # :: Start train procedure. ::
 
     console.print(
-        "train procedure started"
-        + f", with device '[cyan]{device}[/cyan]'...",
+        "train procedure started" + f", with device '[cyan]{device}[/cyan]'...",
     )
 
     best_vloss = inf
